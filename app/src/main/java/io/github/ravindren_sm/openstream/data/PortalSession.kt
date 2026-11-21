@@ -36,7 +36,7 @@ sealed interface SessionStatus {
  * Nothing here is logged.
  */
 class PortalSession(
-    private val newManager: (PortalSettings) -> SessionManager = ::defaultManager,
+    private val newManager: (PortalSettings) -> SessionManager = { defaultManager(it, PortalTransport.interceptors) },
     private val executor: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "portal-session").apply { isDaemon = true } },
     private val intervalMillis: Long = SessionManager.WATCHDOG_INTERVAL_MILLIS,
 ) {
@@ -89,7 +89,7 @@ class PortalSession(
     }
 
     companion object {
-        private fun defaultManager(s: PortalSettings) =
-            SessionManager(StalkerClient(s.portalUrl, s.mac, HttpProbe(RequestPacer(), 1_000_000), StalkerIdentity.HONEST))
+        private fun defaultManager(s: PortalSettings, interceptors: List<okhttp3.Interceptor>) =
+            SessionManager(StalkerClient(s.portalUrl, s.mac, HttpProbe(RequestPacer(), 1_000_000, interceptors), StalkerIdentity.HONEST))
     }
 }

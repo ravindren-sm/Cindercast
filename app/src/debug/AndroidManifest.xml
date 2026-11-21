@@ -6,7 +6,10 @@
          adb shell am start -n io.github.ravindren_sm.openstream/.DebugPlayerActivity
        Release builds get neither. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:networkSecurityConfig="@xml/network_security_config">
+    <!-- DebugApp attaches the portal traffic logger (PortalTrafficLog) at start-up. -->
+    <application
+        android:name=".DebugApp"
+        android:networkSecurityConfig="@xml/network_security_config">
         <activity
             android:name=".DebugPlayerActivity"
             android:exported="true" />

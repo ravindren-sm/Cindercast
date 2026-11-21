@@ -1,5 +1,6 @@
 package io.github.ravindren_sm.openstream.provider
 
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
@@ -30,6 +31,15 @@ class HttpProbe internal constructor(
     /** Public entry point: always the locked-down default client (OkHttp stays internal). */
     constructor(budget: RequestGate, maxBodyBytes: Int = DEFAULT_MAX_BODY_BYTES) :
         this(budget, maxBodyBytes, defaultClient())
+
+    /**
+     * Hook for debug-only observers. [interceptors] are added as application interceptors
+     * (they see each logical call once, and the final response). They cannot change the
+     * client's TLS, redirect or retry settings, which are set in [defaultClient].
+     * Release code passes nothing; the debug logger is the only caller that passes any.
+     */
+    constructor(budget: RequestGate, maxBodyBytes: Int, interceptors: List<Interceptor>) :
+        this(budget, maxBodyBytes, defaultClient(interceptors))
 
     fun send(request: ProbeRequest): ProbeOutcome {
         budget.acquire()
@@ -101,13 +111,14 @@ class HttpProbe internal constructor(
         /** Upper bound for [sendFollowingRedirects]. */
         const val MAX_REDIRECT_HOPS = 2
 
-        internal fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
+        internal fun defaultClient(interceptors: List<Interceptor> = emptyList()): OkHttpClient = OkHttpClient.Builder()
             .retryOnConnectionFailure(false)
             .followRedirects(false)
             .followSslRedirects(false)
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)
             .callTimeout(20, TimeUnit.SECONDS)
+            .apply { interceptors.forEach { addInterceptor(it) } }
             .build()
     }
 }

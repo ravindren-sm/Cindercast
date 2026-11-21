@@ -28,10 +28,10 @@ sealed interface TestResult {
  */
 object ConnectionTester {
 
-    fun run(settings: PortalSettings): TestResult {
+    fun run(settings: PortalSettings, interceptors: List<okhttp3.Interceptor> = PortalTransport.interceptors): TestResult {
         val started = SystemClock.elapsedRealtime()
         return try {
-            val client = StalkerClient(settings.portalUrl, settings.mac, HttpProbe(RequestPacer(), 1_000_000), StalkerIdentity.HONEST)
+            val client = StalkerClient(settings.portalUrl, settings.mac, HttpProbe(RequestPacer(), 1_000_000, interceptors), StalkerIdentity.HONEST)
             val session = SessionManager(client)
             if (session.start() == SessionManager.State.READY) {
                 TestResult.Success(session.accountExpiry?.take(10), SystemClock.elapsedRealtime() - started)
