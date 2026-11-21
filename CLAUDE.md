@@ -4,8 +4,11 @@ Goal (resumed 2026-11-21): a clean, modern, open-source Stalker/MAG client for F
 free on GitHub, covering Live TV and VOD (movies and shows) without paywalls.
 Status (2026-11-21): RESUMED by the user. TiviMate 5.3.3 proved the portal accepts a
 third-party MAC-only Stalker client (user-reported: 5,100 live channels, 99,500 movies,
-27,700 shows). Step 4a done: HANDSHAKE_ACCEPTED (our client got a token). Profile, catalog and
-playback unverified; 4b-4d each need approval. Milestones: docs/MILESTONES.md. Findings: docs/PROVIDER_FINDINGS.md. Plan: docs/PHASE2_PROBE_PLAN.md
+27,700 shows). Steps 4a-4c done: HANDSHAKE_ACCEPTED, PROFILE_AUTHORIZED (status 0, MAC only),
+LIVE_CATALOG_LISTED (74 genres, 4,900 channels); 4d: LINK_CREATED; streams are HLS but the
+edge returned 403 to the probe, also with MAG headers (User-Agent ruled out). Also 403
+on the channel TiviMate plays. RESOLVED 2026-11-21: the debug player on the Fire TV plays
+live TV (PLAYBACK_VERIFIED_ON_DEVICE); the 403 is Mac-specific. Mac probing stopped. Playback unverified. Milestones: docs/MILESTONES.md. Findings: docs/PROVIDER_FINDINGS.md. Plan: docs/PHASE2_PROBE_PLAN.md
 Repo: ~/Developer/firetv-iptv (outside Google Drive). Build with ./gradlew using
 Android Studio's JBR as JAVA_HOME; wrapper pins Gradle 9.5.0 (AGP 8.x breaks on 9.6+).
 Full plan: docs/PROJECT_PLAN.md
@@ -31,7 +34,8 @@ Full plan: docs/PROJECT_PLAN.md
 8. Native macOS tools only. No Windows, WSL, or Docker.
 9. Do not deploy an APK until the user approves Phase 3 in chat.
    Exception granted 2026-11-20: the Phase 1 hello app (com.example.firetvhello)
-   may be installed. Any APK with provider or playback code still needs Phase 3 approval.
+   may be installed. Phase 3 go-ahead 2026-11-21 ("build the debug player"): debug builds
+   of the player may be installed for testing. Release builds still need user approval.
 
 10. Zero secrets in git: never commit the portal URL, MAC, tokens, or raw captured
     portal responses. Local test config lives in gitignored files (dev-config*.json,

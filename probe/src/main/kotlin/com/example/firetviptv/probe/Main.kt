@@ -46,11 +46,16 @@ private const val EXIT_NOT_AVAILABLE = 2
 /** Set from flags in main(). */
 private var identity: StalkerIdentity = StalkerIdentity.HONEST
 private var stbEmuIdle: Boolean = false
+/** --genre="..." and --channel="..." for portal-link-channel (catalog labels, not secrets). */
+private var genreArg: String? = null
+private var channelArg: String? = null
 
 fun main(args: Array<String>) {
     val command = args.firstOrNull { !it.startsWith("--") }
     val dryRun = "--dry-run" in args
     stbEmuIdle = "--stbemu-idle" in args
+    genreArg = args.firstOrNull { it.startsWith("--genre=") }?.substringAfter('=')
+    channelArg = args.firstOrNull { it.startsWith("--channel=") }?.substringAfter('=')
     identity = when (args.firstOrNull { it.startsWith("--identity=") }?.substringAfter('=')) {
         null, "honest" -> StalkerIdentity.HONEST
         "mag" -> StalkerIdentity.MAG
@@ -82,7 +87,11 @@ private val LIVE_APPROVED: Map<ProbeStep, String> = mapOf(
     ProbeStep.REACHABILITY_XTREAM to "2026-11-20",
     ProbeStep.DISCOVERY to "2026-11-20",
     ProbeStep.CAPTURE_PORTAL to "2026-11-20",   // runs DISCOVERY_PORTAL as its second part
-    ProbeStep.PORTAL_HANDSHAKE to "2026-11-21", // Step 4a only; 4b-4d not approved
+    ProbeStep.PORTAL_HANDSHAKE to "2026-11-21", // Step 4a
+    ProbeStep.PORTAL_PROFILE to "2026-11-21",   // Step 4b
+    ProbeStep.PORTAL_CHANNELS to "2026-11-21",  // Step 4c
+    ProbeStep.PORTAL_LINK to "2026-11-21",      // Step 4d (rerun with max 2 stream redirect hops approved 2026-11-21)
+    ProbeStep.PORTAL_LINK_CHANNEL to "2026-11-21", // 4d on the channel TiviMate plays (honest identity)
 )
 
 /** HTTP statuses that end Phase 2 until the user decides (plan section 10). */
@@ -135,7 +144,11 @@ private fun dryRunStep(step: ProbeStep) {
 
     val report = buildString {
         appendLine("DRY RUN: ${step.cliName} (${step.planStep}). Nothing was sent.")
-        appendLine("Requests this step would send: ${requests.size} (budget per run: 10, >= 2 s apart, no retries)")
+        if (step == ProbeStep.PORTAL_LINK_CHANNEL) appendLine("chosen genre: '${genreArg ?: "(missing)"}', channel: '${channelArg ?: "(missing)"}'")
+        val hops = if (step == ProbeStep.PORTAL_LINK || step == ProbeStep.PORTAL_LINK_CHANNEL) HttpProbe.MAX_REDIRECT_HOPS else 0
+        appendLine("Requests this step would send: ${requests.size}" +
+            (if (hops > 0) " plus up to $hops redirect hops on the stream fetch (max ${requests.size + hops})" else "") +
+            " (>= 2 s apart, no retries)")
         requests.forEachIndexed { i, r ->
             appendLine("--- request ${i + 1}")
             appendLine(r.describe(redactor))
@@ -301,9 +314,16 @@ private fun runSequential(
  * missing token, or non-zero profile status.
  */
 private fun portalStep(step: ProbeStep, secrets: Secrets, redactor: () -> Redactor, log: (String) -> Unit) {
-    val planned = ProbeRequests.forStep(step, secrets).size
+    // 4d may follow up to 2 redirects on the stream fetch only (CDN edge); each hop is a request.
+    val linkStep = step == ProbeStep.PORTAL_LINK || step == ProbeStep.PORTAL_LINK_CHANNEL
+    val streamHops = if (linkStep) HttpProbe.MAX_REDIRECT_HOPS else 0
+    if (step == ProbeStep.PORTAL_LINK_CHANNEL && (genreArg.isNullOrBlank() || channelArg.isNullOrBlank())) {
+        log("STOP: portal-link-channel needs --genre=\"...\" and --channel=\"...\". Nothing sent."); return
+    }
+    val planned = ProbeRequests.forStep(step, secrets).size + streamHops
     log("Identity: ${identity.name}${if (identity == StalkerIdentity.MAG) " (MAG headers, user-consented single retry)" else " (honest User-Agent)"}")
     log("Planned: up to $planned request(s); MAC sent as a cookie; raw bodies never printed. StbEmu confirmed idle by the user.")
+    if (step == ProbeStep.PORTAL_LINK_CHANNEL) log("Chosen genre: '$genreArg', channel name contains: '$channelArg'")
     val budget = RequestBudget(maxRequests = planned)
     val apiProbe = HttpProbe(budget, maxBodyBytes = 1_000_000)
     val client = StalkerClient(secrets.require("PORTAL_URL"), secrets.require("EMU_MAC"), apiProbe, identity)
@@ -345,19 +365,47 @@ private fun portalStep(step: ProbeStep, secrets: Secrets, redactor: () -> Redact
         return
     }
 
-    // Step 4d
-    val (page, cmd) = client.channelsPage1()
-    if (!report("get_ordered_list page 1", page)) return
-    if (cmd == null) { log("STOP: no channel cmd on page 1."); return }
+    // Step 4d: pick the channel (first by number, or the user's chosen one), then link and stream.
+    val cmd: String
+    val which: String
+    if (step == ProbeStep.PORTAL_LINK_CHANNEL) {
+        val (g, genreId) = client.findGenreId(genreArg!!)
+        if (!report("get_genres", g)) return
+        if (genreId == null) { log("STOP: genre '$genreArg' not found."); return }
+        val (page, chosenCmd, label) = client.channelInGenre(genreId, channelArg!!)
+        if (!report("get_ordered_list (genre '$genreArg', page 1)", page)) return
+        if (chosenCmd == null) { log("STOP: channel '$channelArg' not found on page 1 of that genre."); return }
+        cmd = chosenCmd; which = "chosen channel $label"
+    } else {
+        val (page, firstCmd) = client.channelsPage1()
+        if (!report("get_ordered_list page 1", page)) return
+        if (firstCmd == null) { log("STOP: no channel cmd on page 1."); return }
+        cmd = firstCmd; which = "first channel"
+    }
     val (link, url) = client.createLink(cmd)
-    if (!report("create_link (first channel)", link)) return
+    if (!report("create_link ($which)", link)) return
     if (url == null) { log("STOP: create_link returned no stream URL."); return }
     n++
-    log("--- request $n of $planned: stream GET, first 64 KB only")
+    log("--- request $n of $planned: stream GET, first 64 KB only (follows at most $streamHops redirects)")
     val streamProbe = HttpProbe(budget, maxBodyBytes = 64 * 1024)
-    val s = streamProbe.send(ProbeRequest("GET", url, mapOf("User-Agent" to identity.userAgent), "Step 4d stream format check"))
-    log(s.describe(redactor(), includeBody = false))
-    if (s is ProbeOutcome.Response) log("  stream format: ${StalkerClient.streamSignature(s.bodyPrefix)}")
+    val hops = streamProbe.sendFollowingRedirects(
+        ProbeRequest("GET", url, mapOf("User-Agent" to identity.userAgent), "Step 4d stream format check"), streamHops,
+    )
+    hops.forEachIndexed { i, o ->
+        if (i > 0) { n++; log("--- request $n of $planned: redirect hop $i") }
+        log(o.describe(redactor(), includeBody = false))
+        if (i > 0) {
+            // Whether the hop changed host, without printing either host.
+            val prev = java.net.URI(hops[i - 1].request.url).let { it.host ?: it.rawAuthority }
+            val cur = java.net.URI(o.request.url).let { it.host ?: it.rawAuthority }
+            log("  same host as previous hop: ${if (prev.equals(cur, ignoreCase = true)) "yes" else "no"}")
+        }
+    }
+    val final = hops.last()
+    if (final is ProbeOutcome.Response) {
+        log("  final status: ${final.status}; stream format: ${StalkerClient.streamSignature(final.bodyPrefix)}")
+        if (final.status in 300..399) log("  still a redirect after $streamHops hops: format unverified")
+    }
     log("--- Step 4d complete. Check StbEmu on the TV.")
 }
 

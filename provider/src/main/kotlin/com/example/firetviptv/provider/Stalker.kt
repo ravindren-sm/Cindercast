@@ -9,7 +9,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import java.net.URI
 import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 import java.time.ZoneId
 
 /*
@@ -59,6 +58,11 @@ object StalkerRequests {
     fun channelsPage1(ctx: Context) = build(ctx, "Step 4c: first page of live channels and the total count",
         "type" to "itv", "action" to "get_ordered_list", "genre" to "*", "fav" to "0", "sortby" to "number", "p" to "1")
 
+    /** One page of live channels in a single genre (by genre id from get_genres). */
+    fun channelsInGenre(ctx: Context, genreId: String, page: Int = 1) = build(ctx,
+        "Step 4d (chosen channel): channels in one genre, page $page",
+        "type" to "itv", "action" to "get_ordered_list", "genre" to genreId, "fav" to "0", "sortby" to "number", "p" to page.toString())
+
     fun createLink(ctx: Context, cmd: String) = build(ctx, "Step 4d: create_link (turns a channel's cmd into a stream URL)",
         "type" to "itv", "action" to "create_link", "cmd" to cmd, "series" to "", "forced_storage" to "0",
         "disable_ad" to "0", "download" to "0")
@@ -85,7 +89,7 @@ object StalkerRequests {
         return ProbeRequest("GET", "${apiUrl(ctx.portalUrl)}?$query", headers, purpose)
     }
 
-    private fun enc(v: String) = URLEncoder.encode(v, StandardCharsets.UTF_8)
+    private fun enc(v: String) = URLEncoder.encode(v, "UTF-8") /* String overload: Android 11 lacks the Charset one */
 }
 
 /**
@@ -120,7 +124,9 @@ class StalkerClient(
         val t = (js as? JsonObject)?.str("token")
         token = t?.takeIf { it.isNotEmpty() }
         // Presence only: no length, hash, or any other property of the token is reported.
-        listOf("token issued: ${if (token != null) "yes" else "no"}") + keysLine(js)
+        // not_valid is a 0/1 portal flag (not identifying), shown to help diagnose get_profile.
+        val notValid = (js as? JsonObject)?.get("not_valid")?.let { "not_valid: ${shortValue(it)}" }
+        listOfNotNull("token issued: ${if (token != null) "yes" else "no"}", notValid) + keysLine(js)
     }
 
     fun profile(): StalkerResult = call(StalkerRequests.profile(ctx())) { js ->
@@ -136,6 +142,42 @@ class StalkerClient(
         val arr = js as? JsonArray
         val titles = arr?.mapNotNull { (it as? JsonObject)?.str("title") }.orEmpty()
         listOf("genres: ${arr?.size ?: "?"}", "first titles: ${titles.take(12).joinToString(" | ")}")
+    }
+
+    /**
+     * get_genres, then the id of the genre whose title equals [title] (case-insensitive).
+     * Genre titles are catalog labels, not identifying data.
+     */
+    fun findGenreId(title: String): Pair<StalkerResult, String?> {
+        var id: String? = null
+        val r = call(StalkerRequests.genres(ctx())) { js ->
+            val items = (js as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+            id = items.firstOrNull { it.str("title")?.trim().equals(title.trim(), ignoreCase = true) }?.str("id")
+            listOf("genres: ${items.size}", "requested genre '$title': ${if (id != null) "found" else "not found"}")
+        }
+        return r to id
+    }
+
+    /**
+     * Page 1 of genre [genreId]; picks the first channel whose name contains [nameContains]
+     * (case-insensitive). Returns the result, that channel's cmd, and "number name" for the log.
+     */
+    fun channelInGenre(genreId: String, nameContains: String): Triple<StalkerResult, String?, String?> {
+        var cmd: String? = null
+        var label: String? = null
+        val r = call(StalkerRequests.channelsInGenre(ctx(), genreId)) { js ->
+            val o = js as? JsonObject
+            val items = (o?.get("data") as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+            val hit = items.firstOrNull { it.str("name")?.contains(nameContains.trim(), ignoreCase = true) == true }
+            cmd = hit?.str("cmd")?.takeIf { it.isNotBlank() }
+            label = hit?.let { "${it.str("number") ?: "?"} ${it.str("name") ?: "?"}" }
+            listOf(
+                "channels in genre: ${o?.get("total_items")?.let(::shortValue) ?: "?"} (page 1 shows ${items.size})",
+                "requested channel '$nameContains': ${label?.let { "found ($it)" } ?: "not found on page 1"}",
+                "cmd shape: ${cmd?.let(::cmdShape) ?: "-"}",
+            )
+        }
+        return Triple(r, cmd, label)
     }
 
     /** Returns the first channel's cmd through [firstCmd] for create_link. */
@@ -163,7 +205,12 @@ class StalkerClient(
         val r = call(StalkerRequests.createLink(ctx(), cmd)) { js ->
             val linkCmd = (js as? JsonObject)?.str("cmd")
             url = linkCmd?.let(::streamUrlFromCmd)
-            listOf("link returned: ${if (url != null) "yes, shape ${cmdShape(linkCmd!!)}" else "no"}") + keysLine(js)
+            // error is a short portal status string (for example "" or "nothing_to_play"); not identifying.
+            val error = (js as? JsonObject)?.str("error")
+            listOfNotNull(
+                "link returned: ${if (url != null) "yes, shape ${cmdShape(linkCmd!!)}" else "no"}",
+                error?.let { "error: '${it.take(60)}'" },
+            ) + keysLine(js)
         }
         return r to url
     }
@@ -192,12 +239,21 @@ class StalkerClient(
             val prefix = cmd.trim().substringBefore(' ', "").takeIf { cmd.trim().contains(' ') } ?: "-"
             val url = streamUrlFromCmd(cmd) ?: return "$prefix (no URL)"
             val u = try { URI(url) } catch (_: Exception) { null }
-            val hostKind = when (u?.host?.lowercase()) {
-                null -> "?"
-                "localhost", "127.0.0.1" -> "localhost (needs create_link)"
+            // URI.host is null for names it rejects (for example with underscores); fall back
+            // to the raw authority so the kind can still be classified. Never printed itself.
+            val host = (u?.host ?: u?.rawAuthority?.substringAfterLast('@')?.substringBefore(':'))?.lowercase()
+            val hostKind = when {
+                host == null -> "unparsed host"
+                host == "localhost" || host == "127.0.0.1" -> "localhost (needs create_link)"
+                Regex("^\\d{1,3}(\\.\\d{1,3}){3}$").matches(host) -> "remote IP address"
+                u?.host == null -> "remote host (non-standard name)"
                 else -> "remote host"
             }
-            return "$prefix ${u?.scheme ?: "?"} $hostKind"
+            // Non-standard host names also lose their port in URI; take it from the raw authority.
+            val portNum = u?.port?.takeIf { it >= 0 }
+                ?: u?.rawAuthority?.substringAfterLast(':', "")?.toIntOrNull()
+            val port = portNum?.let { " port $it" } ?: ""
+            return "$prefix ${u?.scheme ?: url.substringBefore("://")} $hostKind$port"
         }
 
         /** Identifies a stream from its first bytes: MPEG-TS sync pattern, HLS playlist, or unknown. */

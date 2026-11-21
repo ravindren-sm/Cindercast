@@ -37,7 +37,7 @@ class HttpProbe internal constructor(
         request.headers.forEach { (name, value) -> builder.header(name, value) }
         return try {
             client.newCall(builder.build()).execute().use { response ->
-                val body = response.body?.byteStream()?.use { it.readNBytes(maxBodyBytes) } ?: ByteArray(0)
+                val body = response.body?.byteStream()?.use { readUpTo(it, maxBodyBytes) } ?: ByteArray(0)
                 val tls = response.handshake?.let { hs ->
                     val leaf = hs.peerCertificates.firstOrNull() as? X509Certificate
                     TlsInfo(
@@ -61,8 +61,45 @@ class HttpProbe internal constructor(
         }
     }
 
+    /**
+     * Sends [request] and follows at most [maxHops] redirects by hand. Each hop is a new
+     * request through [send], so it takes its own budget slot and is returned in the list
+     * (first outcome first). Used only for stream fetches, where CDNs redirect to an edge
+     * server; API calls keep using [send], which never follows redirects.
+     * Stops early at a non-redirect, a failure, a missing Location, or a non-http(s) target.
+     */
+    fun sendFollowingRedirects(request: ProbeRequest, maxHops: Int): List<ProbeOutcome> {
+        require(maxHops in 0..MAX_REDIRECT_HOPS) { "maxHops must be 0..$MAX_REDIRECT_HOPS" }
+        val outcomes = mutableListOf(send(request))
+        var hops = 0
+        while (hops < maxHops) {
+            val last = outcomes.last() as? ProbeOutcome.Response ?: break
+            if (last.status !in 300..399) break
+            val location = last.header("Location")?.trim()?.takeIf { it.isNotEmpty() } ?: break
+            val next = try { java.net.URI(last.request.url).resolve(location) } catch (_: Exception) { break }
+            if (next.scheme?.lowercase() !in setOf("http", "https")) break
+            hops++
+            outcomes += send(last.request.copy(url = next.toString(), purpose = "redirect hop $hops of ${last.request.purpose}"))
+        }
+        return outcomes
+    }
+
     companion object {
+        /** Reads at most [max] bytes. Hand-written: InputStream.readNBytes needs Android 13+. */
+        internal fun readUpTo(input: java.io.InputStream, max: Int): ByteArray {
+            val out = java.io.ByteArrayOutputStream(minOf(max, 8192))
+            val buf = ByteArray(8192)
+            while (out.size() < max) {
+                val n = input.read(buf, 0, minOf(buf.size, max - out.size()))
+                if (n < 0) break
+                out.write(buf, 0, n)
+            }
+            return out.toByteArray()
+        }
+
         const val DEFAULT_MAX_BODY_BYTES = 4096
+        /** Upper bound for [sendFollowingRedirects]. */
+        const val MAX_REDIRECT_HOPS = 2
 
         internal fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .retryOnConnectionFailure(false)

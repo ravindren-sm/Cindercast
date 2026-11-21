@@ -122,7 +122,7 @@ object SecretsLoader {
         val tmp = Files.createTempFile(dir, ".tmp.", ".env",
             java.nio.file.attribute.PosixFilePermissions.asFileAttribute(ownerOnly))
         try {
-            Files.writeString(tmp, content)
+            Files.write(tmp, content.toByteArray(Charsets.UTF_8))
             Files.move(tmp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
         } finally {
             Files.deleteIfExists(tmp)

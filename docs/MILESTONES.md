@@ -17,9 +17,9 @@ Done: our client obtained a session token (HANDSHAKE_ACCEPTED). Nothing else ver
 ## M1: Prove the protocol on the Mac (probe, one approval per step)
 | Step | Requests | Proves | Done when |
 |---|---|---|---|
-| 4b profile | 2 | Token activates; account status | `status` = 0, not blocked |
-| 4c live catalog | 4 | Genres, channel paging, total count | Counts close to TiviMate's 5,100 |
-| 4d live link | 5 | `create_link` gives a stream; container | First 64 KB is MPEG-TS or HLS |
+| 4b profile (DONE 2026-11-21) | 2 | Token activates; account status | `status` = 0, not blocked: passed, MAC only |
+| 4c live catalog (DONE 2026-11-21) | 4 | Genres, channel paging, total count | Counts close to TiviMate's 5,100: 4,900 (about 3% fewer; to explain) |
+| 4d live link (2026-11-21: link created; HLS; edge 403 to the probe, stopped) | 5 (+2 redirect hops) | `create_link` gives a stream; container | First 64 KB is MPEG-TS or HLS |
 | 4e VOD catalog (new, offline first) | about 4 | VOD categories, movie paging, series markers | Counts close to 99,500 movies / 27,700 shows |
 | 4f VOD link (new, offline first) | about 5 | Movie and episode `create_link` | First bytes are a playable container |
 | 4g keep-alive (new, offline first) | small, spaced | Watchdog/events polling keeps the token valid | Token still valid after a timed wait |
@@ -28,6 +28,11 @@ Small offline fixes before 4b: show the handshake's `not_valid` flag (0/1, not i
 If 4b fails on device fields (serial, device IDs, signature), add them as optional local
 secrets read from StbEmu's settings screen by the user (looking only).
 Done: all six steps pass, recorded in docs/PROVIDER_FINDINGS.md.
+
+## M1.5: Debug player on the device (done 2026-11-21)
+Done: live channel plays on the Fire TV through :provider + Media3 (HLS, H.264 1080p, AAC).
+The Mac probe's 403 does not affect the device. Next M1 items (4e VOD, 4f VOD link, 4g
+keep-alive) can now be tested in the debug player instead of the Mac probe.
 
 ## M2: App foundation (offline, then Phase 3 approval to install)
 - Rename the package off `com.example.*`; choose a license (open decision).

@@ -6,7 +6,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 
 /**
  * Scrubs secrets from any text before it is printed, logged or saved.
@@ -99,8 +98,8 @@ class Redactor(secrets: Map<String, String>) {
         urlHostVariants(value)?.let { base += it }
         val withEncoded = base.toMutableSet()
         for (v in base) {
-            withEncoded += URLEncoder.encode(v, StandardCharsets.UTF_8)            // space -> '+'
-            withEncoded += URLEncoder.encode(v, StandardCharsets.UTF_8).replace("+", "%20")
+            withEncoded += URLEncoder.encode(v, "UTF-8") /* String overload: Android 11 lacks the Charset one */            // space -> '+'
+            withEncoded += URLEncoder.encode(v, "UTF-8") /* String overload: Android 11 lacks the Charset one */.replace("+", "%20")
         }
         return withEncoded
     }

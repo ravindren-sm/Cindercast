@@ -80,3 +80,40 @@ class HttpProbeTest {
         assertTrue(text.contains("HTTP 200") && text.contains("tls: none (plain HTTP)") && text.contains("Active"), text)
     }
 }
+
+/** Redirect following for stream fetches: bounded hops, each hop budgeted. */
+class HttpProbeRedirectTest {
+    private var now = 0L
+    private fun budget(max: Int) = RequestBudget(max, nowMillis = { now }, sleepMillis = { now += it })
+
+    @Test fun `follows up to the hop limit, each hop takes budget`() {
+        val s = okhttp3.mockwebserver.MockWebServer().apply { start() }
+        s.enqueue(okhttp3.mockwebserver.MockResponse().setResponseCode(301).setHeader("Location", "/hop1"))
+        s.enqueue(okhttp3.mockwebserver.MockResponse().setResponseCode(302).setHeader("Location", s.url("/hop2").toString()))
+        s.enqueue(okhttp3.mockwebserver.MockResponse().setResponseCode(200).setBody("TS"))
+        val b = budget(3)
+        val out = HttpProbe(b).sendFollowingRedirects(ProbeRequest("GET", s.url("/start").toString(), emptyMap(), "stream"), 2)
+        kotlin.test.assertEquals(listOf(301, 302, 200), out.map { (it as ProbeOutcome.Response).status })
+        kotlin.test.assertEquals(3, b.used)
+        kotlin.test.assertEquals(listOf("/start", "/hop1", "/hop2"), List(3) { s.takeRequest().path })
+        s.shutdown()
+    }
+
+    @Test fun `stops at the hop limit and never exceeds MAX_REDIRECT_HOPS`() {
+        val s = okhttp3.mockwebserver.MockWebServer().apply { start() }
+        repeat(4) { s.enqueue(okhttp3.mockwebserver.MockResponse().setResponseCode(302).setHeader("Location", "/again")) }
+        val out = HttpProbe(budget(10)).sendFollowingRedirects(ProbeRequest("GET", s.url("/x").toString(), emptyMap(), "stream"), 1)
+        kotlin.test.assertEquals(2, out.size)
+        kotlin.test.assertEquals(2, s.requestCount)
+        kotlin.test.assertFailsWith<IllegalArgumentException> { HttpProbe(budget(10)).sendFollowingRedirects(out[0].request, 3) }
+        s.shutdown()
+    }
+
+    @Test fun `does not follow non-http targets`() {
+        val s = okhttp3.mockwebserver.MockWebServer().apply { start() }
+        s.enqueue(okhttp3.mockwebserver.MockResponse().setResponseCode(302).setHeader("Location", "rtmp://elsewhere.test/live"))
+        val out = HttpProbe(budget(5)).sendFollowingRedirects(ProbeRequest("GET", s.url("/x").toString(), emptyMap(), "stream"), 2)
+        kotlin.test.assertEquals(1, out.size)
+        s.shutdown()
+    }
+}

@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Manifest for the Phase 1 hello app.
      Leanback launcher intent makes the app appear on the Fire TV home row.
-     No network or storage permissions are requested in Phase 1. -->
+     Phase 3 debug player: INTERNET only. Cleartext HTTP is allowed in debug builds only
+     (src/debug network security config); the provider has no HTTPS. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Network access for the portal API and the player. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <uses-feature
         android:name="android.software.leanback"

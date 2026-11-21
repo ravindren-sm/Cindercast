@@ -37,12 +37,14 @@ class StalkerTest {
     }
 
     @Test fun `handshake sends MAC cookie and referer, then token is used as bearer`() {
-        server.enqueue(json("""{"js":{"token":"ABCDEF0123456789ABCDEF0123456789","random":"x"}}"""))
+        server.enqueue(json("""{"js":{"token":"ABCDEF0123456789ABCDEF0123456789","random":"x","not_valid":0}}"""))
         server.enqueue(json("""{"js":{"status":0,"blocked":"0","ip":"203.0.113.9","fname":"A B"}}"""))
         val c = client()
         val hs = c.handshake()
         assertTrue(hs.ok)
         assertEquals("token issued: yes", hs.summary.first())
+        assertTrue(hs.summary.contains("not_valid: 0"), hs.summary.toString())
+        assertFalse(hs.summary.joinToString().contains("ABCDEF0123"), "token value must never appear")
         assertFalse(hs.summary.joinToString().contains("32"), "token length must not be reported: ${hs.summary}")
 
         val r1 = server.takeRequest()
@@ -91,6 +93,7 @@ class StalkerTest {
         val (link, url) = c.createLink(cmd!!)
         assertEquals("http://edge.example.test/play/live.php?stream=1&token=abc123", url)
         assertTrue(link.summary.first().contains("remote host"), link.summary.toString())
+        assertFalse(link.summary.joinToString().contains("edge.example.test"), "host must never be printed")
         server.takeRequest(); server.takeRequest()
         val linkReq = server.takeRequest()
         assertEquals("create_link", linkReq.requestUrl!!.queryParameter("action"))
@@ -102,6 +105,48 @@ class StalkerTest {
         val r = client().handshake()
         assertFalse(r.ok)
         assertEquals(listOf("no JSON payload in the response"), r.summary)
+    }
+
+    @Test fun `create_link error field and non-standard hosts are summarized safely`() {
+        assertEquals("- http remote host (non-standard name) port 8080", StalkerClient.cmdShape("http://edge_01.example.test:8080/live/1.ts?token=x"))
+        assertEquals("- http remote IP address", StalkerClient.cmdShape("http://203.0.113.5/live/1.ts"))
+        assertEquals("ffrt http localhost (needs create_link)", StalkerClient.cmdShape("ffrt http://localhost/ch/1_"))
+        server.enqueue(json("""{"js":{"token":"t0k3n"}}"""))
+        server.enqueue(json("""{"js":{"id":"1","cmd":"http://edge_01.example.test/x.ts?t=abc","error":""}}"""))
+        val c = client(); c.handshake()
+        val (link, _) = c.createLink("ffrt http://localhost/ch/1_")
+        assertTrue(link.summary.contains("error: ''"), link.summary.toString())
+        assertFalse(link.summary.joinToString().contains("edge_01"), link.summary.toString())
+    }
+
+    @Test fun `genre lookup by title and channel by name within that genre`() {
+        server.enqueue(json("""{"js":{"token":"t0k3n"}}"""))
+        server.enqueue(json("""{"js":[{"id":"*","title":"All"},{"id":"12","title":"English USA Local"},{"id":"13","title":"Kids"}]}"""))
+        server.enqueue(json("""{"js":{"total_items":"57","max_page_items":14,"data":[
+            {"number":"1","name":"NEWS 12 LONG ISLAND 4K","cmd":"ffrt http://localhost/ch/101_"},
+            {"number":"2","name":"NEWS 12 CONNECTICUT","cmd":"ffrt http://localhost/ch/102_"}]}}"""))
+        val c = client(); c.handshake()
+        val (g, id) = c.findGenreId("ENGLISH USA LOCAL")
+        assertEquals("12", id)
+        assertTrue(g.summary.contains("requested genre 'ENGLISH USA LOCAL': found"), g.summary.toString())
+        val (page, cmd, label) = c.channelInGenre(id!!, "news 12 long island")
+        assertEquals("ffrt http://localhost/ch/101_", cmd)
+        assertEquals("1 NEWS 12 LONG ISLAND 4K", label)
+        assertTrue(page.summary.first().contains("channels in genre: 57"), page.summary.toString())
+        server.takeRequest(); server.takeRequest()
+        val listReq = server.takeRequest()
+        assertEquals("12", listReq.requestUrl!!.queryParameter("genre"))
+        assertEquals("get_ordered_list", listReq.requestUrl!!.queryParameter("action"))
+    }
+
+    @Test fun `missing genre or channel is reported, not guessed`() {
+        server.enqueue(json("""{"js":{"token":"t0k3n"}}"""))
+        server.enqueue(json("""{"js":[{"id":"1","title":"Kids"}]}"""))
+        server.enqueue(json("""{"js":{"total_items":"1","data":[{"number":"9","name":"Other","cmd":"ffrt http://localhost/ch/9_"}]}}"""))
+        val c = client(); c.handshake()
+        assertNull(c.findGenreId("ENGLISH USA LOCAL").second)
+        val (_, cmd, label) = c.channelInGenre("1", "NEWS 12")
+        assertNull(cmd); assertNull(label)
     }
 
     @Test fun `stream signatures`() {

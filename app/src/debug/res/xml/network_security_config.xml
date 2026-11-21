@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug only. Cleartext is permitted because the provider offers no HTTPS (decision
+     recorded in docs/PHASE2_PROBE_PLAN.md section 9). HTTPS still validates certificates
+     against the system trust store; nothing here relaxes TLS (CLAUDE.md hard rule 4). -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

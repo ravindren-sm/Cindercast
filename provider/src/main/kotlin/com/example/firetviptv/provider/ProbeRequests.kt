@@ -1,7 +1,6 @@
 package com.example.firetviptv.provider
 
 import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 
 /**
  * A request the probe would send, described as data. In the Step 0 build nothing
@@ -50,7 +49,9 @@ enum class ProbeStep(val cliName: String, val planStep: String, val needs: List<
     PORTAL_HANDSHAKE("portal-handshake", "Step 4a", listOf("PORTAL_URL", "EMU_MAC"), usesMac = true),
     PORTAL_PROFILE("portal-profile", "Step 4b", listOf("PORTAL_URL", "EMU_MAC"), usesMac = true),
     PORTAL_CHANNELS("portal-channels", "Step 4c", listOf("PORTAL_URL", "EMU_MAC"), usesMac = true),
-    PORTAL_LINK("portal-link", "Step 4d", listOf("PORTAL_URL", "EMU_MAC"), usesMac = true);
+    PORTAL_LINK("portal-link", "Step 4d", listOf("PORTAL_URL", "EMU_MAC"), usesMac = true),
+    /** 4d on a chosen channel (--genre="..." --channel="..."), for example one known to play in TiviMate. */
+    PORTAL_LINK_CHANNEL("portal-link-channel", "Step 4d (chosen channel)", listOf("PORTAL_URL", "EMU_MAC"), usesMac = true);
 
     companion object {
         fun fromCliName(name: String): ProbeStep? = entries.firstOrNull { it.cliName == name }
@@ -70,7 +71,8 @@ object ProbeRequests {
             )
         )
         ProbeStep.DISCOVERY_PORTAL -> discovery(secrets.require("PORTAL_URL"))
-        ProbeStep.PORTAL_HANDSHAKE, ProbeStep.PORTAL_PROFILE, ProbeStep.PORTAL_CHANNELS, ProbeStep.PORTAL_LINK ->
+        ProbeStep.PORTAL_HANDSHAKE, ProbeStep.PORTAL_PROFILE, ProbeStep.PORTAL_CHANNELS, ProbeStep.PORTAL_LINK,
+        ProbeStep.PORTAL_LINK_CHANNEL ->
             portalPlan(step, secrets)
         ProbeStep.XTREAM_ACCOUNT -> listOf(xtreamAccount(secrets))
         ProbeStep.M3U_PLAYLIST -> listOf(
@@ -138,6 +140,13 @@ object ProbeRequests {
                 ProbeRequest("GET", "http://stream-url-from-create-link.invalid/", mapOf("User-Agent" to identity.userAgent),
                     "Step 4d: first 64 KB of the stream only (format check, no playback)"),
             )
+            ProbeStep.PORTAL_LINK_CHANNEL -> listOf(
+                StalkerRequests.handshake(first), StalkerRequests.profile(after),
+                StalkerRequests.genres(after), StalkerRequests.channelsInGenre(after, "GENRE-ID-FROM-GET_GENRES"),
+                StalkerRequests.createLink(after, "CMD-OF-CHOSEN-CHANNEL"),
+                ProbeRequest("GET", "http://stream-url-from-create-link.invalid/", mapOf("User-Agent" to identity.userAgent),
+                    "Step 4d: first 64 KB of the stream only (format check, no playback)"),
+            )
             else -> error("not a portal step")
         }
     }
@@ -168,5 +177,5 @@ object ProbeRequests {
         )
     }
 
-    private fun enc(v: String) = URLEncoder.encode(v, StandardCharsets.UTF_8)
+    private fun enc(v: String) = URLEncoder.encode(v, "UTF-8") /* String overload: Android 11 lacks the Charset one */
 }
