@@ -7,17 +7,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import io.github.ravindren_sm.openstream.data.LiveCatalog
 import io.github.ravindren_sm.openstream.data.PortalSession
+import io.github.ravindren_sm.openstream.data.SessionStatus
 import io.github.ravindren_sm.openstream.data.SettingsStore
 import io.github.ravindren_sm.openstream.nav.NavStack
 import io.github.ravindren_sm.openstream.nav.Route
 import io.github.ravindren_sm.openstream.nav.tabFocusId
 import io.github.ravindren_sm.openstream.ui.components.TopNavBar
 import io.github.ravindren_sm.openstream.ui.focus.FocusMemory
+import io.github.ravindren_sm.openstream.ui.screens.LiveBrowseState
+import io.github.ravindren_sm.openstream.ui.screens.LiveTvScreen
 import io.github.ravindren_sm.openstream.ui.screens.PlaceholderScreen
 import io.github.ravindren_sm.openstream.ui.screens.SessionStatusLine
 import io.github.ravindren_sm.openstream.ui.screens.SetupScreen
@@ -39,6 +44,10 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     val notice = if (loaded is SettingsStore.Loaded.Unreadable) "The saved settings could not be opened on this device. Please enter them again." else null
     var stack by remember { mutableStateOf(NavStack.start(if (loaded is SettingsStore.Loaded.Found) Route.HOME else Route.SETUP)) }
     val memory = remember { FocusMemory() }
+    // Live TV browsing state lives here so it survives opening a channel and coming back. A new
+    // portal (saved from setup) gets a fresh one, so nothing from the old portal is shown.
+    var portalEpoch by remember { mutableIntStateOf(0) }
+    val liveState = remember(portalEpoch) { LiveBrowseState(LiveCatalog(session)) }
     // A portal already saved: hand it to the session (it connects while the app is in the foreground).
     LaunchedEffect(Unit) { (loaded as? SettingsStore.Loaded.Found)?.let { session.configure(it.settings) } }
 
@@ -56,7 +65,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 store = store,
                 memory = memory,
                 notice = notice,
-                onSaved = { settings -> session.configure(settings); stack = NavStack.start(Route.HOME) },
+                onSaved = { settings -> session.configure(settings); portalEpoch++; stack = NavStack.start(Route.HOME) },
                 onSkip = { stack = NavStack.start(Route.HOME) },
             )
         } else {
@@ -66,13 +75,25 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 onSelectTab = { tab -> stack = stack.resetToTab(tab) },
             )
             SessionStatusLine(session.status)
-            PlaceholderScreen(
-                entry = stack.current,
-                memory = memory,
-                onOpenDetail = { route, params ->
-                    stack = stack.navigate(route, params, currentFocusId = memory.focusedId)
-                },
-            )
+            if (stack.current.route == Route.LIVE_TV) {
+                LiveTvScreen(
+                    state = liveState,
+                    connected = session.status.let { it is SessionStatus.Ready || it is SessionStatus.Degraded },
+                    memory = memory,
+                    onOpenChannel = { index, _ ->
+                        // The player is built in the next M3 slice; for now it opens the placeholder.
+                        stack = stack.navigate(Route.LIVE_PLAYER, mapOf("item" to "$index"), currentFocusId = memory.focusedId)
+                    },
+                )
+            } else {
+                PlaceholderScreen(
+                    entry = stack.current,
+                    memory = memory,
+                    onOpenDetail = { route, params ->
+                        stack = stack.navigate(route, params, currentFocusId = memory.focusedId)
+                    },
+                )
+            }
         }
     }
 

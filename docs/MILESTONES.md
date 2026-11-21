@@ -198,3 +198,10 @@ Remaining for M2.0's done condition: the setup screen with the sealed settings s
 - Added a session-level test for the app's own re-auth path: a keep-alive answered with "Authorization failed." makes `PortalSession` re-handshake once and stay connected; a refused re-handshake shows a failure and the portal is not hammered. 7 tests now in PortalSessionTest.
 - Still unobserved, and only a live portal run can show them (each needs the user's approval and StbEmu and TiviMate stopped, rule 12): Save from setup with a real portal; re-auth on a real expiry; a keep-alive seen as a log line (the traffic log makes it visible); the "saved settings could not be opened" notice on the device; the debug build's Application class starting on the device.
 
+
+## M3 slice 1: live genres and paged channels (2026-11-21, offline)
+- Provider: `LiveGenre`, `LiveChannel` (cmd never printed), `LiveChannelPage`, `StalkerClient.liveGenres()` and `liveChannels(genre, page)`. Counts sent as text parse; missing totals fall back to the page.
+- App: `PortalSession.withSession` runs catalog calls on the session thread, serialized with the keep-alive; `LiveCatalog` (fixed-text failures, "All channels" always first); `PagedChannels` loads one server page at a time, retries a failed page without skipping it, drops a channel repeated across pages, stops at the total or on an empty page.
+- UI: Live TV tab shows a genre rail and the channel list, loading more as the user nears the end (6 rows ahead). Browsing state is held by the shell, so opening a channel and coming back keeps the loaded pages and scroll. Selecting a channel opens the existing placeholder player screen; playback is the next slice.
+- Tests: 6 provider, 7 app (fake portal with 40 channels, 14 per page). 127 in all; debug and release build.
+- NOT verified: the screen has never run. Focus movement between rail and list, scroll-driven paging and Back restoration need the Fire TV, which needs either a live portal (approval, rule 12) or a fake portal on the Mac with the saved settings cleared. Layout is written from the prototype's tokens without a device look.

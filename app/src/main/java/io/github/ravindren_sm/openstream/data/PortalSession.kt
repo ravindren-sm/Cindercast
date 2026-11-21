@@ -9,7 +9,9 @@ import io.github.ravindren_sm.openstream.provider.RequestPacer
 import io.github.ravindren_sm.openstream.provider.SessionManager
 import io.github.ravindren_sm.openstream.provider.StalkerClient
 import io.github.ravindren_sm.openstream.provider.StalkerIdentity
+import java.util.concurrent.Callable
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.Future
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -58,6 +60,23 @@ class PortalSession(
     fun onForeground() = executor.execute { foreground = true; restart() }
 
     fun onBackground() = executor.execute { foreground = false; restart() }
+
+    /**
+     * Runs [block] on the session thread, so catalog calls stay serialized with the keep-alive (the
+     * portal expects one request at a time per device), and waits for the answer. Blocking: call off
+     * the main thread. Returns null if the session is not connected, the block threw, or the wait ran out.
+     */
+    fun <T : Any> withSession(timeoutMillis: Long = 30_000, block: (SessionManager) -> T): T? {
+        val task = try {
+            executor.submit(Callable<T?> {
+                val m = manager
+                if (m != null && m.state == SessionManager.State.READY) block(m) else null
+            })
+        } catch (_: RejectedExecutionException) {
+            return null
+        }
+        return try { task.get(timeoutMillis, TimeUnit.MILLISECONDS) } catch (_: Exception) { task.cancel(false); null }
+    }
 
     /** Stops the background thread for good (tests, process end). */
     fun shutdown() { executor.shutdownNow() }

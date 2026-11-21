@@ -247,6 +247,26 @@ class StalkerClient(
         listOf("genres: ${arr?.size ?: "?"}", "first titles: ${titles.take(12).joinToString(" ; ")}")
     }
 
+    /** Live genres, parsed. The summary holds only a count. */
+    fun liveGenres(): Pair<StalkerResult, List<LiveGenre>> {
+        var parsed: List<LiveGenre> = emptyList()
+        val r = call(StalkerRequests.genres(ctx())) { js ->
+            parsed = LiveCatalogParser.genres(js)
+            listOf("genres: ${parsed.size}")
+        }
+        return r to parsed
+    }
+
+    /** One page (1-based) of live channels in [genreId] ("*" for all). Null page if the payload is unusable. */
+    fun liveChannels(genreId: String, page: Int): Pair<StalkerResult, LiveChannelPage?> {
+        var parsed: LiveChannelPage? = null
+        val r = call(StalkerRequests.channelsInGenre(ctx(), genreId, page)) { js ->
+            parsed = LiveCatalogParser.channelPage(js, page)
+            listOf("channels page $page: ${parsed?.items?.size ?: "?"} of ${parsed?.totalItems ?: "?"}")
+        }
+        return r to parsed
+    }
+
     /**
      * get_genres, then the id of the genre whose title equals [title] (case-insensitive).
      * Genre titles are catalog labels, not identifying data.
