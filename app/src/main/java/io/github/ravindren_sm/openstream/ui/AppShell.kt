@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import io.github.ravindren_sm.openstream.data.LiveCatalog
+import io.github.ravindren_sm.openstream.data.LivePlayback
 import io.github.ravindren_sm.openstream.data.PortalSession
 import io.github.ravindren_sm.openstream.data.SessionStatus
 import io.github.ravindren_sm.openstream.data.SettingsStore
@@ -22,6 +23,7 @@ import io.github.ravindren_sm.openstream.nav.tabFocusId
 import io.github.ravindren_sm.openstream.ui.components.TopNavBar
 import io.github.ravindren_sm.openstream.ui.focus.FocusMemory
 import io.github.ravindren_sm.openstream.ui.screens.LiveBrowseState
+import io.github.ravindren_sm.openstream.ui.screens.LivePlayerScreen
 import io.github.ravindren_sm.openstream.ui.screens.LiveTvScreen
 import io.github.ravindren_sm.openstream.ui.screens.PlaceholderScreen
 import io.github.ravindren_sm.openstream.ui.screens.SessionStatusLine
@@ -48,6 +50,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     // portal (saved from setup) gets a fresh one, so nothing from the old portal is shown.
     var portalEpoch by remember { mutableIntStateOf(0) }
     val liveState = remember(portalEpoch) { LiveBrowseState(LiveCatalog(session)) }
+    val livePlayback = remember(portalEpoch) { LivePlayback(session) }
     // A portal already saved: hand it to the session (it connects while the app is in the foreground).
     LaunchedEffect(Unit) { (loaded as? SettingsStore.Loaded.Found)?.let { session.configure(it.settings) } }
 
@@ -68,6 +71,10 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 onSaved = { settings -> session.configure(settings); portalEpoch++; stack = NavStack.start(Route.HOME) },
                 onSkip = { stack = NavStack.start(Route.HOME) },
             )
+        } else if (stack.current.route == Route.LIVE_PLAYER) {
+            // Full screen: no tab bar or status line over the video (a focused tab would leave on Select).
+            val index = stack.current.params["item"]?.toIntOrNull() ?: -1
+            LivePlayerScreen(channel = liveState.channels.items.getOrNull(index), playback = livePlayback, memory = memory)
         } else {
             TopNavBar(
                 activeTab = topTab,
@@ -81,7 +88,6 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                     connected = session.status.let { it is SessionStatus.Ready || it is SessionStatus.Degraded },
                     memory = memory,
                     onOpenChannel = { index, _ ->
-                        // The player is built in the next M3 slice; for now it opens the placeholder.
                         stack = stack.navigate(Route.LIVE_PLAYER, mapOf("item" to "$index"), currentFocusId = memory.focusedId)
                     },
                 )

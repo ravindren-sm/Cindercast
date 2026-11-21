@@ -21,7 +21,11 @@ import io.github.ravindren_sm.openstream.ui.theme.Spacing
 import io.github.ravindren_sm.openstream.ui.theme.Tokens
 
 /** The focus ID a screen takes when it appears and nothing was remembered (per the prototype's focus table). */
-fun initialFocusId(route: Route): String = if (route == Route.LIVE_TV) genreFocusId(0) else "card-0"
+fun initialFocusId(route: Route): String = when (route) {
+    Route.LIVE_TV -> genreFocusId(0)
+    Route.LIVE_PLAYER -> PLAYER_SURFACE_ID
+    else -> "card-0"
+}
 
 /**
  * Stand-in for every screen until it is built (M3 and later). It exists to exercise the shell:
