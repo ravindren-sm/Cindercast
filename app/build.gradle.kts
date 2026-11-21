@@ -41,6 +41,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Side-by-side test install with its own empty storage, so a fake-portal run never
+            // touches the real app's saved settings:  ./gradlew -PcheckSuffix=true :app:assembleDebug
+            if (providers.gradleProperty("checkSuffix").isPresent) applicationIdSuffix = ".check"
+        }
         release {
             isMinifyEnabled = false
         }

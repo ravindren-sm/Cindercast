@@ -20,6 +20,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
@@ -125,7 +127,11 @@ fun LiveTvScreen(
                     }
                 }
                 state.genresError != null -> RetryRow(state.genresError!!, memory) {
-                    scope.launch { withContext(Dispatchers.IO) { state.loadGenres() } }
+                    scope.launch {
+                        withContext(Dispatchers.IO) { state.loadGenres() }
+                        // The retry row is gone once the genres load; without this, focus falls to the top tab.
+                        if (state.genresLoaded) { withFrameNanos { }; memory.tryFocus(genreFocusId(0)) }
+                    }
                 }
                 else -> Message(if (connected) "Loading channel groups…" else "Waiting for the portal connection…")
             }
@@ -174,7 +180,7 @@ private fun ChannelList(state: LiveBrowseState, memory: FocusMemory, onOpenChann
                         modifier = Modifier.fillMaxWidth(),
                         onSelect = { onOpenChannel(index, channel) },
                     ) { _ ->
-                        Row(Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1 + 4.dp)) {
+                        Row(Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1 + 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(channel.number, style = Tokens.Mono, color = Tokens.TextSecondary, maxLines = 1, modifier = Modifier.width(96.dp))
                             Text(channel.name, style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 1)
                         }
@@ -182,7 +188,19 @@ private fun ChannelList(state: LiveBrowseState, memory: FocusMemory, onOpenChann
                 }
                 if (paged.error != null) {
                     item(key = "retry") {
-                        RetryRow(paged.error!!, memory) { scope.launch { withContext(Dispatchers.IO) { paged.loadNext() } } }
+                        RetryRow(paged.error!!, memory) {
+                            scope.launch {
+                                val before = paged.items.size
+                                withContext(Dispatchers.IO) { paged.loadNext() }
+                                // The retry row is removed on success. Put focus on the first new row (keeping a
+                                // few rows of context above it) instead of letting it fall to the top tab.
+                                if (paged.items.size > before) {
+                                    listState.scrollToItem(maxOf(before - 3, 0))
+                                    withFrameNanos { }
+                                    memory.tryFocus(channelFocusId(before))
+                                }
+                            }
+                        }
                     }
                 }
             }
