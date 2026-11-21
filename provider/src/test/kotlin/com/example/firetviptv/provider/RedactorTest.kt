@@ -57,6 +57,36 @@ class RedactorTest {
         assertEquals(7, Regex("<EMU_MAC>").findAll(out).count(), out)
     }
 
+    @Test fun `bare hostnames of URL secrets are caught everywhere`() {
+        val out = r.redact(
+            "CN=xt.example.test, O=Example | Server: nginx on portal.example.test | " +
+                "redirect to https://xt.example.test/login | www.xt.example.test | xt.example.test:8000"
+        )
+        assertNoLeak(out)
+        listOf("xt.example.test", "portal.example.test").forEach {
+            assertFalse(out.contains(it, ignoreCase = true), "Leaked host '$it' in: $out")
+        }
+        assertTrue(out.contains("CN=<XTREAM_HOST>"), out)
+    }
+
+    @Test fun `URL shape keeps a known host placeholder but hides other hosts`() {
+        val out = r.redact("Location: https://xt.example.test/stalker_portal/c and http://cdn.other.test/stalker_portal/c")
+        assertNoLeak(out)
+        assertTrue(out.contains("https://<XTREAM_HOST>/stalker_portal/c"), out)
+        assertTrue(out.contains("http://<HOST>/stalker_portal/c"), out)
+    }
+
+    @Test fun `stalker profile fields and IP addresses are masked`() {
+        val profile = """{"js":{"id":"77","name":"Alex","fname":"A B","ip":"203.0.113.45","phone":"555-0100",
+            "status":0,"blocked":"0","random":"r4nd0m","expire_billing_date":"2027-01-01 00:00:00"}}"""
+        val out = r.redact(profile)
+        listOf("203.0.113.45", "A B", "555-0100", "r4nd0m").forEach {
+            assertFalse(out.contains(it), "Leaked '$it' in: $out")
+        }
+        assertTrue(out.contains("\"status\":0") && out.contains("2027-01-01"), out)
+        assertEquals("seen from <IP> and <IP>", r.redact("seen from 192.0.2.10 and 198.51.100.7"))
+    }
+
     @Test fun `unknown MACs are masked too`() {
         val out = r.redact("other device 11:22:33:44:55:66 and 11%3A22%3A33%3A44%3A55%3A66")
         assertFalse(out.contains("11:22", ignoreCase = true))

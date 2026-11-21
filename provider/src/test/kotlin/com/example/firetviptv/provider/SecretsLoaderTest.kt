@@ -71,6 +71,27 @@ class SecretsLoaderTest {
         assertEquals(listOf("PIN"), s.namesTooShortToRedact)
     }
 
+    @Test fun `put adds or replaces one entry, keeps others, stays mode 600`() {
+        val file = tempSecrets("# note\nA='keep me'\nPORTAL_URL='old'\n", "rw-------")
+        SecretsLoader.put(file, "PORTAL_URL", "http://real.example.test:8080/stalker_portal/c/")
+        SecretsLoader.put(file, "Q", "it's")
+        val s = SecretsLoader.load(file)
+        assertEquals("keep me", s.require("A"))
+        assertEquals("http://real.example.test:8080/stalker_portal/c/", s.require("PORTAL_URL"))
+        assertEquals("it's", s.require("Q"))
+        assertEquals(1, Files.readAllLines(file).count { it.startsWith("PORTAL_URL=") })
+        assertTrue(Files.readAllLines(file).contains("# note"))
+        assertEquals("rw-------", PosixFilePermissions.toString(Files.getPosixFilePermissions(file)))
+        assertEquals(1, Files.list(file.parent).count(), "temp file left behind")
+    }
+
+    @Test fun `put refuses an open file and multi-line values`() {
+        val open = tempSecrets("A='x1234'\n", "rw-r--r--")
+        assertFailsWith<InsecureSecretsFileException> { SecretsLoader.put(open, "B", "value") }
+        val ok = tempSecrets("", "rw-------")
+        assertFailsWith<IllegalArgumentException> { SecretsLoader.put(ok, "B", "two\nlines") }
+    }
+
     @Test fun `env var overrides the default path`() {
         assertEquals("/tmp/x.env", SecretsLoader.defaultPath(mapOf(SecretsLoader.PATH_ENV_VAR to "/tmp/x.env")).toString())
         assertTrue(SecretsLoader.defaultPath(emptyMap()).toString().endsWith(".config/firetv-iptv/secrets.env"))

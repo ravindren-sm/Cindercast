@@ -1,7 +1,8 @@
 # CLAUDE.md: IPTV app for Fire TV Stick 4K Plus
 
 Goal: replace StbEmu on the user's Fire TV with a remote-friendly TV app.
-Status: Phase 1 done (hello app runs on the Fire TV). No provider contact yet.
+Status: Phase 1 done; Phase 2 Step 0 done (offline probe tooling, dry-run only).
+No provider contact yet. Phase 2 plan: docs/PHASE2_PROBE_PLAN.md
 Repo: ~/Developer/firetv-iptv (outside Google Drive). Build with ./gradlew using
 Android Studio's JBR as JAVA_HOME; wrapper pins Gradle 9.5.0 (AGP 8.x breaks on 9.6+).
 Full plan: docs/PROJECT_PLAN.md
@@ -9,11 +10,15 @@ Full plan: docs/PROJECT_PLAN.md
 ## Hard rules
 1. Never modify, uninstall, clear data from, or overwrite StbEmu on any device.
 2. Never contact the IPTV provider until the user approves Phase 2 in chat.
-3. Never ask for, accept, echo, log, or commit credentials, tokens, portal URLs,
-   registered MAC addresses, or device serials.
-   Fire TV IP: the user allowed it in chat and in local commands (2026-11-20).
-   It must still never appear in repo files, docs, logs, or commits.
+3. Never write credentials, tokens, portal URLs, registered MAC addresses, device
+   serials, or the Fire TV IP into repo files, docs, logs, commits, command lines,
+   or any file outside ~/.config/firetv-iptv/.
    Placeholders only in files: <PORTAL_URL>, <EMU_MAC>, <USERNAME>, <PASSWORD>, <FIRETV_IP>.
+   Seeing values (user decision 2026-11-20, after a risk discussion): Claude may read
+   secret values (secrets file, provider emails) when a task needs them. Claude still
+   does not repeat them in chat unless the user asks, and never sends them anywhere
+   except the provider during an approved NETWORK step.
+   Fire TV IP: allowed in chat and in local commands.
 4. Never disable TLS validation. Never change router/UniFi settings.
 5. Ask before installing anything or changing system configuration.
 6. Do not assume ADB exposes StbEmu private data or the provider protocol.
@@ -25,8 +30,9 @@ Full plan: docs/PROJECT_PLAN.md
 
 ## Secret handling
 - Secrets live outside this repo and outside Google Drive sync, in
-  ~/.config/firetv-iptv/secrets.env (chmod 600), typed by the user in their own
-  terminal. Claude reads only variable names, never values.
+  ~/.config/firetv-iptv/secrets.env (chmod 600), entered with scripts/save_secret.sh.
+  Claude may read values when needed (hard rule 3) but prefers redacted probe output;
+  values in Claude's context also land in session transcripts under ~/.claude/.
 - Code reads secrets from the path in env var FIRETV_IPTV_SECRETS.
 - On the device, the user enters portal details through an in-app settings screen.
   Store them with EncryptedSharedPreferences / Android Keystore. Never in

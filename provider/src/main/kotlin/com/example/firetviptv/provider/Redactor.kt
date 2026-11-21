@@ -25,11 +25,17 @@ import java.nio.charset.StandardCharsets
  */
 class Redactor(secrets: Map<String, String>) {
 
-    /** (pattern, replacement) pairs for known secret values, longest values first. */
+    /**
+     * (pattern, replacement) pairs for every spelling of every known secret value.
+     * Sorted longest spelling first across all secrets, so a full URL is replaced
+     * before its bare hostname and before any shorter secret it contains.
+     */
     private val secretPatterns: List<Pair<Regex, String>> = secrets.entries
         .filter { it.value.length >= MIN_SECRET_LENGTH }
-        .sortedByDescending { it.value.length }
-        .flatMap { (name, value) -> variantsOf(value).map { variantPattern(it) to "<$name>" } }
+        .flatMap { (name, value) -> variantsOf(value).map { it to "<$name>" } }
+        .filter { it.first.length >= MIN_SECRET_LENGTH }
+        .sortedByDescending { it.first.length }
+        .map { (variant, placeholder) -> variantPattern(variant) to placeholder }
 
     fun redact(text: String): String {
         var out = redactJsonIfJson(text)
@@ -42,6 +48,7 @@ class Redactor(secrets: Map<String, String>) {
             if (isSensitiveKey(m.groupValues[1])) "${m.groupValues[1]}=<REDACTED>" else m.value
         }
         out = MAC.replace(out, "<MAC>")
+        out = IPV4.replace(out, "<IP>")
         out = MAC_URL_ENCODED.replace(out, "<MAC>")
         out = BEARER.replace(out, "Bearer <TOKEN>")
         out = LONG_HEX.replace(out, "<HEX>")
@@ -86,12 +93,26 @@ class Redactor(secrets: Map<String, String>) {
             base += pairs.joinToString(":")
             base += pairs.joinToString("-")
         }
+        // URL-valued secrets (hosts, portal URLs): the bare host, host:port and the
+        // URL without a trailing slash can each show up on their own, for example in
+        // a certificate subject, a Server header or a redirect Location.
+        urlHostVariants(value)?.let { base += it }
         val withEncoded = base.toMutableSet()
         for (v in base) {
             withEncoded += URLEncoder.encode(v, StandardCharsets.UTF_8)            // space -> '+'
             withEncoded += URLEncoder.encode(v, StandardCharsets.UTF_8).replace("+", "%20")
         }
         return withEncoded
+    }
+
+    private fun urlHostVariants(value: String): Set<String>? {
+        val uri = try { java.net.URI(value.trim()) } catch (_: Exception) { return null }
+        val host = uri.host ?: return null
+        val out = mutableSetOf(host, value.trim().trimEnd('/'))
+        if (uri.port >= 0) out += "$host:${uri.port}"
+        // "www." and bare forms of the same host.
+        if (host.startsWith("www.")) out += host.removePrefix("www.") else out += "www.$host"
+        return out
     }
 
     /** Case-insensitive literal match; percent-escapes match in either hex case. */
@@ -115,7 +136,11 @@ class Redactor(secrets: Map<String, String>) {
         }
         val path = if (segments.isEmpty()) "" else "/" + segments.joinToString("/")
         val query = if (queryStart >= 0) "?<q>" else ""
-        return "$scheme://<HOST>$path$query"
+        // Keep a known-secret placeholder host (for example <XTREAM_HOST>) so readers can
+        // tell "same provider host" from "some other host"; hide anything else.
+        val authority = if (pathStart < 0) rest.substringBefore('?').substringBefore('#') else rest.substring(0, pathStart)
+        val hostLabel = PLACEHOLDER_HOST.matchEntire(authority)?.value ?: "<HOST>"
+        return "$scheme://$hostLabel$path$query"
     }
 
     companion object {
@@ -128,6 +153,9 @@ class Redactor(secrets: Map<String, String>) {
             "token", "password", "pass", "username", "user", "login", "mac", "sn", "serial",
             "signature", "cmd", "url", "stream_url", "auth", "authorization", "cookie",
             "session", "sessionid", "key", "api_key", "apikey",
+            // Stalker profile fields that identify the account or household.
+            "ip", "random", "fname", "phone", "email", "parent_password", "settings_password",
+            "account", "account_id", "comment", "address",
         )
 
         fun isSensitiveKey(key: String): Boolean {
@@ -147,6 +175,9 @@ class Redactor(secrets: Map<String, String>) {
             "index.m3u8", "playlist.m3u8", "api",
         )
 
+        /** A host part that is exactly one placeholder, optionally with a port. */
+        private val PLACEHOLDER_HOST = Regex("<[A-Z0-9_]+>(:\\d+)?")
+
         private val HEADER = Regex("(?im)^\\s*(Authorization|Cookie|Set-Cookie)\\s*:.*$")
 
         // key=value pairs (query strings, form bodies, cookies). Only pairs whose key is
@@ -159,6 +190,8 @@ class Redactor(secrets: Map<String, String>) {
         private val MAC_EXACT = Regex("(?i)^([0-9a-f]{2}[:-]){5}[0-9a-f]{2}$|^[0-9a-f]{12}$")
         private val MAC = Regex("(?i)\\b([0-9a-f]{2}[:-]){5}[0-9a-f]{2}\\b")
         private val MAC_URL_ENCODED = Regex("(?i)\\b([0-9a-f]{2}%3a){5}[0-9a-f]{2}\\b")
+        // Any dotted quad (public or LAN IP). Also masks 4-part version strings; acceptable.
+        private val IPV4 = Regex("\\b(?:(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\b")
         private val BEARER = Regex("(?i)\\bBearer\\s+[^\\s\"',;]+")
         private val LONG_HEX = Regex("(?i)\\b[0-9a-f]{24,}\\b")
         private val LONG_TOKEN = Regex("[A-Za-z0-9+/_=-]{32,}")

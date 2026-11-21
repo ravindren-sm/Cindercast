@@ -97,6 +97,39 @@ object SecretsLoader {
 
     private val NAME_PATTERN = Regex("[A-Za-z_][A-Za-z0-9_]*")
 
+    /**
+     * Sets [name] to [value] in the secrets file at [path], the same way
+     * scripts/save_secret.sh does: other entries kept, an existing entry for [name]
+     * replaced, value single-quoted with embedded quotes escaped, written to a temp
+     * file in the same directory and moved into place, final mode 600.
+     * Used to store values discovered by the probe (for example a redirect target)
+     * without ever printing them.
+     */
+    fun put(path: Path, name: String, value: String) {
+        require(NAME_PATTERN.matches(name)) { "Invalid secret name" }
+        require(value.isNotEmpty() && '\n' !in value && '\r' !in value) { "Invalid secret value for $name" }
+        val existing = if (Files.isRegularFile(path)) {
+            checkPermissions(path)
+            Files.readAllLines(path)
+        } else emptyList()
+        val kept = existing.filterNot { it.trim().removePrefix("export ").trim().startsWith("$name=") }
+        val escaped = value.replace("'", "'\\''")
+        val content = (kept + "$name='$escaped'").joinToString("\n", postfix = "\n")
+
+        val ownerOnly = java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")
+        val dir = path.toAbsolutePath().parent
+        Files.createDirectories(dir)
+        val tmp = Files.createTempFile(dir, ".tmp.", ".env",
+            java.nio.file.attribute.PosixFilePermissions.asFileAttribute(ownerOnly))
+        try {
+            Files.writeString(tmp, content)
+            Files.move(tmp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+        } finally {
+            Files.deleteIfExists(tmp)
+        }
+        Files.setPosixFilePermissions(path, ownerOnly)
+    }
+
     /** Undoes shell single-quoting: 'a'\''b' -> a'b. Unquoted text is kept as is. */
     private fun unquote(text: String): String {
         if (!text.startsWith("'")) return text

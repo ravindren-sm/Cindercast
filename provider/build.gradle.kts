@@ -23,8 +23,11 @@ kotlin {
 
 dependencies {
     implementation(libs.kotlinx.serialization.json)
+    // HTTP client (Step 2 onward). Only HttpProbe uses it, always behind RequestBudget.
+    implementation(libs.okhttp)
 
     testImplementation(libs.kotlin.test)
+    testImplementation(libs.okhttp.mockwebserver)   // local fake server; tests never touch the provider
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
