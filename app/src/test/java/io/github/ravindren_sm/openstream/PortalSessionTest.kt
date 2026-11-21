@@ -24,6 +24,7 @@ class PortalSessionTest {
     private val watchdogs = AtomicInteger()
     private val handshakes = AtomicInteger()
     @Volatile private var refuse = false
+    private val expireNext = java.util.concurrent.atomic.AtomicBoolean(false)
     private lateinit var session: PortalSession
 
     @Before fun setUp() {
@@ -35,6 +36,8 @@ class PortalSessionTest {
                     return when {
                         "handshake" in q -> { handshakes.incrementAndGet(); ok("""{"js":{"token":"t0k3n"}}""") }
                         "get_profile" in q -> ok("""{"js":{"status":0,"expire_billing_date":"2027-11-04 19:14:32"}}""")
+                        // The portal's expired-session reply: plain text, no "js" payload.
+                        "get_events" in q && expireNext.getAndSet(false) -> ok("Authorization failed.")
                         "get_events" in q -> { watchdogs.incrementAndGet(); ok("""{"js":{"data":{"msgs":0}}}""") }
                         else -> MockResponse().setResponseCode(404)
                     }
@@ -95,5 +98,26 @@ class PortalSessionTest {
         assertTrue(msg, "403" in msg)
         Thread.sleep(400)
         assertEquals(0, watchdogs.get())
+    }
+
+    @Test fun `an expired session is re-authenticated by the keep-alive and stays connected`() {
+        session.configure(settings()); session.onForeground()
+        waitFor("a keep-alive") { watchdogs.get() >= 1 }
+        val before = watchdogs.get()
+        expireNext.set(true)
+        waitFor("a second handshake and a repeated keep-alive") { handshakes.get() >= 2 && watchdogs.get() > before }
+        waitFor("ready again") { session.status is SessionStatus.Ready }
+        assertEquals(2, handshakes.get())
+    }
+
+    @Test fun `a refused re-authentication shows a failure and does not hammer the portal`() {
+        session.configure(settings()); session.onForeground()
+        waitFor("a keep-alive") { watchdogs.get() >= 1 }
+        refuse = true            // the re-handshake will get 403
+        expireNext.set(true)
+        waitFor("failed") { session.status is SessionStatus.Failed }
+        Thread.sleep(400)        // several more keep-alive intervals (100 ms in this test)
+        assertEquals("one re-handshake attempt, no more", 2, handshakes.get())
+        assertTrue(session.status is SessionStatus.Failed)
     }
 }

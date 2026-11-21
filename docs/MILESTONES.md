@@ -172,7 +172,7 @@ Remaining for M2.0's done condition: the setup screen with the sealed settings s
 - Tests (5, against a local fake portal): connect and expiry, repeated keep-alives, silence in the background and reconnect on return, no portal configured, refused handshake. 93 local tests in all.
 - Verified on the Fire TV with placeholder settings (no provider contact): Home starts with saved settings, shows the fixed "could not reach" line, and survives background and resume. Placeholder settings cleared afterwards.
 - Not verified: a successful live session and a real keep-alive on device (needs a Phase 2 approval to contact the provider); re-auth on a real expiry is still unobserved.
-- Still to do in M2: debug-only OkHttp interceptor (rule 13).
+- (Done later the same day: the debug-only OkHttp interceptor, see "M2 debug portal traffic log" below.)
 
 ## M2 first live session of the app (2026-11-21, user-approved)
 - StbEmu and TiviMate confirmed not running before and after (read-only check). Real settings were imported into the sealed store from the pushed dev config (debug-only `--ez import true` on the self-test activity; the plaintext dev-config.json was deleted from the device afterwards).
@@ -192,3 +192,9 @@ Remaining for M2.0's done condition: the setup screen with the sealed settings s
 - Fix: the long-token rule now leaves a slash-separated run alone only when every part is a protocol path word, a digit-only part, or the start of a file name followed by a short extension. Real token-like runs are still masked.
 - Tests: RedactorTest regression for the stalker path, and a check that a long token containing a slash is still masked. 112 provider and debug app unit tests pass.
 - Follow-up to the debug traffic log: the debug player's four portal clients (live, VOD, seasons, create_link) now take the same interceptor hook, so their calls are logged too. Stream (media) requests are not logged.
+
+## M2 status after the offline close-out (2026-11-21)
+- Code complete: setup screen, sealed store, session with watchdog, debug traffic log, Media3 diagnostics in the debug player (state, first frame, codecs, load and player errors, all redacted). The real app has no player until M3, so player diagnostics for it are an M3 task.
+- Added a session-level test for the app's own re-auth path: a keep-alive answered with "Authorization failed." makes `PortalSession` re-handshake once and stay connected; a refused re-handshake shows a failure and the portal is not hammered. 7 tests now in PortalSessionTest.
+- Still unobserved, and only a live portal run can show them (each needs the user's approval and StbEmu and TiviMate stopped, rule 12): Save from setup with a real portal; re-auth on a real expiry; a keep-alive seen as a log line (the traffic log makes it visible); the "saved settings could not be opened" notice on the device; the debug build's Application class starting on the device.
+
