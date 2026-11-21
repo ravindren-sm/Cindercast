@@ -19,3 +19,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "firetv-iptv"
 include(":app")
+// Phase 2: provider protocol library (plain Kotlin, reused by :app in Phase 3)
+// and the command-line probe that drives it on the Mac.
+include(":provider")
+include(":probe")

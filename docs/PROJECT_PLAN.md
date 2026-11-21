@@ -68,6 +68,7 @@ modern interface, without touching StbEmu.
 
 ## Phase 2: Provider compatibility probe (GATE; needs explicit approval first)
 Purpose: find out what the provider speaks before any UI work.
+Detailed step-by-step plan: docs/PHASE2_PROBE_PLAN.md (supersedes the outline below where they differ).
 - Step A, offline: write the secret-entry workflow (see CLAUDE.md). User fills
   ~/.config/firetv-iptv/secrets.env. No values shown to Claude.
 - Step B, probe tool on the Mac (small script or JVM CLI), TLS validation on, redacted logs.
