@@ -1,6 +1,10 @@
 # Project plan: modern IPTV app for Fire TV Stick 4K Plus
 
-Date: 2026-11-20. Status: Phase 0 (discovery). Nothing installed, no provider contact.
+Date: 2026-11-20. Status (2026-11-21): **custom build PAUSED.**
+Phases 0–1 done; Phase 2 done through Step 3b (Step 4 built offline, never run).
+The provider is Stalker/MAG portal only, and TiviMate on the Fire TV works with it, which
+meets the immediate goal. Resume if TiviMate falls short on something specific; see
+docs/PROVIDER_FINDINGS.md and docs/PHASE2_PROBE_PLAN.md.
 
 ## Problem
 StbEmu emulates a MAG set-top box (Stalker-style portal client) with a dated UI.

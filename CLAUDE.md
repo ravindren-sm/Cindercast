@@ -1,8 +1,10 @@
 # CLAUDE.md: IPTV app for Fire TV Stick 4K Plus
 
 Goal: replace StbEmu on the user's Fire TV with a remote-friendly TV app.
-Status: Phase 1 done; Phase 2 Step 0 done (offline probe tooling, dry-run only).
-No provider contact yet. Phase 2 plan: docs/PHASE2_PROBE_PLAN.md
+Status (2026-11-21): custom build PAUSED. User uses TiviMate on the Fire TV, which works
+with the provider's Stalker portal. Phase 2 done through Step 3b; Step 4 (MAC) built
+offline, never run, not approved. Do not resume probing or building without the user's
+go-ahead. Findings: docs/PROVIDER_FINDINGS.md. Plan: docs/PHASE2_PROBE_PLAN.md
 Repo: ~/Developer/firetv-iptv (outside Google Drive). Build with ./gradlew using
 Android Studio's JBR as JAVA_HOME; wrapper pins Gradle 9.5.0 (AGP 8.x breaks on 9.6+).
 Full plan: docs/PROJECT_PLAN.md
