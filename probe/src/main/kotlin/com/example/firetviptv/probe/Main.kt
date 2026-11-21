@@ -82,6 +82,7 @@ private val LIVE_APPROVED: Map<ProbeStep, String> = mapOf(
     ProbeStep.REACHABILITY_XTREAM to "2026-11-20",
     ProbeStep.DISCOVERY to "2026-11-20",
     ProbeStep.CAPTURE_PORTAL to "2026-11-20",   // runs DISCOVERY_PORTAL as its second part
+    ProbeStep.PORTAL_HANDSHAKE to "2026-11-21", // Step 4a only; 4b-4d not approved
 )
 
 /** HTTP statuses that end Phase 2 until the user decides (plan section 10). */

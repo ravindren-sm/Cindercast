@@ -1,16 +1,19 @@
 # CLAUDE.md: IPTV app for Fire TV Stick 4K Plus
 
-Goal: replace StbEmu on the user's Fire TV with a remote-friendly TV app.
-Status (2026-11-21): custom build PAUSED. User uses TiviMate on the Fire TV, which works
-with the provider's Stalker portal. Phase 2 done through Step 3b; Step 4 (MAC) built
-offline, never run, not approved. Do not resume probing or building without the user's
-go-ahead. Findings: docs/PROVIDER_FINDINGS.md. Plan: docs/PHASE2_PROBE_PLAN.md
+Goal (resumed 2026-11-21): a clean, modern, open-source Stalker/MAG client for Fire TV,
+free on GitHub, covering Live TV and VOD (movies and shows) without paywalls.
+Status (2026-11-21): RESUMED by the user. TiviMate 5.3.3 proved the portal accepts a
+third-party MAC-only Stalker client (user-reported: 5,100 live channels, 99,500 movies,
+27,700 shows). Step 4a done: HANDSHAKE_ACCEPTED (our client got a token). Profile, catalog and
+playback unverified; 4b-4d each need approval. Milestones: docs/MILESTONES.md. Findings: docs/PROVIDER_FINDINGS.md. Plan: docs/PHASE2_PROBE_PLAN.md
 Repo: ~/Developer/firetv-iptv (outside Google Drive). Build with ./gradlew using
 Android Studio's JBR as JAVA_HOME; wrapper pins Gradle 9.5.0 (AGP 8.x breaks on 9.6+).
 Full plan: docs/PROJECT_PLAN.md
 
 ## Hard rules
 1. Never modify, uninstall, clear data from, or overwrite StbEmu on any device.
+   Force-stopping StbEmu or TiviMate (`am force-stop`) before a live portal run is
+   allowed when the user OKs it for that run (rule 12); it changes no app data.
 2. Never contact the IPTV provider until the user approves Phase 2 in chat.
 3. Never write credentials, tokens, portal URLs, registered MAC addresses, device
    serials, or the Fire TV IP into repo files, docs, logs, commits, command lines,
@@ -29,6 +32,29 @@ Full plan: docs/PROJECT_PLAN.md
 9. Do not deploy an APK until the user approves Phase 3 in chat.
    Exception granted 2026-11-20: the Phase 1 hello app (com.example.firetvhello)
    may be installed. Any APK with provider or playback code still needs Phase 3 approval.
+
+10. Zero secrets in git: never commit the portal URL, MAC, tokens, or raw captured
+    portal responses. Local test config lives in gitignored files (dev-config*.json,
+    local.properties) or ~/.config/firetv-iptv/; the app gets an on-device setup screen.
+    A local pre-commit hook runs scripts/secret_scan.sh --staged (install it in a new
+    clone: see the script header).
+11. Clean room: never decompile or inspect proprietary APKs (TiviMate, StbEmu). For
+    Stalker/Ministra quirks (handshake, get_profile, create_link, VOD pages and seasons,
+    token refresh) use public protocol behavior and open-source clients such as Kodi's
+    pvr.stalker for reference only. Do not copy their code (license compatibility).
+12. Single active connection: before any live portal request, remind the user to stop,
+    or with their OK force-stop via ADB, both StbEmu (com.mvas.stb.emu.pro) and TiviMate
+    (ar.tvplayer.tv), so the MAC never has two concurrent sessions.
+13. Debug-only diagnostics: OkHttp logging interceptor whose saved/shared output redacts
+    MACs, tokens, portal hosts; structured Media3 error and codec/stream logging readable
+    via adb logcat (stream URLs redacted). None of this in release builds.
+14. Fire TV UX from the start: D-pad navigation, reliable focus, fast paging for large
+    catalogs (about 100k movies, 28k shows), search, favorites.
+
+## Before publishing on GitHub (open decisions)
+- License not chosen yet. Package name must move off com.example.*.
+- Review docs/ for provider-specific detail before making the repo public; the
+  provider is never named, but findings describe its setup.
 
 ## Secret handling
 - Secrets live outside this repo and outside Google Drive sync, in

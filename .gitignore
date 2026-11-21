@@ -9,6 +9,15 @@ docs/env_report.local.txt
 docs/*.local.md
 probe_output/
 captures/
+# Local dev config for the app/probe (portal URL, MAC): never commit.
+dev-config*.json
+# Raw network captures and device logs (may contain stream URLs, tokens, MACs).
+*.har
+*.pcap
+*.pcapng
+logs/
+logcat*.txt
+*.logcat
 *.jks
 *.keystore
 
