@@ -179,4 +179,17 @@ class RedactorTest {
         listOf("name", "number", "status", "port", "max_connections", "exp_date")
             .forEach { assertFalse(Redactor.isSensitiveKey(it), it) }
     }
+
+    @Test fun `stalker portal path survives the URL shape rule when the host is a secret`() {
+        val r = Redactor(mapOf("PORTAL_HOST" to "localhost"))
+        val out = r.redact("http://localhost:52955/stalker_portal/server/load.php")
+        assertEquals("http://<PORTAL_HOST>:52955/stalker_portal/server/load.php", out)
+    }
+
+    @Test fun `a long token containing a slash is still masked`() {
+        val token = "Zq9xT7kLmN2pR8sV4wY6bH1cD3fG5jK0/aX7bQ2nM9vL4tR1"
+        val out = Redactor(emptyMap()).redact("token-like: $token")
+        assertFalse(out.contains(token), out)
+        assertTrue(out.contains("<TOKEN>"), out)
+    }
 }

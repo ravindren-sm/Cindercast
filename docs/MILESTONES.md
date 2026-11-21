@@ -186,3 +186,8 @@ Remaining for M2.0's done condition: the setup screen with the sealed settings s
 - Tests: 5 new in `app/src/testDebug` against a local fake portal: fields present, no host, port, MAC (all spellings), token or query marker leaks, a failing request still logs a redacted FAILED line, unsafe type/action values show as `?`, and session keep-alive traffic is logged through the hook.
 - Found while testing: the provider Redactor's URL rule mangles some stalker paths (its long-token rule could eat part of a path). The logger therefore builds the URL shape itself and still runs the final line through Redactor.
 - Not done: no device run and no provider contact for this slice.
+
+## Redactor fix: stalker paths with a long port (2026-11-21)
+- Found: a URL with a 5-digit port and a stalker path (for example `:52955/stalker_portal/server/load.php`) came out as `<TOKEN>.php`. The long-token rule matched the path shape the URL rule had just kept.
+- Fix: the long-token rule now leaves a slash-separated run alone only when every part is a protocol path word, a digit-only part, or the start of a file name followed by a short extension. Real token-like runs are still masked.
+- Tests: RedactorTest regression for the stalker path, and a check that a long token containing a slash is still masked. 112 provider and debug app unit tests pass.

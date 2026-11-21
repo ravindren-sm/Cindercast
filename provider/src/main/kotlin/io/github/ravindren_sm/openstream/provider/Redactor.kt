@@ -51,7 +51,13 @@ class Redactor(secrets: Map<String, String>) {
         out = MAC_URL_ENCODED.replace(out, "<MAC>")
         out = BEARER.replace(out, "Bearer <TOKEN>")
         out = LONG_HEX.replace(out, "<HEX>")
-        out = LONG_TOKEN.replace(out, "<TOKEN>")
+        // A run that is only URL path shape (protocol words, digits such as a port) is not a
+        // token, even when it is long: masking it would cut the URL shape that is kept above.
+        val beforeTokens = out
+        out = LONG_TOKEN.replace(beforeTokens) { m ->
+            val rest = beforeTokens.substring(m.range.last + 1)
+            if (isPathShapeOnly(m.value, rest)) m.value else "<TOKEN>"
+        }
         return out
     }
 
@@ -119,6 +125,18 @@ class Redactor(secrets: Map<String, String>) {
         Regex(Regex.escape(variant), RegexOption.IGNORE_CASE)
 
     // ---- URLs ----------------------------------------------------------------
+
+    /** True for a slash-separated run made only of protocol path words and digit-only parts (for example a port). */
+    private fun isPathShapeOnly(run: String, rest: String): Boolean {
+        if (!run.contains('/')) return false
+        // The run stops at a '.', so the last segment may be the start of a file name ("load" of "load.php").
+        val segments = run.split('/')
+        val (init, last) = segments.dropLast(1) to segments.last()
+        val initOk = init.all { seg -> seg.isEmpty() || seg.lowercase() in SAFE_PATH_SEGMENTS || seg.all { it.isDigit() } }
+        val lastOk = last.isEmpty() || SAFE_PATH_SEGMENTS.any { it.startsWith(last.lowercase()) } || last.all { it.isDigit() }
+        val extensionOk = rest.isEmpty() || rest[0] != '.' || Regex("^\\.[a-z]{1,8}(?![A-Za-z0-9])").containsMatchIn(rest)
+        return initOk && lastOk && extensionOk
+    }
 
     private fun urlShape(scheme: String, rest: String): String {
         // rest = host[:port][/path][?query][#fragment]
