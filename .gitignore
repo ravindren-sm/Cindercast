@@ -1,0 +1,22 @@
+# Secrets and device identifiers: never commit
+.env
+.env.*
+*.secrets
+secrets/
+local.properties
+*.local.*
+docs/env_report.local.txt
+docs/*.local.md
+probe_output/
+captures/
+*.jks
+*.keystore
+
+# Build output
+build/
+.gradle/
+.kotlin/
+.idea/
+*.apk
+*.aab
+.DS_Store
