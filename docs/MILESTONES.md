@@ -51,7 +51,8 @@ Compose for TV on top of `:provider`.
 Tasks, in order:
 1. Decisions: license MIT (decided 2026-11-21; LICENSE added here, copyright line "Sriram Ravindren"
    from the git author name, changeable); app name OpenStream (decided; no IPTV project of that name
-   found, trademark not checked); package id still open; add a LICENSE file to the OpenStream
+   found, trademark not checked); package id `io.github.ravindren_sm.openstream` (chosen);
+   add a LICENSE file to the OpenStream
    prototype repo too (owner action: no push access from here).
 2. Compose theme from `tokens.ts`: colors, type scale, spacing, radii, badges.
 3. Focus and navigation base: single-focus rule, back stack with focus restore, overlay focus
@@ -61,7 +62,7 @@ Tasks, in order:
 Done: theme + navigation shell + setup screen running on the Fire TV with sample data.
 
 ## M2: App foundation (offline, then Phase 3 approval to install)
-- Rename the package off `com.example.*`; choose a license (open decision).
+- Package renamed to `io.github.ravindren_sm.openstream` and license chosen (MIT), 2026-11-21.
 - `:app` depends on `:provider` (plain Kotlin; reused as is).
 - On-device setup screen: portal URL and MAC entered with the remote. Stored encrypted with
   an Android Keystore key. Note: `EncryptedSharedPreferences` (CLAUDE.md) is deprecated

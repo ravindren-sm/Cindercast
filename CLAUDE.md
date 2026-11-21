@@ -39,7 +39,7 @@ Full plan: docs/PROJECT_PLAN.md
 7. Do not build the full UI before provider compatibility is proven (Phase 2 gate).
 8. Native macOS tools only. No Windows, WSL, or Docker.
 9. Do not deploy an APK until the user approves Phase 3 in chat.
-   Exception granted 2026-11-20: the Phase 1 hello app (com.example.firetvhello)
+   Exception granted 2026-11-20: the Phase 1 hello app (io.github.ravindren_sm.openstream)
    may be installed. Phase 3 go-ahead 2026-11-21 ("build the debug player"): debug builds
    of the player may be installed for testing. Release builds still need user approval.
 
@@ -65,8 +65,10 @@ Full plan: docs/PROJECT_PLAN.md
 - License: MIT, decided by the user 2026-11-21 (LICENSE added; the copyright line uses the git
   author name and can be changed). App name: OpenStream (decided 2026-11-21). A web search found no
   IPTV project with that name; one small unrelated Google Play podcast/radio app is called
-  OpenStream; trademark databases were not checked. Package id still to decide: it must move off
-  com.example.* (it also appears in scripts/push_dev_config.sh and scripts/pull_debug_log.sh).
+  OpenStream; trademark databases were not checked. Package id: io.github.ravindren_sm.openstream
+  (chosen 2026-11-21; was com.example.firetvhello for the debug app, so an older debug install on
+  the Fire TV is a separate app that can be removed). Library and probe packages are
+  io.github.ravindren_sm.openstream.provider and .probe.
 - Review docs/ for provider-specific detail before making the repo public; the
   provider is never named, but findings describe its setup.
 

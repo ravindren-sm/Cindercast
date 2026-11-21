@@ -3,7 +3,7 @@
 # The lines are already redacted by the app; this script prints nothing else.
 # Debug builds only (run-as). Usage: bash scripts/pull_debug_log.sh
 set -euo pipefail
-PKG="com.example.firetvhello"
+PKG="io.github.ravindren_sm.openstream"
 FILE="${FIRETV_IPTV_SECRETS:-$HOME/.config/firetv-iptv/secrets.env}"
 ADB="${ADB:-$HOME/Library/Android/sdk/platform-tools/adb}"
 SERIAL="${ADB_SERIAL:-$(python3 -I - "$FILE" <<'PY'

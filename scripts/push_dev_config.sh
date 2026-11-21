@@ -15,7 +15,7 @@
 # FIRETV_IP is read from the same file; ADB_SERIAL can override the device.
 set -euo pipefail
 
-PKG="com.example.firetvhello"
+PKG="io.github.ravindren_sm.openstream"
 FILE="${FIRETV_IPTV_SECRETS:-$HOME/.config/firetv-iptv/secrets.env}"
 ADB="${ADB:-$HOME/Library/Android/sdk/platform-tools/adb}"
 GENRE="${1:-ENGLISH USA LOCAL}"; CHANNEL="${2:-NEWS 12 LONG ISLAND}"

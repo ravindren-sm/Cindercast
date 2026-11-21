@@ -18,7 +18,7 @@ kotlin {
 }
 
 android {
-    namespace = "com.example.firetvhello"
+    namespace = "io.github.ravindren_sm.openstream"
     // The installed platform is android-37.0 (minor 0). Ask AGP for that exact release.
     compileSdk {
         version = release(37) {
@@ -27,7 +27,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.firetvhello"
+        applicationId = "io.github.ravindren_sm.openstream"
         // minSdk 25 keeps room for older Fire TV models; the test device is API 30.
         minSdk = 25
         targetSdk = 37

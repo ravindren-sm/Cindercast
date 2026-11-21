@@ -22,7 +22,7 @@ kotlin {
 }
 
 application {
-    mainClass.set("com.example.firetviptv.probe.MainKt")
+    mainClass.set("io.github.ravindren_sm.openstream.probe.MainKt")
 }
 
 dependencies {
