@@ -57,6 +57,17 @@ class HttpProbeTest {
         assertTrue(server.requestCount <= 1, "client retried: ${server.requestCount} requests")
     }
 
+    @Test fun `a connection the server closed after answering does not break the next request`() {
+        // A server with a short idle timeout answers, then closes the socket without a "Connection: close"
+        // header. Reusing that pooled connection would fail at once (retries are off by design).
+        repeat(2) { server.enqueue(MockResponse().setResponseCode(200).setBody("ok").setSocketPolicy(SocketPolicy.DISCONNECT_AT_END)) }
+        val p = HttpProbe(budget())
+        assertIs<ProbeOutcome.Response>(p.send(req()))
+        Thread.sleep(300)   // let the close reach the client
+        assertIs<ProbeOutcome.Response>(p.send(req()))
+        assertEquals(2, server.requestCount)
+    }
+
     @Test fun `every send consumes budget and the cap stops the next one`() {
         repeat(2) { server.enqueue(MockResponse().setResponseCode(204)) }
         val p = HttpProbe(budget(max = 2))

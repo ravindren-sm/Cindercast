@@ -1,5 +1,6 @@
 package io.github.ravindren_sm.openstream.provider
 
+import okhttp3.ConnectionPool
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -16,7 +17,9 @@ import java.util.concurrent.TimeUnit
  *   to the caller as [ProbeOutcome.Failure], never retried.
  * - No redirects followed: a redirect is recorded (Location shape) but not visited,
  *   so a request cannot wander to another host.
- * - No cookie storage, no cache.
+ * - No cookie storage, no cache, and no connection reuse: every request opens a fresh connection.
+ *   A server that closes an idle connection (the 120 s keep-alive is longer than many idle
+ *   timeouts) would otherwise fail the next request at once, because retries are off.
  * - TLS: OkHttp defaults, which validate the certificate chain and hostname against
  *   the JDK trust store. There is no code path that relaxes this (hard rule 4).
  * - At most [maxBodyBytes] of a response body are read.
@@ -113,6 +116,7 @@ class HttpProbe internal constructor(
 
         internal fun defaultClient(interceptors: List<Interceptor> = emptyList()): OkHttpClient = OkHttpClient.Builder()
             .retryOnConnectionFailure(false)
+            .connectionPool(ConnectionPool(0, 1, TimeUnit.SECONDS))   // keeps no idle connections: see the class comment
             .followRedirects(false)
             .followSslRedirects(false)
             .connectTimeout(10, TimeUnit.SECONDS)
