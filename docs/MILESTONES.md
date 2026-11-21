@@ -166,3 +166,10 @@ Remaining for M2.0's done condition: the setup screen with the sealed settings s
 - Test lesson: a cold start takes about 5 s and key events sent before the window has focus are dropped; on-device scripts must wait about 9 s after launch. Earlier "Back leaves the step" reports were this timing artifact, not an app bug.
 - Not yet verified on device: Save with a successful test (needs a real portal, held for the M2 session wiring), "unreadable settings" notice, Home start when settings exist.
 - Remaining for M2.0's done condition: none for the screen itself; those three checks fold into the M2 wiring work.
+
+## M2 session wiring (2026-11-21, fourth slice)
+- Added `PortalSession` (app): one background thread owns the portal session. It connects when the app is in the foreground and a portal is configured, sends the watchdog every 120 s, and stops entirely in the background (so an idle TV does not hold the MAC's single session). Status (`Idle`, `Connecting`, `Ready(expiry)`, `Degraded`, `Failed(fixed message)`) is Compose state; a one-line status sits under the tab bar. Saving in setup, or starting with saved settings, configures it.
+- Tests (5, against a local fake portal): connect and expiry, repeated keep-alives, silence in the background and reconnect on return, no portal configured, refused handshake. 93 local tests in all.
+- Verified on the Fire TV with placeholder settings (no provider contact): Home starts with saved settings, shows the fixed "could not reach" line, and survives background and resume. Placeholder settings cleared afterwards.
+- Not verified: a successful live session and a real keep-alive on device (needs a Phase 2 approval to contact the provider); re-auth on a real expiry is still unobserved.
+- Still to do in M2: debug-only OkHttp interceptor (rule 13).

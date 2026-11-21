@@ -52,7 +52,7 @@ fun SetupScreen(
     store: SettingsStore,
     memory: FocusMemory,
     notice: String?,
-    onSaved: () -> Unit,
+    onSaved: (PortalSettings) -> Unit,
     onSkip: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -139,7 +139,7 @@ fun SetupScreen(
                     })
                     OsButton("setup-save", memory, "Save and continue", enabled = test is TestResult.Success, onSelect = {
                         val valid = validation as? PortalSettings.Result.Valid ?: return@OsButton
-                        try { store.save(valid.settings); onSaved() }
+                        try { store.save(valid.settings); onSaved(valid.settings) }
                         catch (_: java.io.IOException) { saveError = "Could not save the settings on this device." }
                     })
                     OsButton("setup-back", memory, "Back", onSelect = { step = SetupStep.WELCOME; test = TestResult.Idle })

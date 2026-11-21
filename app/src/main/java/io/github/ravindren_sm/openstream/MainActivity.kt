@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import io.github.ravindren_sm.openstream.data.AndroidKeystoreKey
+import io.github.ravindren_sm.openstream.data.PortalSession
 import io.github.ravindren_sm.openstream.data.SettingsStore
 import io.github.ravindren_sm.openstream.ui.AppShell
 import io.github.ravindren_sm.openstream.ui.theme.OpenStreamTheme
@@ -24,6 +25,12 @@ import java.io.File
  * The debug player and self-test live in the debug source set and are not in release builds.
  */
 class MainActivity : ComponentActivity() {
+    private val session = PortalSession()
+
+    override fun onStart() { super.onStart(); session.onForeground() }
+    override fun onStop() { session.onBackground(); super.onStop() }
+    override fun onDestroy() { if (isFinishing) session.shutdown(); super.onDestroy() }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val store = try {
@@ -34,7 +41,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             OpenStreamTheme {
                 if (store != null) {
-                    AppShell(store = store, onExit = { finish() })
+                    AppShell(store = store, session = session, onExit = { finish() })
                 } else {
                     Box(Modifier.fillMaxSize().background(Tokens.BgCanvas).padding(Spacing.SafeHorizontal)) {
                         Text(

@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import io.github.ravindren_sm.openstream.data.PortalSession
 import io.github.ravindren_sm.openstream.data.SettingsStore
 import io.github.ravindren_sm.openstream.nav.NavStack
 import io.github.ravindren_sm.openstream.nav.Route
@@ -18,6 +19,7 @@ import io.github.ravindren_sm.openstream.nav.tabFocusId
 import io.github.ravindren_sm.openstream.ui.components.TopNavBar
 import io.github.ravindren_sm.openstream.ui.focus.FocusMemory
 import io.github.ravindren_sm.openstream.ui.screens.PlaceholderScreen
+import io.github.ravindren_sm.openstream.ui.screens.SessionStatusLine
 import io.github.ravindren_sm.openstream.ui.screens.SetupScreen
 import io.github.ravindren_sm.openstream.ui.screens.initialFocusId
 import io.github.ravindren_sm.openstream.ui.theme.Tokens
@@ -31,12 +33,14 @@ import io.github.ravindren_sm.openstream.ui.theme.Tokens
  * initial focus, then to the active tab. Back pops the stack; at the root it calls [onExit].
  */
 @Composable
-fun AppShell(store: SettingsStore, onExit: () -> Unit) {
+fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     // First run (or unreadable settings) starts on the setup screen; otherwise on Home.
     val loaded = remember { store.load() }
     val notice = if (loaded is SettingsStore.Loaded.Unreadable) "The saved settings could not be opened on this device. Please enter them again." else null
     var stack by remember { mutableStateOf(NavStack.start(if (loaded is SettingsStore.Loaded.Found) Route.HOME else Route.SETUP)) }
     val memory = remember { FocusMemory() }
+    // A portal already saved: hand it to the session (it connects while the app is in the foreground).
+    LaunchedEffect(Unit) { (loaded as? SettingsStore.Loaded.Found)?.let { session.configure(it.settings) } }
 
     BackHandler {
         if (memory.justFinishedEditing()) return@BackHandler    // that Back closed a keyboard
@@ -52,7 +56,7 @@ fun AppShell(store: SettingsStore, onExit: () -> Unit) {
                 store = store,
                 memory = memory,
                 notice = notice,
-                onSaved = { stack = NavStack.start(Route.HOME) },
+                onSaved = { settings -> session.configure(settings); stack = NavStack.start(Route.HOME) },
                 onSkip = { stack = NavStack.start(Route.HOME) },
             )
         } else {
@@ -61,6 +65,7 @@ fun AppShell(store: SettingsStore, onExit: () -> Unit) {
                 memory = memory,
                 onSelectTab = { tab -> stack = stack.resetToTab(tab) },
             )
+            SessionStatusLine(session.status)
             PlaceholderScreen(
                 entry = stack.current,
                 memory = memory,

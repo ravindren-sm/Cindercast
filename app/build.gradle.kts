@@ -77,4 +77,5 @@ dependencies {
 
     testImplementation(libs.junit4)
     testImplementation(libs.kotlin.test.junit)
+    testImplementation(libs.okhttp.mockwebserver)   // local fake portal; tests never touch the provider
 }
