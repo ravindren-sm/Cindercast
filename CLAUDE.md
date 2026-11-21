@@ -11,7 +11,9 @@ on the channel TiviMate plays. RESOLVED 2026-11-21: the debug player on the Fire
 live TV (PLAYBACK_VERIFIED_ON_DEVICE); the 403 is Mac-specific. Mac probing stopped.
 Step 4e (on device): VOD_CATALOG_LISTED: 164 categories, 104,000 items, shows inside type=vod.
 Step 4f (on device): VOD_MOVIE_PLAYED and VOD_EPISODE_PLAYED (show > season > episode > file).
-Next: 4g keep-alive. Playback unverified. Milestones: docs/MILESTONES.md. Findings: docs/PROVIDER_FINDINGS.md. Plan: docs/PHASE2_PROBE_PLAN.md
+Step 4g: KEEPALIVE_VERIFIED (watchdog every 120 s; token valid with and without it over
+~8 min; re-auth unit-tested only). M1 complete. Debug app logs to files/debug-log.txt. Ask before changing any device setting
+(for example stay-awake), even temporarily. Playback unverified. Milestones: docs/MILESTONES.md. Findings: docs/PROVIDER_FINDINGS.md. Plan: docs/PHASE2_PROBE_PLAN.md
 Repo: ~/Developer/firetv-iptv (outside Google Drive). Build with ./gradlew using
 Android Studio's JBR as JAVA_HOME; wrapper pins Gradle 9.5.0 (AGP 8.x breaks on 9.6+).
 Full plan: docs/PROJECT_PLAN.md

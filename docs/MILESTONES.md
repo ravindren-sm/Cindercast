@@ -22,12 +22,14 @@ Done: our client obtained a session token (HANDSHAKE_ACCEPTED). Nothing else ver
 | 4d live link (2026-11-21: link created; HLS; edge 403 to the probe, stopped) | 5 (+2 redirect hops) | `create_link` gives a stream; container | First 64 KB is MPEG-TS or HLS |
 | 4e VOD catalog (DONE 2026-11-21, on device) | 6 | VOD categories, movie paging, series markers | 164 categories, 104,000 items; shows inside type=vod (is_series=1); no series module |
 | 4f VOD link: DONE 2026-11-21: movie (HEVC, seek 0.9 s) and episode (4-level navigation, seek 0.8 s) | 5 / 8 | Movie and episode `create_link` | Plays on the device with a working seek |
-| 4g keep-alive (new, offline first) | small, spaced | Watchdog/events polling keeps the token valid | Token still valid after a timed wait |
+| 4g keep-alive: DONE 2026-11-21 (watchdog x3 ok; token valid with and without keep-alive; re-auth unit-tested) | 7-10 | Watchdog/events polling keeps the token valid | Token still valid after a timed wait |
 
 Small offline fixes before 4b: show the handshake's `not_valid` flag (0/1, not identifying).
 If 4b fails on device fields (serial, device IDs, signature), add them as optional local
 secrets read from StbEmu's settings screen by the user (looking only).
 Done: all six steps pass, recorded in docs/PROVIDER_FINDINGS.md.
+
+M1 status 2026-11-21: complete on the device (4a-4g). Only a live re-authentication is unobserved.
 
 ## M1.5: Debug player on the device (done 2026-11-21)
 Done: live channel plays on the Fire TV through :provider + Media3 (HLS, H.264 1080p, AAC).

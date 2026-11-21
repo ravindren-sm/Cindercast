@@ -27,7 +27,7 @@ data class DevConfig(
     val identity: StalkerIdentity,
     /** "player" (Media3 default), "mag" (MAG box UA) or "honest" (probe UA) for stream requests. */
     val streamUserAgent: String,
-    /** "live", "vod-catalog" (4e), "vod-movie" or "vod-episode" (4f: play one VOD item, seek check). */
+    /** "live", "vod-catalog" (4e), "vod-movie"/"vod-episode" (4f), or "keepalive" (4g, no playback). */
     val mode: String = "live",
     /** VOD category title for 4f (exact match, else shortest title containing it). */
     val vodCategory: String = "ENGLISH MOVIES",

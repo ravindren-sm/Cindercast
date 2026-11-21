@@ -93,6 +93,10 @@ object StalkerRequests {
         else -> "files of an episode"
     }
 
+    /** Session keep-alive (the shape open-source clients send), interval below watchdog_timeout. */
+    fun watchdog(ctx: Context) = build(ctx, "Step 4g: watchdog get_events (keep-alive)",
+        "type" to "watchdog", "action" to "get_events", "init" to "0", "cur_play_type" to "1", "event_active_id" to "0")
+
     /** VOD create_link: movie (series "") or episode (series = episode number on older portals). */
     fun vodCreateLink(ctx: Context, cmd: String, series: String = "") = build(ctx,
         "Step 4f: VOD create_link (${if (series.isEmpty()) "movie or episode cmd" else "episode number"})",
@@ -143,6 +147,16 @@ class StalkerResult(val outcome: ProbeOutcome, internal val js: JsonElement?, va
 
     /** Whether the payload is a JSON object (as opposed to an array, scalar or nothing). */
     val isObject: Boolean get() = js is JsonObject
+
+    /**
+     * The portal's expired-session signal: an HTTP 200 whose body is the text
+     * "Authorization failed." instead of JSON (behavior of Stalker middleware as handled by
+     * open-source clients). The caller re-authenticates once.
+     */
+    val authFailed: Boolean get() {
+        val resp = outcome as? ProbeOutcome.Response ?: return false
+        return js == null && String(resp.bodyPrefix, Charsets.UTF_8).contains("Authorization failed", ignoreCase = true)
+    }
 }
 
 /**
@@ -353,6 +367,23 @@ class StalkerClient(
             )
     }
 
+    /** Keep-alive call. Summary: data keys and the event name if one is pending (not identifying). */
+    fun watchdog(): StalkerResult = call(StalkerRequests.watchdog(ctx())) { js ->
+        val data = (js as? JsonObject)?.get("data") as? JsonObject
+        listOfNotNull(
+            "watchdog ok",
+            data?.let { "data keys: ${it.keys.sorted().joinToString(",")}" },
+            data?.str("event")?.takeIf { it.isNotBlank() }?.let { "pending event: $it" },
+        ) + keysLine(js)
+    }
+
+    /** Re-authenticates after an expired session: handshake (new token) then get_profile. */
+    fun reauthenticate(): Pair<StalkerResult, StalkerResult?> {
+        val hs = handshake()
+        if (!hs.ok || token == null) return hs to null
+        return hs to profile()
+    }
+
     /** Returns the first channel's cmd through [firstCmd] for create_link. */
     fun channelsPage1(): Pair<StalkerResult, String?> {
         var cmd: String? = null
@@ -391,7 +422,13 @@ class StalkerClient(
     private fun call(request: ProbeRequest, summarize: (JsonElement?) -> List<String>): StalkerResult {
         val outcome = probe.send(request)
         val js = (outcome as? ProbeOutcome.Response)?.let { parseJs(it.bodyPrefix) }
-        val summary = if (js != null) summarize(js) else listOf("no JSON payload in the response")
+        val body = (outcome as? ProbeOutcome.Response)?.bodyPrefix
+        val summary = when {
+            js != null -> summarize(js)
+            body != null && String(body, Charsets.UTF_8).contains("Authorization failed", ignoreCase = true) ->
+                listOf("portal says: Authorization failed (session expired)")
+            else -> listOf("no JSON payload in the response")
+        }
         return StalkerResult(outcome, js, summary)
     }
 

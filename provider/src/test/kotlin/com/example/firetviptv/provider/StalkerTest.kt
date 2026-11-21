@@ -260,6 +260,46 @@ class StalkerTest {
         assertFalse(inline.joinToString().contains("/media"))
     }
 
+    @Test fun `watchdog request shape and summary`() {
+        server.enqueue(json("""{"js":{"token":"t0k3n"}}"""))
+        server.enqueue(json("""{"js":{"data":{"msgs":0,"additional_services_on":"1","event":""}}}"""))
+        val c = client(); c.handshake()
+        val w = c.watchdog()
+        assertTrue(w.ok && w.summary.first() == "watchdog ok", w.summary.toString())
+        assertTrue(w.summary.any { it == "data keys: additional_services_on,event,msgs" }, w.summary.toString())
+        server.takeRequest()
+        val r = server.takeRequest()
+        val u = r.requestUrl!!
+        assertEquals("watchdog", u.queryParameter("type")); assertEquals("get_events", u.queryParameter("action"))
+        assertEquals("0", u.queryParameter("init")); assertEquals("1", u.queryParameter("cur_play_type"))
+        assertEquals("0", u.queryParameter("event_active_id")); assertEquals("Bearer t0k3n", r.getHeader("Authorization"))
+    }
+
+    @Test fun `Authorization failed is detected and reauthentication gets a new token`() {
+        server.enqueue(json("""{"js":{"token":"OLDTOKEN1"}}"""))
+        server.enqueue(MockResponse().setResponseCode(200).setBody("Authorization failed."))
+        server.enqueue(json("""{"js":{"token":"NEWTOKEN2","not_valid":0}}"""))
+        server.enqueue(json("""{"js":{"status":0,"blocked":"0"}}"""))
+        server.enqueue(json("""{"js":[{"id":"1","title":"News"}]}"""))
+        val c = client(); c.handshake()
+        val expired = c.genres()
+        assertTrue(expired.authFailed && !expired.ok)
+        assertEquals(listOf("portal says: Authorization failed (session expired)"), expired.summary)
+        val (hs, profile) = c.reauthenticate()
+        assertTrue(hs.ok && profile!!.ok && profile.field("status") == "0")
+        assertTrue(c.genres().ok)
+        repeat(4) { server.takeRequest() }
+        assertEquals("Bearer NEWTOKEN2", server.takeRequest().getHeader("Authorization"))
+        assertFalse(expired.summary.joinToString().contains("TOKEN"))
+    }
+
+    @Test fun `a normal non-JSON body is not mistaken for an auth failure`() {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("<html>maintenance</html>"))
+        val r = client().handshake()
+        assertFalse(r.authFailed)
+        assertEquals(listOf("no JSON payload in the response"), r.summary)
+    }
+
     @Test fun `vod cmd kinds`() {
         assertEquals("server path", StalkerClient.vodCmdKind("/media/x.mpg"))
         assertTrue(StalkerClient.vodCmdKind("eyJ0eXBlIjoibW92aWUifQ==").startsWith("base64-like"))

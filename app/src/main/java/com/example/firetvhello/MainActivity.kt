@@ -91,7 +91,9 @@ class MainActivity : ComponentActivity() {
             return
         }
         log("Config loaded: $config")
-        if (config.mode == "vod-catalog") {
+        if (config.mode == "keepalive") {
+            Thread({ runKeepAlive(config) }, "keepalive").start()
+        } else if (config.mode == "vod-catalog") {
             Thread({ runVodCatalog(config) }, "vod-catalog").start()
         } else if (config.mode == "vod-movie" || config.mode == "vod-episode") {
             seekCheckPending = true
@@ -109,11 +111,19 @@ class MainActivity : ComponentActivity() {
 
     // ---- logging ---------------------------------------------------------------------
 
-    /** Every line is redacted before it reaches logcat or the screen. */
+    /**
+     * Run log in app-private storage (files/debug-log.txt), recreated at each launch. logcat's
+     * 256 KB ring buffer on the Fire TV overwrote a 9-minute run (Step 4g), so the redacted lines
+     * are also kept here. Read with: adb shell run-as <pkg> cat files/debug-log.txt
+     */
+    private val runLog: java.io.File by lazy { java.io.File(filesDir, "debug-log.txt").also { it.writeText("") } }
+
+    /** Every line is redacted before it reaches logcat, the screen or the run log file. */
     private fun log(message: String) {
         val t = (SystemClock.elapsedRealtime() - startMs) / 1000.0
         val safe = redactor.redact("[%.1fs] %s".format(t, message))
         Log.i(TAG, safe)
+        synchronized(runLog) { runLog.appendText(safe + "\n") }
         runOnUiThread {
             lines += safe
             while (lines.size > MAX_LINES) lines.removeAt(0)
@@ -267,6 +277,64 @@ class MainActivity : ComponentActivity() {
             runOnUiThread { exo.setMediaItem(MediaItem.fromUri(url)); exo.prepare(); exo.playWhenReady = true }
         } catch (e: Exception) {
             log("VOD playback error: ${redactor.redact(e)}")
+        }
+    }
+
+    /**
+     * Step 4g keep-alive test, no playback, at most 10 portal requests over about 8.5 minutes
+     * (ProbeRequests.keepAlivePlan):
+     *   handshake, profile; watchdog at 0/120/240 s; genres check (~250 s);
+     *   240 s idle without watchdog; genres check;
+     *   only if that check reports "Authorization failed": handshake, profile, genres.
+     */
+    private fun runKeepAlive(config: DevConfig) {
+        val budget = RequestBudget(maxRequests = 10)
+        val client = StalkerClient(config.portalUrl, config.mac, HttpProbe(budget, maxBodyBytes = 1_000_000), config.identity)
+        fun step(label: String, r: StalkerResult): Boolean {
+            val status = (r.outcome as? ProbeOutcome.Response)?.status?.toString()
+                ?: "transport failure (${(r.outcome as ProbeOutcome.Failure).error::class.simpleName})"
+            log("$label: $status${if (r.authFailed) " (AUTH FAILED)" else ""}")
+            r.summary.forEach { log("  $it") }
+            return r.ok
+        }
+        try {
+            log("Step 4g keep-alive: up to 10 portal requests, ~8.5 min, no playback")
+            if (!step("handshake", client.handshake()) || client.token == null) { log("STOP: no token"); return }
+            val profile = client.profile()
+            if (!step("get_profile", profile) || profile.field("status") != "0") { log("STOP: profile not authorized"); return }
+            log("profile timeslot (pvr.stalker's watchdog interval): ${profile.field("timeslot") ?: "-"}")
+
+            for (i in 0 until 3) {
+                if (i > 0) { log("waiting 120 s until the next watchdog"); Thread.sleep(120_000) }
+                if (!step("watchdog #${i + 1}", client.watchdog())) { log("STOP: watchdog failed"); return }
+            }
+            Thread.sleep(10_000)
+            val withKeepAlive = client.genres()
+            step("check after ~250 s WITH keep-alive (get_genres)", withKeepAlive)
+            log("RESULT A: token ${if (withKeepAlive.ok) "VALID" else if (withKeepAlive.authFailed) "EXPIRED" else "check failed"} after ~250 s with keep-alive")
+
+            log("idle 240 s WITHOUT watchdog (longer than watchdog_timeout 180 s)")
+            Thread.sleep(240_000)
+            val idle = client.genres()
+            step("check after 240 s idle (get_genres)", idle)
+            when {
+                idle.ok -> log("RESULT B: token still VALID after 240 s idle; re-auth path not exercised live (unit-tested)")
+                idle.authFailed -> {
+                    log("RESULT B: token EXPIRED after 240 s idle; re-authenticating once")
+                    val (hs, prof) = client.reauthenticate()
+                    step("re-auth handshake", hs)
+                    prof?.let { step("re-auth get_profile", it) }
+                    if (prof?.ok == true && prof.field("status") == "0") {
+                        val after = client.genres()
+                        step("check after re-auth (get_genres)", after)
+                        log("RESULT C: re-auth ${if (after.ok) "WORKED" else "did not restore access"}")
+                    } else log("RESULT C: re-auth failed")
+                }
+                else -> log("RESULT B: check failed for another reason (see status above)")
+            }
+            log("Step 4g done")
+        } catch (e: Exception) {
+            log("keep-alive error: ${redactor.redact(e)}")
         }
     }
 

@@ -99,3 +99,19 @@ Update after the first episode run (2026-11-21): navigation is show -> seasons -
 `get_ordered_list&movie_id=<show>&season_id=<season>&episode_id=<episode>`; each file should
 carry the `cmd` for `create_link`. The client uses inline `series_files` cmds if present,
 otherwise requests the file level.
+
+## Session keep-alive design (Step 4g, 2026-11-21; assumptions until verified live)
+- Watchdog: `type=watchdog&action=get_events&init=0&cur_play_type=1&event_active_id=0`, with the
+  bearer token (stalkerhek and pvr.stalker send this shape). Interval 120 s, safely inside this
+  portal's `watchdog_timeout` of 180 s. pvr.stalker uses the profile's `timeslot`; to compare later.
+- Expiry signal: both reference clients treat a non-JSON body `Authorization failed.` as an
+  expired session and re-run handshake + `get_profile`. Our client flags such a response as
+  `authFailed` and re-authenticates once (no loops).
+
+One-run device test (at most 10 portal requests, about 8.5 minutes, no playback):
+1. handshake, `get_profile`                                   (2)
+2. watchdog at t = 0, 120, 240 s                              (3)
+3. at about 250 s: `get_genres` as an authenticated check     (1)  -> token valid with keep-alive?
+4. 240 s idle, no watchdog; then `get_genres` again           (1)  -> does the token expire without it?
+5. only if step 4 says `Authorization failed.`: handshake, `get_profile`, `get_genres` (3)
+If step 4 still succeeds, the re-auth path is covered by unit tests only, and the log says so.

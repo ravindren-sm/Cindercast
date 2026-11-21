@@ -5,6 +5,7 @@
 #   bash scripts/push_dev_config.sh [genre] [channel] [identity] [streamUserAgent] [mode] [vodCategory]
 #   defaults: "ENGLISH USA LOCAL" "NEWS 12 LONG ISLAND" honest player live "ENGLISH MOVIES"
 #   mode: live | vod-catalog (4e, no playback) | vod-movie | vod-episode (4f, play + seek check)
+#         | keepalive (4g, ~8.5 min, no playback)
 #
 # How secrets stay out of sight (CLAUDE.md rules 3 and 10):
 # - PORTAL_URL and EMU_MAC are read from the local secrets file by Python (not the shell),

@@ -96,13 +96,13 @@ class ProbeRequestsTest {
         assertEquals(
             setOf(ProbeStep.PORTAL_HANDSHAKE, ProbeStep.PORTAL_PROFILE, ProbeStep.PORTAL_CHANNELS, ProbeStep.PORTAL_LINK,
                 ProbeStep.PORTAL_LINK_CHANNEL, ProbeStep.PORTAL_VOD_CATALOG, ProbeStep.PORTAL_VOD_MOVIE,
-                ProbeStep.PORTAL_VOD_EPISODE),
+                ProbeStep.PORTAL_VOD_EPISODE, ProbeStep.PORTAL_KEEPALIVE),
             ProbeStep.entries.filter { it.usesMac }.toSet(),
         )
-        assertEquals(listOf(1, 2, 4, 5, 6, 6, 5, 8), listOf(
+        assertEquals(listOf(1, 2, 4, 5, 6, 6, 5, 8, 10), listOf(
             ProbeStep.PORTAL_HANDSHAKE, ProbeStep.PORTAL_PROFILE, ProbeStep.PORTAL_CHANNELS, ProbeStep.PORTAL_LINK,
             ProbeStep.PORTAL_LINK_CHANNEL, ProbeStep.PORTAL_VOD_CATALOG, ProbeStep.PORTAL_VOD_MOVIE,
-            ProbeStep.PORTAL_VOD_EPISODE,
+            ProbeStep.PORTAL_VOD_EPISODE, ProbeStep.PORTAL_KEEPALIVE,
         ).map { ProbeRequests.forStep(it, secrets).size })
     }
 
