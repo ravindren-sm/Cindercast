@@ -1,0 +1,6 @@
+{
+  "name": "OpenStream TV — 10-Foot Fire TV IPTV Prototype",
+  "description": "A 1920x1080 D-pad-only 10-foot TV UI design reference prototype for a free, open-source Amazon Fire TV IPTV client built for Jetpack Compose for TV handoff.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
