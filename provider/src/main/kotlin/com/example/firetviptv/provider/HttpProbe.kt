@@ -23,12 +23,12 @@ import java.util.concurrent.TimeUnit
  * Results hold raw data; callers print them only through [ProbeOutcome.describe].
  */
 class HttpProbe internal constructor(
-    private val budget: RequestBudget,
+    private val budget: RequestGate,
     private val maxBodyBytes: Int,
     private val client: OkHttpClient,
 ) {
     /** Public entry point: always the locked-down default client (OkHttp stays internal). */
-    constructor(budget: RequestBudget, maxBodyBytes: Int = DEFAULT_MAX_BODY_BYTES) :
+    constructor(budget: RequestGate, maxBodyBytes: Int = DEFAULT_MAX_BODY_BYTES) :
         this(budget, maxBodyBytes, defaultClient())
 
     fun send(request: ProbeRequest): ProbeOutcome {

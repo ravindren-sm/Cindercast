@@ -36,6 +36,30 @@ Done: live channel plays on the Fire TV through :provider + Media3 (HLS, H.264 1
 The Mac probe's 403 does not affect the device. Next M1 items (4e VOD, 4f VOD link, 4g
 keep-alive) can now be tested in the debug player instead of the Mac probe.
 
+## M2.0: OpenStream intake and decisions (started 2026-11-21)
+Review: docs/OPENSTREAM_INTAKE.md. The prototype is the UI source of truth; screens are ported to
+Compose for TV on top of `:provider`.
+
+| Prototype screen | Milestone |
+|---|---|
+| `setup` (first run) | M2 |
+| `live-tv`, `live-player`, channel-number overlay | M3 |
+| `movies`, `movie-detail`, `shows`, `show-detail`, `vod-player`, language/subtitles overlay | M4 |
+| `home`, `search`, `favorites`, `settings`, `tv-guide`, ratings overlay, PIN modal | M5 |
+| `states`, `design-notes`, prototype menu | reference only, not shipped |
+
+Tasks, in order:
+1. Decisions: license MIT (decided 2026-11-21; LICENSE added here, copyright line "Sriram Ravindren"
+   from the git author name, changeable); app name OpenStream (decided; no IPTV project of that name
+   found, trademark not checked); package id still open; add a LICENSE file to the OpenStream
+   prototype repo too (owner action: no push access from here).
+2. Compose theme from `tokens.ts`: colors, type scale, spacing, radii, badges.
+3. Focus and navigation base: single-focus rule, back stack with focus restore, overlay focus
+   trapping, shared focusable component.
+4. Data gap list from the intake (four-level shows, channel numbers, guide, ratings, counts).
+5. Optional WebView spike, only if literal reuse of the web code is wanted.
+Done: theme + navigation shell + setup screen running on the Fire TV with sample data.
+
 ## M2: App foundation (offline, then Phase 3 approval to install)
 - Rename the package off `com.example.*`; choose a license (open decision).
 - `:app` depends on `:provider` (plain Kotlin; reused as is).
@@ -68,3 +92,26 @@ Search (server-side), favorites (local), EPG if the portal provides it, settings
 release build without diagnostics. Open-source prep: license, README, docs scrub of
 provider-specific detail, CI running the unit tests and the secret scan.
 Done: user approves a public GitHub release.
+
+
+## M2 progress (2026-11-21)
+Decisions:
+- **Secret storage: platform Keystore + AES-256-GCM, no new dependency.** `EncryptedSharedPreferences`
+  and `MasterKey` are deprecated upstream (https://developer.android.com/reference/androidx/security/crypto/package-summary).
+  The DataStore + Tink route exists but is alpha and documented mainly by third parties
+  (https://proandroiddev.com/finally-the-official-way-of-secure-datastore-is-here-ae878f5eb457);
+  our data is two short strings, so one small wrapper is simpler. Keystore AES-GCM works from API 23;
+  `minSdk` is 25. Do not use StrongBox or unlock-required flags (Android 9+ only).
+- **Request limits:** the probe's strict `RequestBudget` (10 requests) stays for probing. The app uses
+  `RequestPacer` (about 3 requests per second, no cap), through a shared `RequestGate` interface.
+
+Done offline, 80 unit tests:
+- `AesGcmBox` (seal/open, fresh IV each time, tamper/wrong-key/wrong-AAD rejected without leaking).
+- `PortalSettings` (URL and MAC validation, MAC normalization, fixed problem messages, no values in
+  `toString`, sealed round trip).
+- `SessionManager` (start, one re-auth on "Authorization failed.", 30 s gap between re-auths, watchdog
+  every 120 s, no other retries).
+
+Next slices: Keystore key + sealed file in `:app`; on-device setup screen (D-pad, TV keyboard);
+wire the session manager and a watchdog timer into the app; debug-only OkHttp interceptor (rule 13).
+Needs the user's decision first: package name and license (see CLAUDE.md "Before publishing").

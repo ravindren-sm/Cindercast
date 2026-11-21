@@ -16,6 +16,7 @@ Step 4g: KEEPALIVE_VERIFIED (watchdog every 120 s; token valid with and without 
 (for example stay-awake), even temporarily. Playback unverified. Milestones: docs/MILESTONES.md. Findings: docs/PROVIDER_FINDINGS.md. Plan: docs/PHASE2_PROBE_PLAN.md
 Repo: ~/Developer/firetv-iptv (outside Google Drive). Build with ./gradlew using
 Android Studio's JBR as JAVA_HOME; wrapper pins Gradle 9.5.0 (AGP 8.x breaks on 9.6+).
+UI source: the OpenStream prototype (docs/OPENSTREAM_INTAKE.md), ported to Compose for TV.
 Full plan: docs/PROJECT_PLAN.md
 
 ## Hard rules
@@ -61,7 +62,11 @@ Full plan: docs/PROJECT_PLAN.md
     catalogs (about 100k movies, 28k shows), search, favorites.
 
 ## Before publishing on GitHub (open decisions)
-- License not chosen yet. Package name must move off com.example.*.
+- License: MIT, decided by the user 2026-11-21 (LICENSE added; the copyright line uses the git
+  author name and can be changed). App name: OpenStream (decided 2026-11-21). A web search found no
+  IPTV project with that name; one small unrelated Google Play podcast/radio app is called
+  OpenStream; trademark databases were not checked. Package id still to decide: it must move off
+  com.example.* (it also appears in scripts/push_dev_config.sh and scripts/pull_debug_log.sh).
 - Review docs/ for provider-specific detail before making the repo public; the
   provider is never named, but findings describe its setup.
 
@@ -72,7 +77,8 @@ Full plan: docs/PROJECT_PLAN.md
   values in Claude's context also land in session transcripts under ~/.claude/.
 - Code reads secrets from the path in env var FIRETV_IPTV_SECRETS.
 - On the device, the user enters portal details through an in-app settings screen.
-  Store them with EncryptedSharedPreferences / Android Keystore. Never in
+  Store them sealed with AES-256-GCM under an Android Keystore key (AesGcmBox in :provider;
+  EncryptedSharedPreferences is deprecated upstream, see docs/MILESTONES.md M2). Never in
   BuildConfig, resources, logs, crash reports, or the APK.
 - Logging: a redaction helper is required before any network code logs anything.
   Redact URLs (keep scheme + path shape only), MACs, tokens, usernames.
