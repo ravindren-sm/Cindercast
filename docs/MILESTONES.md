@@ -191,3 +191,4 @@ Remaining for M2.0's done condition: the setup screen with the sealed settings s
 - Found: a URL with a 5-digit port and a stalker path (for example `:52955/stalker_portal/server/load.php`) came out as `<TOKEN>.php`. The long-token rule matched the path shape the URL rule had just kept.
 - Fix: the long-token rule now leaves a slash-separated run alone only when every part is a protocol path word, a digit-only part, or the start of a file name followed by a short extension. Real token-like runs are still masked.
 - Tests: RedactorTest regression for the stalker path, and a check that a long token containing a slash is still masked. 112 provider and debug app unit tests pass.
+- Follow-up to the debug traffic log: the debug player's four portal clients (live, VOD, seasons, create_link) now take the same interceptor hook, so their calls are logged too. Stream (media) requests are not logged.

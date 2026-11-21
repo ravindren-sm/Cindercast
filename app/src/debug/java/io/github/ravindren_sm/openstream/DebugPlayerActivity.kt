@@ -1,5 +1,6 @@
 package io.github.ravindren_sm.openstream
 
+import io.github.ravindren_sm.openstream.data.PortalTransport
 import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
@@ -135,7 +136,7 @@ class DebugPlayerActivity : ComponentActivity() {
     private fun runPortalFlow(config: DevConfig, exo: ExoPlayer) {
         // Same safety rails as the Mac probe: at most 6 portal requests, >= 2 s apart, no retries.
         val budget = RequestBudget(maxRequests = 6)
-        val client = StalkerClient(config.portalUrl, config.mac, HttpProbe(budget, maxBodyBytes = 1_000_000), config.identity)
+        val client = StalkerClient(config.portalUrl, config.mac, HttpProbe(budget, 1_000_000, PortalTransport.interceptors), config.identity)
 
         fun step(label: String, r: StalkerResult): Boolean {
             val status = (r.outcome as? ProbeOutcome.Response)?.status?.toString()
@@ -178,7 +179,7 @@ class DebugPlayerActivity : ComponentActivity() {
      */
     private fun runVodCatalog(config: DevConfig) {
         val budget = RequestBudget(maxRequests = 6)
-        val client = StalkerClient(config.portalUrl, config.mac, HttpProbe(budget, maxBodyBytes = 1_000_000), config.identity)
+        val client = StalkerClient(config.portalUrl, config.mac, HttpProbe(budget, 1_000_000, PortalTransport.interceptors), config.identity)
         fun step(label: String, r: StalkerResult): Boolean {
             val status = (r.outcome as? ProbeOutcome.Response)?.status?.toString()
                 ?: "transport failure (${(r.outcome as ProbeOutcome.Failure).error::class.simpleName})"
@@ -212,7 +213,7 @@ class DebugPlayerActivity : ComponentActivity() {
      */
     private fun runVodPlayback(config: DevConfig, exo: ExoPlayer, episode: Boolean) {
         val budget = RequestBudget(maxRequests = if (episode) 8 else 5)
-        val client = StalkerClient(config.portalUrl, config.mac, HttpProbe(budget, maxBodyBytes = 1_000_000), config.identity)
+        val client = StalkerClient(config.portalUrl, config.mac, HttpProbe(budget, 1_000_000, PortalTransport.interceptors), config.identity)
         fun step(label: String, r: StalkerResult): Boolean {
             val status = (r.outcome as? ProbeOutcome.Response)?.status?.toString()
                 ?: "transport failure (${(r.outcome as ProbeOutcome.Failure).error::class.simpleName})"
@@ -289,7 +290,7 @@ class DebugPlayerActivity : ComponentActivity() {
      */
     private fun runKeepAlive(config: DevConfig) {
         val budget = RequestBudget(maxRequests = 10)
-        val client = StalkerClient(config.portalUrl, config.mac, HttpProbe(budget, maxBodyBytes = 1_000_000), config.identity)
+        val client = StalkerClient(config.portalUrl, config.mac, HttpProbe(budget, 1_000_000, PortalTransport.interceptors), config.identity)
         fun step(label: String, r: StalkerResult): Boolean {
             val status = (r.outcome as? ProbeOutcome.Response)?.status?.toString()
                 ?: "transport failure (${(r.outcome as ProbeOutcome.Failure).error::class.simpleName})"
