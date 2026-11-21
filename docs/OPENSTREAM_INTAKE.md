@@ -52,6 +52,10 @@ the repo was installed, built or run. The scratch copy was deleted afterwards.
 6. **Stream info.** Real values come from Media3 (for example HEVC 1916x800 or H.264 1280x536),
    not fixed strings.
 
+7. **Contrast claim.** The notes say secondary text has "above 8.5:1" contrast. Measured: 9.1 on the
+   canvas, 8.3 on resting cards, 7.3 on selected cards, 6.2 on the focused row surface. All are above
+   the 4.5:1 body-text minimum; the claim is accurate for the canvas only.
+
 ## Decision
 Use OpenStream as the **UI source of truth** and port it screen by screen to Compose for TV on top
 of `:provider`, as its own handoff notes intend. A WebView hybrid is not planned (it would need a

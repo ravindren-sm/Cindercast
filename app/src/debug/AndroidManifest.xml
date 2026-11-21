@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Debug-only manifest overlay: points the app at a network security config that
-     permits cleartext HTTP (the provider's portal and streams are plain HTTP).
-     Release builds do not get this overlay. -->
+<!-- Debug-only manifest overlay:
+     - network security config that permits cleartext HTTP (the provider has no HTTPS; TLS
+       validation is untouched; see docs/PHASE2_PROBE_PLAN.md section 9);
+     - the debug player activity, started with:
+         adb shell am start -n io.github.ravindren_sm.openstream/.DebugPlayerActivity
+       Release builds get neither. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:networkSecurityConfig="@xml/network_security_config" />
+    <application android:networkSecurityConfig="@xml/network_security_config">
+        <activity
+            android:name=".DebugPlayerActivity"
+            android:exported="true" />
+    </application>
 </manifest>

@@ -116,3 +116,28 @@ Done offline, 80 unit tests:
 Next slices: Keystore key + sealed file in `:app`; on-device setup screen (D-pad, TV keyboard);
 wire the session manager and a watchdog timer into the app; debug-only OkHttp interceptor (rule 13).
 Needs the user's decision first: package name and license (see CLAUDE.md "Before publishing").
+
+
+## M2.0 progress (2026-11-21, second slice)
+Built from the OpenStream prototype (commit 01bcc7990f67) and verified offline; not yet run on the TV.
+- **Theme**: `ui/theme/Tokens.kt` and `Theme.kt`: colors, type scale (nothing under 24 sp for body),
+  spacing, radii, focus style; mapped onto Compose for TV `darkColorScheme` and `Typography`.
+- **Contrast, measured** (locked in `ContrastTest`): primary text 17.8:1 on canvas, 16.2 on cards, 12.1
+  on the focused surface; secondary text 9.1 on canvas, 8.3 on cards, 7.3 on selected, 6.2 on the
+  focused surface. The prototype's "secondary above 8.5:1" is true on the canvas only; every pair stays
+  above the 4.5:1 minimum.
+- **Navigation**: `nav/NavStack.kt`, an immutable back stack that remembers the focused element per
+  screen, restores it on Back, resets to [Home, tab] on a tab change, and returns null at the root so
+  the app can exit. 6 unit tests.
+- **Focus**: `ui/focus/FocusMemory.kt` (focus IDs to requesters, single-focus rule) and
+  `ui/components/OsFocusable.kt` (3 dp ring, card scale, select key, registered ID);
+  `TopNavBar` with the prototype's tab order.
+- **Shell**: `AppShell` + `PlaceholderScreen` exercise it (sample cards, open a detail, Back restores
+  the exact card). `MainActivity` now hosts the shell.
+- **Debug tooling moved to the debug source set**: `DebugPlayerActivity`, `DevConfig`, the cleartext
+  network config. A release build contains none of it (checked: 0 hits for the debug class, the log
+  file name, the config file name, the log tag, or the debug manifest entries).
+  Start the debug player with:
+  `adb shell am start -n io.github.ravindren_sm.openstream/.DebugPlayerActivity`.
+- Tests: 10 in `:app` (4 contrast, 6 navigation) plus 80 in `:provider`.
+Remaining for M2.0's done condition: run the shell on the Fire TV; build the setup screen.
