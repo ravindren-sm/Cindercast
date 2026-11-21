@@ -53,7 +53,11 @@ enum class ProbeStep(val cliName: String, val planStep: String, val needs: List<
     /** 4d on a chosen channel (--genre="..." --channel="..."), for example one known to play in TiviMate. */
     PORTAL_LINK_CHANNEL("portal-link-channel", "Step 4d (chosen channel)", listOf("PORTAL_URL", "EMU_MAC"), usesMac = true),
     /** 4e: VOD catalog (movies and shows). Runs in the Fire TV debug player; listed here for dry runs. */
-    PORTAL_VOD_CATALOG("portal-vod-catalog", "Step 4e", listOf("PORTAL_URL", "EMU_MAC"), usesMac = true);
+    PORTAL_VOD_CATALOG("portal-vod-catalog", "Step 4e", listOf("PORTAL_URL", "EMU_MAC"), usesMac = true),
+    /** 4f movie: runs in the Fire TV debug player; listed here for dry runs. */
+    PORTAL_VOD_MOVIE("portal-vod-movie", "Step 4f (movie)", listOf("PORTAL_URL", "EMU_MAC"), usesMac = true),
+    /** 4f episode: runs in the Fire TV debug player; listed here for dry runs. */
+    PORTAL_VOD_EPISODE("portal-vod-episode", "Step 4f (episode)", listOf("PORTAL_URL", "EMU_MAC"), usesMac = true);
 
     companion object {
         fun fromCliName(name: String): ProbeStep? = entries.firstOrNull { it.cliName == name }
@@ -74,7 +78,8 @@ object ProbeRequests {
         )
         ProbeStep.DISCOVERY_PORTAL -> discovery(secrets.require("PORTAL_URL"))
         ProbeStep.PORTAL_HANDSHAKE, ProbeStep.PORTAL_PROFILE, ProbeStep.PORTAL_CHANNELS, ProbeStep.PORTAL_LINK,
-        ProbeStep.PORTAL_LINK_CHANNEL, ProbeStep.PORTAL_VOD_CATALOG ->
+        ProbeStep.PORTAL_LINK_CHANNEL, ProbeStep.PORTAL_VOD_CATALOG, ProbeStep.PORTAL_VOD_MOVIE,
+        ProbeStep.PORTAL_VOD_EPISODE ->
             portalPlan(step, secrets)
         ProbeStep.XTREAM_ACCOUNT -> listOf(xtreamAccount(secrets))
         ProbeStep.M3U_PLAYLIST -> listOf(
@@ -150,6 +155,8 @@ object ProbeRequests {
                     "Step 4d: first 64 KB of the stream only (format check, no playback)"),
             )
             ProbeStep.PORTAL_VOD_CATALOG -> vodCatalogPlan(first, after)
+            ProbeStep.PORTAL_VOD_MOVIE -> vodMoviePlan(first, after)
+            ProbeStep.PORTAL_VOD_EPISODE -> vodEpisodePlan(first, after)
             else -> error("not a portal step")
         }
     }
@@ -162,6 +169,25 @@ object ProbeRequests {
         StalkerRequests.handshake(first), StalkerRequests.profile(after),
         StalkerRequests.vodCategories(after, "vod"), StalkerRequests.vodPage(after, "vod"),
         StalkerRequests.vodCategories(after, "series"), StalkerRequests.vodPage(after, "series"),
+    )
+
+    /** Step 4f movie: 5 portal requests (stream requests are the player's, not counted here). */
+    fun vodMoviePlan(first: StalkerRequests.Context, after: StalkerRequests.Context): List<ProbeRequest> = listOf(
+        StalkerRequests.handshake(first), StalkerRequests.profile(after),
+        StalkerRequests.vodCategories(after, "vod"),
+        StalkerRequests.vodPage(after, "vod", category = "CATEGORY-ID-FROM-CATEGORIES"),
+        StalkerRequests.vodCreateLink(after, "CMD-OF-CHOSEN-MOVIE"),
+    )
+
+    /** Step 4f episode: 8 portal requests (show, seasons, episodes, files, create_link). */
+    fun vodEpisodePlan(first: StalkerRequests.Context, after: StalkerRequests.Context): List<ProbeRequest> = listOf(
+        StalkerRequests.handshake(first), StalkerRequests.profile(after),
+        StalkerRequests.vodCategories(after, "vod"),
+        StalkerRequests.vodPage(after, "vod", category = "CATEGORY-ID-FROM-CATEGORIES"),
+        StalkerRequests.vodChildren(after, "SHOW-ID"),
+        StalkerRequests.vodChildren(after, "SHOW-ID", "SEASON-ID"),
+        StalkerRequests.vodChildren(after, "SHOW-ID", "SEASON-ID", "EPISODE-ID"),
+        StalkerRequests.vodCreateLink(after, "CMD-OF-CHOSEN-FILE"),
     )
 
     /**

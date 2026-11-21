@@ -16,7 +16,7 @@ import java.io.File
  * File shape (values are the user's; never logged):
  *   {"portalUrl": "...", "mac": "...", "genre": "ENGLISH USA LOCAL",
  *    "channel": "NEWS 12 LONG ISLAND", "identity": "honest", "streamUserAgent": "player",
- *    "mode": "live" | "vod-catalog"}
+ *    "mode": "live" | "vod-catalog" | "vod-movie" | "vod-episode", "vodCategory": "ENGLISH MOVIES"}
  */
 data class DevConfig(
     val portalUrl: String,
@@ -27,14 +27,16 @@ data class DevConfig(
     val identity: StalkerIdentity,
     /** "player" (Media3 default), "mag" (MAG box UA) or "honest" (probe UA) for stream requests. */
     val streamUserAgent: String,
-    /** "live" (play one live channel) or "vod-catalog" (Step 4e: list VOD counts, no playback). */
+    /** "live", "vod-catalog" (4e), "vod-movie" or "vod-episode" (4f: play one VOD item, seek check). */
     val mode: String = "live",
+    /** VOD category title for 4f (exact match, else shortest title containing it). */
+    val vodCategory: String = "ENGLISH MOVIES",
 ) {
     /** Values the redactor must mask, labelled like the Mac probe's placeholders. */
     fun secretsForRedaction(): Map<String, String> = mapOf("PORTAL_URL" to portalUrl, "EMU_MAC" to mac)
 
     /** Safe description: no URL, no MAC. */
-    override fun toString() = "DevConfig(mode=$mode, genre=$genre, channel=$channel, identity=$identity, streamUserAgent=$streamUserAgent)"
+    override fun toString() = "DevConfig(mode=$mode, genre=$genre, channel=$channel, vodCategory=$vodCategory, identity=$identity, streamUserAgent=$streamUserAgent)"
 
     companion object {
         const val FILE_NAME = "dev-config.json"
@@ -52,6 +54,7 @@ data class DevConfig(
                     identity = if (j.optString("identity", "honest") == "mag") StalkerIdentity.MAG else StalkerIdentity.HONEST,
                     streamUserAgent = j.optString("streamUserAgent", "player"),
                     mode = j.optString("mode", "live"),
+                    vodCategory = j.optString("vodCategory", "ENGLISH MOVIES"),
                 ).takeIf { it.portalUrl.isNotEmpty() && it.mac.isNotEmpty() }
             }
         } catch (_: Exception) {

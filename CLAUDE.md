@@ -9,7 +9,9 @@ LIVE_CATALOG_LISTED (74 genres, 4,900 channels); 4d: LINK_CREATED; streams are H
 edge returned 403 to the probe, also with MAG headers (User-Agent ruled out). Also 403
 on the channel TiviMate plays. RESOLVED 2026-11-21: the debug player on the Fire TV plays
 live TV (PLAYBACK_VERIFIED_ON_DEVICE); the 403 is Mac-specific. Mac probing stopped.
-Step 4e (on device): VOD_CATALOG_LISTED: 164 categories, 104,000 items, shows inside type=vod. Playback unverified. Milestones: docs/MILESTONES.md. Findings: docs/PROVIDER_FINDINGS.md. Plan: docs/PHASE2_PROBE_PLAN.md
+Step 4e (on device): VOD_CATALOG_LISTED: 164 categories, 104,000 items, shows inside type=vod.
+Step 4f (on device): VOD_MOVIE_PLAYED and VOD_EPISODE_PLAYED (show > season > episode > file).
+Next: 4g keep-alive. Playback unverified. Milestones: docs/MILESTONES.md. Findings: docs/PROVIDER_FINDINGS.md. Plan: docs/PHASE2_PROBE_PLAN.md
 Repo: ~/Developer/firetv-iptv (outside Google Drive). Build with ./gradlew using
 Android Studio's JBR as JAVA_HOME; wrapper pins Gradle 9.5.0 (AGP 8.x breaks on 9.6+).
 Full plan: docs/PROJECT_PLAN.md

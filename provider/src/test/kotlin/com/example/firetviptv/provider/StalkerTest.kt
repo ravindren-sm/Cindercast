@@ -165,7 +165,7 @@ class StalkerTest {
         val text = page.summary.joinToString("\n")
         assertTrue(text.contains("vod total: 99500 (page size 14)"), text)
         assertTrue(text.contains("page 1 items: 3; is_series=1: 1; with episode list: 1"), text)
-        assertTrue(text.contains("Fake Movie (2024) | Fake Show (2023)"), text)
+        assertTrue(text.contains("Fake Movie (2024) ; Fake Show (2023)"), text)
         assertTrue(text.contains("base64-like") && text.contains("server path") && text.contains("url: ffmpeg http remote host"), text)
         listOf("eyJ0eXBl", "SECRETVOD", "vod.example.test", "/media/file_3").forEach {
             assertFalse(text.contains(it), "cmd value leaked: $it\n$text")
@@ -187,6 +187,77 @@ class StalkerTest {
         val (r, cats) = c.vodCategories("series")
         assertFalse(r.ok); assertTrue(cats.isEmpty())
         assertEquals(listOf("no JSON payload in the response"), r.summary)
+    }
+
+    @Test fun `category picking prefers exact match, else shortest containing title`() {
+        val cats = listOf("*" to "All", "11" to "HINDI DUB | ENGLISH MOVIES", "12" to "ENGLISH MOVIES 4K", "13" to "ENGLISH MOVIES")
+        assertEquals("13" to "ENGLISH MOVIES", StalkerClient.pickCategory(cats, "english movies"))
+        val noExact = listOf("11" to "HINDI DUB | ENGLISH SERIES", "14" to "ENGLISH SERIES HD")
+        assertEquals("14" to "ENGLISH SERIES HD", StalkerClient.pickCategory(noExact, "ENGLISH SERIES"))
+        assertNull(StalkerClient.pickCategory(cats, "KOREAN"))
+    }
+
+    @Test fun `vod items parse flags and never print cmd`() {
+        val js = StalkerClient.parseJs("""{"js":{"data":[
+            {"id":"5","name":"Show A","is_series":"1","cmd":"/media/show_a","series":[]},
+            {"id":"5:1","name":"Season 1","is_season":true,"cmd":""},
+            {"id":"5:1:3","name":"Episode 3","is_episode":"1","cmd":"/media/ep3.mkv"},
+            {"id":"7","name":"Old Show","is_series":"1","cmd":"/media/old","series":["1","2"]}]}}""".toByteArray())
+        val items = VodItem.listFrom(js)
+        assertEquals(listOf(true, false, false, true), items.map { it.isSeries })
+        assertTrue(items[1].isSeason && items[1].cmd == null)
+        assertTrue(items[2].isEpisode && items[2].cmd == "/media/ep3.mkv")
+        assertEquals(listOf("1", "2"), items[3].episodeNumbers)
+        assertFalse(items.joinToString().contains("/media"), "toString must not show cmd")
+    }
+
+    @Test fun `season and episode navigation and vod create_link requests`() {
+        server.enqueue(json("""{"js":{"token":"t0k3n"}}"""))
+        server.enqueue(json("""{"js":{"total_items":"2","data":[{"id":"5:1","name":"Season 1","is_season":true},{"id":"5:2","name":"Season 2","is_season":true}]}}"""))
+        server.enqueue(json("""{"js":{"total_items":"10","data":[{"id":"5:1:1","name":"Episode 1","is_episode":true,"cmd":"/media/e1.mkv"}]}}"""))
+        server.enqueue(json("""{"js":{"cmd":"ffmpeg http://vod.example.test/e1.mkv?t=SECRETEP","error":""}}"""))
+        val c = client(); c.handshake()
+        val (sr, seasons) = c.vodChildren("5")
+        assertEquals(listOf("5:1", "5:2"), seasons.map { it.id })
+        assertTrue(sr.summary.any { it.contains("season=2") }, sr.summary.toString())
+        val (er, episodes) = c.vodChildren("5", "5:1")
+        assertEquals("/media/e1.mkv", episodes.single().cmd)
+        assertTrue(er.summary.first().startsWith("episodes total: 10"), er.summary.toString())
+        val (link, url) = c.vodCreateLink(episodes.single().cmd!!)
+        assertEquals("http://vod.example.test/e1.mkv?t=SECRETEP", url)
+        assertFalse(link.summary.joinToString().contains("SECRETEP") || link.summary.joinToString().contains("vod.example.test"))
+        server.takeRequest()
+        val s1 = server.takeRequest().requestUrl!!
+        assertEquals("5", s1.queryParameter("movie_id")); assertEquals("0", s1.queryParameter("season_id"))
+        val s2 = server.takeRequest().requestUrl!!
+        assertEquals("5:1", s2.queryParameter("season_id"))
+        val l = server.takeRequest().requestUrl!!
+        assertEquals("vod", l.queryParameter("type")); assertEquals("create_link", l.queryParameter("action"))
+        assertEquals("/media/e1.mkv", l.queryParameter("cmd")); assertEquals("", l.queryParameter("series"))
+    }
+
+    @Test fun `episode files level and inline series_files`() {
+        server.enqueue(json("""{"js":{"token":"t0k3n"}}"""))
+        server.enqueue(json("""{"js":{"total_items":"2","data":[
+            {"id":"f1","name":"1080p","is_file":true,"cmd":"/media/f1.mkv"},
+            {"id":"f2","name":"720p","is_file":"1","cmd":"/media/f2.mkv"}]}}"""))
+        val c = client(); c.handshake()
+        val (r, files) = c.vodChildren("5", "5:1", "5:1:3")
+        assertEquals(listOf("/media/f1.mkv", "/media/f2.mkv"), files.map { it.playableCmd })
+        assertTrue(files.all { it.isFile })
+        assertTrue(r.summary.first().startsWith("files total: 2"), r.summary.toString())
+        assertFalse(r.summary.joinToString().contains("/media/"), r.summary.toString())
+        server.takeRequest()
+        val u = server.takeRequest().requestUrl!!
+        assertEquals("5", u.queryParameter("movie_id")); assertEquals("5:1", u.queryParameter("season_id"))
+        assertEquals("5:1:3", u.queryParameter("episode_id"))
+
+        val inline = VodItem.listFrom(StalkerClient.parseJs("""{"js":{"data":[
+            {"id":"e1","name":"E1","is_episode":true,"series_files":[{"id":"x","cmd":"/media/e1.mkv"}]},
+            {"id":"e2","name":"E2","is_episode":true,"series_files":3}]}}""".toByteArray()))
+        assertEquals("/media/e1.mkv", inline[0].playableCmd)
+        assertNull(inline[1].playableCmd)
+        assertFalse(inline.joinToString().contains("/media"))
     }
 
     @Test fun `vod cmd kinds`() {

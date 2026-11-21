@@ -21,7 +21,7 @@ Done: our client obtained a session token (HANDSHAKE_ACCEPTED). Nothing else ver
 | 4c live catalog (DONE 2026-11-21) | 4 | Genres, channel paging, total count | Counts close to TiviMate's 5,100: 4,900 (about 3% fewer; to explain) |
 | 4d live link (2026-11-21: link created; HLS; edge 403 to the probe, stopped) | 5 (+2 redirect hops) | `create_link` gives a stream; container | First 64 KB is MPEG-TS or HLS |
 | 4e VOD catalog (DONE 2026-11-21, on device) | 6 | VOD categories, movie paging, series markers | 164 categories, 104,000 items; shows inside type=vod (is_series=1); no series module |
-| 4f VOD link (new, offline first) | about 5 | Movie and episode `create_link` | First bytes are a playable container |
+| 4f VOD link: DONE 2026-11-21: movie (HEVC, seek 0.9 s) and episode (4-level navigation, seek 0.8 s) | 5 / 8 | Movie and episode `create_link` | Plays on the device with a working seek |
 | 4g keep-alive (new, offline first) | small, spaced | Watchdog/events polling keeps the token valid | Token still valid after a timed wait |
 
 Small offline fixes before 4b: show the handshake's `not_valid` flag (0/1, not identifying).

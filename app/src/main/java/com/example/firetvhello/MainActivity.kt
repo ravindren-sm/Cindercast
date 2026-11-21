@@ -73,6 +73,11 @@ class MainActivity : ComponentActivity() {
     private var player: ExoPlayer? = null
     private val startMs = SystemClock.elapsedRealtime()
 
+    // VOD seek check state (main thread only).
+    private var seekCheckPending = false
+    private var seekStartedAt = 0L
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val config = DevConfig.load(this)
@@ -88,6 +93,9 @@ class MainActivity : ComponentActivity() {
         log("Config loaded: $config")
         if (config.mode == "vod-catalog") {
             Thread({ runVodCatalog(config) }, "vod-catalog").start()
+        } else if (config.mode == "vod-movie" || config.mode == "vod-episode") {
+            seekCheckPending = true
+            Thread({ runVodPlayback(config, exo, episode = config.mode == "vod-episode") }, "vod-playback").start()
         } else {
             Thread({ runPortalFlow(config, exo) }, "portal-flow").start()
         }
@@ -186,6 +194,105 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Step 4f: pick one movie (or one episode) and play it, with a seek check.
+     * Portal requests: movie 5 (handshake, profile, vod categories, category page 1,
+     * create_link); episode 8 (adds seasons, episodes and the episode's files). Budget sized exactly, >= 2 s apart,
+     * no retries. Stream requests are the player's own and are logged by the interceptor.
+     */
+    private fun runVodPlayback(config: DevConfig, exo: ExoPlayer, episode: Boolean) {
+        val budget = RequestBudget(maxRequests = if (episode) 8 else 5)
+        val client = StalkerClient(config.portalUrl, config.mac, HttpProbe(budget, maxBodyBytes = 1_000_000), config.identity)
+        fun step(label: String, r: StalkerResult): Boolean {
+            val status = (r.outcome as? ProbeOutcome.Response)?.status?.toString()
+                ?: "transport failure (${(r.outcome as ProbeOutcome.Failure).error::class.simpleName})"
+            log("$label: $status")
+            r.summary.forEach { log("  $it") }
+            return r.ok
+        }
+        try {
+            log("Step 4f ${if (episode) "episode" else "movie"}: ${budget.maxRequests} portal requests planned")
+            if (!step("handshake", client.handshake()) || client.token == null) { log("STOP: no token"); return }
+            val profile = client.profile()
+            if (!step("get_profile", profile) || profile.field("status") != "0") { log("STOP: profile not authorized"); return }
+            val (catsResult, cats) = client.vodCategories("vod")
+            if (!step("vod get_categories", catsResult)) { log("STOP at categories"); return }
+            val cat = StalkerClient.pickCategory(cats, config.vodCategory)
+                ?: run { log("STOP: no VOD category matching '${config.vodCategory}'"); return }
+            log("chosen category: '${cat.second}'")
+            val (pageResult, items) = client.vodPageItems("vod", cat.first)
+            if (!step("vod get_ordered_list ('${cat.second}', page 1)", pageResult)) { log("STOP at category page"); return }
+
+            val url: String? = if (!episode) {
+                val movie = items.firstOrNull { !it.isSeries && it.cmd != null }
+                    ?: run { log("STOP: no movie with a cmd on page 1"); return }
+                log("chosen movie: ${movie.name}")
+                val (link, u) = client.vodCreateLink(movie.cmd!!)
+                if (!step("vod create_link (movie)", link)) { log("STOP at create_link"); return }
+                u
+            } else {
+                val show = items.firstOrNull { it.isSeries } ?: run { log("STOP: no show on page 1"); return }
+                log("chosen show: ${show.name}")
+                val (seasonsResult, seasons) = client.vodChildren(show.id)
+                if (!step("vod seasons", seasonsResult)) { log("STOP at seasons"); return }
+                val season = seasons.firstOrNull { it.isSeason } ?: seasons.firstOrNull()
+                if (season != null) {
+                    log("shape: navigation; chosen season: ${season.name}")
+                    val (epsResult, eps) = client.vodChildren(show.id, season.id)
+                    if (!step("vod episodes", epsResult)) { log("STOP at episodes"); return }
+                    val ep = eps.firstOrNull { it.isEpisode } ?: eps.firstOrNull()
+                        ?: run { log("STOP: no episodes"); return }
+                    log("chosen episode: ${ep.name}")
+                    // The episode's own cmd, else an inline series_files cmd, else the file level.
+                    val fileCmd: String = ep.playableCmd ?: run {
+                        val (filesResult, files) = client.vodChildren(show.id, season.id, ep.id)
+                        if (!step("vod files of the episode", filesResult)) { log("STOP at files"); return }
+                        val file = files.firstOrNull { it.playableCmd != null }
+                            ?: run { log("STOP: no file with a cmd"); return }
+                        log("chosen file: ${file.name}")
+                        file.playableCmd!!
+                    }
+                    val (link, u) = client.vodCreateLink(fileCmd)
+                    if (!step("vod create_link (episode file)", link)) { log("STOP at create_link"); return }
+                    u
+                } else if (show.episodeNumbers.isNotEmpty() && show.cmd != null) {
+                    log("shape: episode numbers on the show; using episode ${show.episodeNumbers.first()}")
+                    val (link, u) = client.vodCreateLink(show.cmd!!, show.episodeNumbers.first())
+                    if (!step("vod create_link (episode number)", link)) { log("STOP at create_link"); return }
+                    u
+                } else { log("STOP: show has neither seasons nor episode numbers"); return }
+            }
+            if (url == null) { log("STOP: no playable URL"); return }
+            log("Handing the VOD URL to Media3 (stream UA: ${config.streamUserAgent})")
+            runOnUiThread { exo.setMediaItem(MediaItem.fromUri(url)); exo.prepare(); exo.playWhenReady = true }
+        } catch (e: Exception) {
+            log("VOD playback error: ${redactor.redact(e)}")
+        }
+    }
+
+    /** VOD seek check: 10 s after first READY, seek to the middle (max 5 min in) and time the resume. */
+    private fun onPlayerReady(exo: ExoPlayer) {
+        if (seekStartedAt > 0) {
+            log("seek check: resumed after ${SystemClock.elapsedRealtime() - seekStartedAt} ms at ${exo.currentPosition / 1000}s")
+            seekStartedAt = 0
+            return
+        }
+        if (!seekCheckPending) return
+        seekCheckPending = false
+        mainHandler.postDelayed({
+            val dur = exo.duration
+            log("vod duration: ${if (dur > 0) "${dur / 1000}s" else "unknown"}; seekable: ${exo.isCurrentMediaItemSeekable}; position ${exo.currentPosition / 1000}s")
+            if (dur > 0 && exo.isCurrentMediaItemSeekable) {
+                val target = minOf(dur / 2, 300_000L)
+                seekStartedAt = SystemClock.elapsedRealtime()
+                log("seek check: seeking to ${target / 1000}s")
+                exo.seekTo(target)
+            } else {
+                log("seek check: skipped (not seekable or duration unknown)")
+            }
+        }, 10_000)
+    }
+
     // ---- player ------------------------------------------------------------------------
 
     private fun buildPlayer(config: DevConfig?): ExoPlayer {
@@ -227,6 +334,7 @@ class MainActivity : ComponentActivity() {
                 Player.STATE_READY -> "READY"; Player.STATE_ENDED -> "ENDED"; else -> state.toString()
             }
             log("player state: $name")
+            if (state == Player.STATE_READY) player?.let { onPlayerReady(it) }
         }
 
         override fun onRenderedFirstFrame(eventTime: AnalyticsListener.EventTime, output: Any, renderTimeMs: Long) {

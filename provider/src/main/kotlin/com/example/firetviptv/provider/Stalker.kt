@@ -80,6 +80,25 @@ object StalkerRequests {
         "episode_id" to "0", "category" to category, "fav" to "0", "sortby" to "added",
         "hd" to "0", "not_ended" to "0", "p" to page.toString())
 
+    /** Children of a VOD title: seasons (seasonId "0"), a season's episodes, or an episode's files. */
+    fun vodChildren(ctx: Context, movieId: String, seasonId: String = "0", episodeId: String = "0", page: Int = 1) = build(ctx,
+        "Step 4f: ${levelName(seasonId, episodeId)}, page $page",
+        "type" to "vod", "action" to "get_ordered_list", "movie_id" to movieId, "season_id" to seasonId,
+        "episode_id" to episodeId, "category" to "*", "fav" to "0", "sortby" to "added", "hd" to "0",
+        "not_ended" to "0", "p" to page.toString())
+
+    internal fun levelName(seasonId: String, episodeId: String) = when {
+        seasonId == "0" -> "seasons of a show"
+        episodeId == "0" -> "episodes of a season"
+        else -> "files of an episode"
+    }
+
+    /** VOD create_link: movie (series "") or episode (series = episode number on older portals). */
+    fun vodCreateLink(ctx: Context, cmd: String, series: String = "") = build(ctx,
+        "Step 4f: VOD create_link (${if (series.isEmpty()) "movie or episode cmd" else "episode number"})",
+        "type" to "vod", "action" to "create_link", "cmd" to cmd, "series" to series,
+        "forced_storage" to "undefined", "disable_ad" to "0", "download" to "0", "force_ch_link_check" to "0")
+
     fun createLink(ctx: Context, cmd: String) = build(ctx, "Step 4d: create_link (turns a channel's cmd into a stream URL)",
         "type" to "itv", "action" to "create_link", "cmd" to cmd, "series" to "", "forced_storage" to "0",
         "disable_ad" to "0", "download" to "0")
@@ -124,6 +143,59 @@ class StalkerResult(val outcome: ProbeOutcome, internal val js: JsonElement?, va
 
     /** Whether the payload is a JSON object (as opposed to an array, scalar or nothing). */
     val isObject: Boolean get() = js is JsonObject
+}
+
+/**
+ * A VOD entry (movie, show, season or episode). [cmd] is needed for create_link but is never
+ * printed: [toString] omits it.
+ */
+class VodItem(
+    val id: String,
+    val name: String,
+    val isSeries: Boolean,
+    val isSeason: Boolean,
+    val isEpisode: Boolean,
+    val cmd: String?,
+    /** Episode numbers listed on the item itself (older portals). */
+    val episodeNumbers: List<String>,
+    /** A file entry under an episode (fourth navigation level). */
+    val isFile: Boolean = false,
+    /** cmd values of files listed inline in an episode's `series_files`, if any. Never printed. */
+    val fileCmds: List<String> = emptyList(),
+) {
+    override fun toString() = "VodItem(id=$id, name=$name, series=$isSeries, season=$isSeason, episode=$isEpisode, file=$isFile, inlineFiles=${fileCmds.size})"
+
+    /** The cmd to use for create_link: the item's own, else the first inline file's. */
+    val playableCmd: String? get() = cmd ?: fileCmds.firstOrNull()
+
+    companion object {
+        private fun flag(o: JsonObject, key: String): Boolean =
+            (o[key] as? JsonPrimitive)?.contentOrNull?.lowercase() in setOf("1", "true")
+
+        /** Items from {"data":[...]} of a get_ordered_list payload. */
+        fun listFrom(js: JsonElement?): List<VodItem> {
+            val data = ((js as? JsonObject)?.get("data") as? JsonArray) ?: return emptyList()
+            return data.mapNotNull { e ->
+                val o = e as? JsonObject ?: return@mapNotNull null
+                val id = (o["id"] as? JsonPrimitive)?.contentOrNull ?: return@mapNotNull null
+                VodItem(
+                    id = id,
+                    name = (o["name"] as? JsonPrimitive)?.contentOrNull ?: "?",
+                    isSeries = flag(o, "is_series"),
+                    isSeason = flag(o, "is_season"),
+                    isEpisode = flag(o, "is_episode"),
+                    cmd = (o["cmd"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() },
+                    episodeNumbers = (o["series"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.orEmpty(),
+                    isFile = flag(o, "is_file"),
+                    // series_files may be a count, an id list, or a list of file objects; only
+                    // objects with a non-blank cmd are usable.
+                    fileCmds = (o["series_files"] as? JsonArray)?.mapNotNull { f ->
+                        ((f as? JsonObject)?.get("cmd") as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+                    }.orEmpty(),
+                )
+            }
+        }
+    }
 }
 
 class StalkerClient(
@@ -219,20 +291,67 @@ class StalkerClient(
      * and the item field names.
      */
     fun vodPage(type: String, category: String = "*", page: Int = 1): StalkerResult =
-        call(StalkerRequests.vodPage(ctx(), type, category, page)) { js ->
+        vodPageItems(type, category, page).first
+
+    /** [vodPage] plus the parsed items (for choosing a movie or show). */
+    fun vodPageItems(type: String, category: String = "*", page: Int = 1): Pair<StalkerResult, List<VodItem>> {
+        var parsed: List<VodItem> = emptyList()
+        val r = call(StalkerRequests.vodPage(ctx(), type, category, page)) { js ->
+            parsed = VodItem.listFrom(js)
+            vodPageSummary(type, page, js)
+        }
+        return r to parsed
+    }
+
+    /** Seasons, episodes or files of a VOD title (by level), parsed; summary counts kinds safely. */
+    fun vodChildren(movieId: String, seasonId: String = "0", episodeId: String = "0"): Pair<StalkerResult, List<VodItem>> {
+        var parsed: List<VodItem> = emptyList()
+        val r = call(StalkerRequests.vodChildren(ctx(), movieId, seasonId, episodeId)) { js ->
+            parsed = VodItem.listFrom(js)
             val o = js as? JsonObject
-            val items = (o?.get("data") as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
-            val seriesFlag = items.count { it.str("is_series") == "1" }
-            val withEpisodes = items.count { (it["series"] as? JsonArray)?.isNotEmpty() == true }
-            val cmdKinds = items.mapNotNull { it.str("cmd")?.let(::vodCmdKind) }.groupingBy { it }.eachCount()
+            val level = when { seasonId == "0" -> "seasons"; episodeId == "0" -> "episodes"; else -> "files" }
             listOf(
+                "$level total: ${o?.get("total_items")?.let(::shortValue) ?: "?"}; on page: ${parsed.size}",
+                "flags on page: season=${parsed.count { it.isSeason }} episode=${parsed.count { it.isEpisode }} file=${parsed.count { it.isFile }} series=${parsed.count { it.isSeries }}",
+                "inline series_files cmds: ${parsed.sumOf { it.fileCmds.size }}",
+                "sample: ${parsed.take(5).joinToString(" ; ") { it.name }}",
+                "cmd kinds: ${parsed.mapNotNull { it.cmd?.let(::vodCmdKind) }.groupingBy { it }.eachCount().entries.joinToString { "${it.key} x${it.value}" }.ifEmpty { "-" }}",
+                "item keys: ${(o?.get("data") as? JsonArray)?.firstOrNull()?.let { (it as? JsonObject)?.keys?.sorted()?.joinToString(",") } ?: "-"}",
+            )
+        }
+        return r to parsed
+    }
+
+    /** VOD create_link; returns the playable URL (prefix word stripped). */
+    fun vodCreateLink(cmd: String, series: String = ""): Pair<StalkerResult, String?> {
+        var url: String? = null
+        val r = call(StalkerRequests.vodCreateLink(ctx(), cmd, series)) { js ->
+            val linkCmd = (js as? JsonObject)?.str("cmd")
+            url = linkCmd?.let(::streamUrlFromCmd)
+            val error = (js as? JsonObject)?.str("error")
+            listOfNotNull(
+                "vod link returned: ${if (url != null) "yes, shape ${cmdShape(linkCmd!!)}" else "no (cmd kind: ${linkCmd?.let(::vodCmdKind) ?: "-"})"}",
+                error?.let { "error: '${it.take(60)}'" },
+            ) + keysLine(js)
+        }
+        return r to url
+    }
+
+    /** Safe by construction: totals, page size, sample titles, is_series counts, cmd KINDS, field names. */
+    private fun vodPageSummary(type: String, page: Int, js: JsonElement?): List<String> {
+        val o = js as? JsonObject
+        val items = (o?.get("data") as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+        val seriesFlag = items.count { it.str("is_series") == "1" }
+        val withEpisodes = items.count { (it["series"] as? JsonArray)?.isNotEmpty() == true }
+        val cmdKinds = items.mapNotNull { it.str("cmd")?.let(::vodCmdKind) }.groupingBy { it }.eachCount()
+        return listOf(
                 "$type total: ${o?.get("total_items")?.let(::shortValue) ?: "?"} (page size ${o?.get("max_page_items")?.let(::shortValue) ?: "?"})",
                 "page $page items: ${items.size}; is_series=1: $seriesFlag; with episode list: $withEpisodes",
-                "sample: ${items.take(5).joinToString(" | ") { "${it.str("name") ?: "?"} (${it.str("year") ?: "?"})" }}",
+                "sample: ${items.take(5).joinToString(" ; ") { "${it.str("name") ?: "?"} (${it.str("year") ?: "?"})" }}",
                 "cmd kinds: ${cmdKinds.entries.joinToString { "${it.key} x${it.value}" }.ifEmpty { "-" }}",
                 "item keys: ${items.firstOrNull()?.keys?.sorted()?.joinToString(",") ?: "-"}",
             )
-        }
+    }
 
     /** Returns the first channel's cmd through [firstCmd] for create_link. */
     fun channelsPage1(): Pair<StalkerResult, String?> {
@@ -308,6 +427,16 @@ class StalkerClient(
                 ?: u?.rawAuthority?.substringAfterLast(':', "")?.toIntOrNull()
             val port = portNum?.let { " port $it" } ?: ""
             return "$prefix ${u?.scheme ?: url.substringBefore("://")} $hostKind$port"
+        }
+
+        /**
+         * Category id by title: exact (case-insensitive) match, else the shortest title that
+         * contains [title]. Titles on this portal combine labels with " | ".
+         */
+        fun pickCategory(cats: List<Pair<String, String>>, title: String): Pair<String, String>? {
+            val t = title.trim()
+            return cats.firstOrNull { it.second.trim().equals(t, ignoreCase = true) }
+                ?: cats.filter { it.second.contains(t, ignoreCase = true) }.minByOrNull { it.second.length }
         }
 
         /**

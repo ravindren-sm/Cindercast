@@ -73,3 +73,29 @@ another client/network-path difference at the edge. **Treated as a CLI-only envi
 Investigation stopped by the user's decision; all further protocol checks (4e-4g) run in the
 Fire TV debug player. If it ever matters, log IPv4/IPv6 per stream connection in the debug
 build first.
+
+## VOD playback design (Step 4f, 2026-11-21; assumptions until verified live)
+Inputs from 4e: shows live inside `type=vod` (`is_series=1`); `cmd` values are server paths;
+the top-level `series` field was empty on the newest shows.
+
+Movie (one request after choosing the item):
+- `type=vod&action=create_link&cmd=<item cmd>&series=&forced_storage=undefined&disable_ad=0&download=0&force_ch_link_check=0`
+- Expected: `js.cmd` holds a playable URL (possibly with a prefix word, stripped as for live).
+
+Episode, two known Ministra shapes; the client supports both and logs which one it found:
+1. **Navigation** (expected here): `get_ordered_list&movie_id=<show id>&season_id=0` lists
+   seasons; `...&movie_id=<show id>&season_id=<season id>` lists episodes, each with its own
+   `cmd`; then `create_link` with the episode's `cmd`.
+2. **Episode numbers on the show** (older portals): the show's `series` array lists episode
+   numbers; `create_link` with the show's `cmd` and `series=<episode number>`.
+
+Choosing items: VOD category by title (exact match, else the shortest title containing the
+text, because titles here combine labels with " | "), then the first suitable item on page 1.
+Seek check (VOD only): after 10 s of playback, seek to the middle (at most 5 min in) and log
+the time until playback resumes.
+
+Update after the first episode run (2026-11-21): navigation is show -> seasons -> episodes ->
+**files**. Seasons and episodes carry no `cmd`; episodes carry `series_files`. The file level is
+`get_ordered_list&movie_id=<show>&season_id=<season>&episode_id=<episode>`; each file should
+carry the `cmd` for `create_link`. The client uses inline `series_files` cmds if present,
+otherwise requests the file level.
