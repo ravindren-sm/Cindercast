@@ -27,6 +27,10 @@ class SessionManager(
     @Volatile var failure: String? = null
         private set
 
+    /** The account expiry the profile reported (for example "2027-11-04 19:14:32"), if any. Not a secret. */
+    @Volatile var accountExpiry: String? = null
+        private set
+
     private var lastReauthAt: Long? = null
 
     /** Handshake + profile. */
@@ -38,6 +42,7 @@ class SessionManager(
         if (!profile.ok) return fail("profile failed (${statusOf(profile)})")
         if (profile.field("status") != "0") return fail("account not authorized (status ${profile.field("status") ?: "?"})")
         failure = null
+        accountExpiry = profile.field("expire_billing_date")
         state = State.READY
         return state
     }

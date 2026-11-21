@@ -14,6 +14,20 @@ class PortalSettings private constructor(val portalUrl: String, val mac: String)
 
     override fun toString() = "PortalSettings(portalUrl=<redacted>, mac=<redacted>)"
 
+    /** For on-screen display: scheme, then the host with all but its last 5 characters hidden. */
+    fun maskedUrl(): String {
+        val uri = try { URI(portalUrl) } catch (_: Exception) { null }
+        // rawAuthority is used (not host) because names with underscores leave URI.host null and
+        // URI.port at -1; split user info and port off by hand.
+        val authority = uri?.rawAuthority?.substringAfterLast('@') ?: return "••••••"
+        val portText = authority.substringAfterLast(':', "").takeIf { it.isNotEmpty() && it.all(Char::isDigit) }
+        val host = if (portText != null) authority.substringBeforeLast(':') else authority
+        return "${uri.scheme ?: "http"}://•••${host.takeLast(5)}${portText?.let { ":$it" } ?: ""}"
+    }
+
+    /** For on-screen display: only the last two bytes of the MAC are shown. */
+    fun maskedMac(): String = mac.split(":").mapIndexed { i, b -> if (i < 4) "••" else b }.joinToString(":")
+
     /** True for plain-HTTP portals; the UI can say so (this provider has no HTTPS). */
     val isCleartext: Boolean get() = portalUrl.startsWith("http://", ignoreCase = true)
 

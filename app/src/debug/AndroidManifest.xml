@@ -10,5 +10,8 @@
         <activity
             android:name=".DebugPlayerActivity"
             android:exported="true" />
+        <activity
+            android:name=".KeystoreSelfTestActivity"
+            android:exported="true" />
     </application>
 </manifest>

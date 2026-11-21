@@ -3,6 +3,7 @@ package io.github.ravindren_sm.openstream
 import io.github.ravindren_sm.openstream.nav.NavStack
 import io.github.ravindren_sm.openstream.nav.Route
 import io.github.ravindren_sm.openstream.nav.tabFocusId
+import io.github.ravindren_sm.openstream.ui.focus.FocusMemory
 import io.github.ravindren_sm.openstream.ui.theme.Contrast
 import io.github.ravindren_sm.openstream.ui.theme.designDensity
 import org.junit.Test
@@ -115,5 +116,18 @@ class DesignDensityTest {
         assertEquals(1.0f, designDensity(1920f), 1e-6f)     // Fire TV Stick 4K Plus UI: 1920 px wide
         assertEquals(2.0f, designDensity(3840f), 1e-6f)     // a 4K render surface
         assertEquals(1280f / 1920f, designDensity(1280f), 1e-6f)
+    }
+}
+
+class FocusMemoryTest {
+    @Test fun `a back right after an edit ends is recognized, a later one is not`() {
+        var now = 0L
+        val memory = FocusMemory(nanoTime = { now })
+        assertEquals(false, memory.justFinishedEditing())          // nothing edited yet
+        memory.noteEditEnded()
+        now += 100_000_000L                                        // 100 ms later
+        assertEquals(true, memory.justFinishedEditing())
+        now += 700_000_000L                                        // 800 ms after the edit
+        assertEquals(false, memory.justFinishedEditing())
     }
 }

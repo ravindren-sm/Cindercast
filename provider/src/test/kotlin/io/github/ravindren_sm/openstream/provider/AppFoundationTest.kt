@@ -98,6 +98,13 @@ class AppFoundationTest {
         assertFalse(out.contains("portal.example.test") || out.contains("00:1A:79"), out)
     }
 
+    @Test fun `masked display values hide most of the host and MAC`() {
+        val s = (PortalSettings.validate("http://my_portal.example.test:8080/c/", "00:1A:79:12:34:56") as PortalSettings.Result.Valid).settings
+        assertEquals("http://•••.test:8080", s.maskedUrl())
+        assertEquals("••:••:••:••:34:56", s.maskedMac())
+        assertFalse(s.maskedUrl().contains("portal") || s.maskedMac().contains("1A"))
+    }
+
     // ---- RequestPacer ---------------------------------------------------------------------
 
     @Test fun `pacer spaces requests but has no count cap`() {
@@ -139,6 +146,17 @@ class AppFoundationTest {
         val down = session()
         assertEquals(SessionManager.State.FAILED, down.start())
         assertTrue(down.failure!!.startsWith("handshake failed"))
+    }
+
+    @Test fun `the session records the account expiry from the profile`() {
+        server.enqueue(json("""{"js":{"token":"t0k3n"}}"""))
+        server.enqueue(json("""{"js":{"status":0,"expire_billing_date":"2027-11-04 19:14:32"}}"""))
+        val s = session(); s.start()
+        assertEquals("2027-11-04 19:14:32", s.accountExpiry)
+        server.enqueue(json("""{"js":{"token":"t0k3n"}}"""))
+        server.enqueue(json("""{"js":{"status":0,"expire_billing_date":null}}"""))
+        val none = session(); none.start()
+        assertNull(none.accountExpiry)
     }
 
     @Test fun `an expired session is re-authenticated once and the call runs again`() {

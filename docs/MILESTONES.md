@@ -159,3 +159,10 @@ Driven with remote keys over ADB (select, arrows, Back) with screenshots at each
   1-based); tab text now lines up with page content at the 48 px safe margin.
 - Not yet verified: key repeat and fast navigation, long lists, overlays, and the setup screen.
 Remaining for M2.0's done condition: the setup screen with the sealed settings store.
+
+## M2.0 setup screen and sealed settings store (2026-11-21, third slice)
+- Added: SettingsStore (Keystore-sealed file, tmp + rename writes), first-run SetupScreen (welcome, then portal and MAC with a connection test that must succeed before Save), two-mode OsTextField, OsButton, masked URL/MAC display helpers.
+- Verified on the Fire TV (debug build): Keystore self-test all PASS; welcome to portal step; typing through the Fire OS keyboard; Back closes the keyboard without leaving the step, keeps the value and returns focus to the field; Down from the MAC field lands on "Test connection"; the failure path (unreachable placeholder host) shows a fixed message and keeps Save disabled. 88 local tests pass.
+- Test lesson: a cold start takes about 5 s and key events sent before the window has focus are dropped; on-device scripts must wait about 9 s after launch. Earlier "Back leaves the step" reports were this timing artifact, not an app bug.
+- Not yet verified on device: Save with a successful test (needs a real portal, held for the M2 session wiring), "unreadable settings" notice, Home start when settings exist.
+- Remaining for M2.0's done condition: none for the screen itself; those three checks fold into the M2 wiring work.
