@@ -67,7 +67,7 @@ fun PlaceholderScreen(
             }
         }
         if (entry.params.isNotEmpty()) {
-            Text("Opened from sample ${entry.params["item"]}. Back returns to that card.",
+            Text("Opened from sample ${(entry.params["item"]?.toIntOrNull() ?: 0) + 1}. Back returns to that card.",
                 style = MaterialTheme.typography.bodyLarge, color = Tokens.StatusSuccess)
         }
     }

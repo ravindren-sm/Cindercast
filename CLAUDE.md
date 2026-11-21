@@ -94,6 +94,8 @@ Full plan: docs/PROJECT_PLAN.md
   Fire OS 8.1.8.5 on the Android 11 base (API 30), 32-bit ABI only (armeabi-v7a),
   about 0.9 GB free on /data. compileSdk 37 (installed platform),
   minSdk 30 or lower so the app runs on the device.
+- UI sizes: write the OpenStream prototype's pixel values as dp/sp; `OpenStreamTheme` maps 1 dp to 1 pixel of a
+  1920-px canvas (the Fire TV runs 320 dpi, so raw dp would be twice too big).
 - Code comments: generous and impersonal. Pseudocode: language-agnostic.
 - Diagrams: draw.io (.drawio plus timestamped PNG export; archive older versions).
 - Each phase ends with a stated done condition and a user approval.

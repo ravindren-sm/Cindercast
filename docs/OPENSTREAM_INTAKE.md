@@ -56,6 +56,10 @@ the repo was installed, built or run. The scratch copy was deleted afterwards.
    canvas, 8.3 on resting cards, 7.3 on selected cards, 6.2 on the focused row surface. All are above
    the 4.5:1 body-text minimum; the claim is accurate for the canvas only.
 
+8. **Pixel grid.** The notes assume 1 px = 1 dp on a 1920x1080 canvas. On the Fire TV Stick 4K Plus the
+   1080p interface runs at 320 dpi (1 dp = 2 px), so token values used as raw dp came out twice too
+   big. The app normalizes with a design density (1 dp = 1 design pixel); see MILESTONES.md.
+
 ## Decision
 Use OpenStream as the **UI source of truth** and port it screen by screen to Compose for TV on top
 of `:provider`, as its own handoff notes intend. A WebView hybrid is not planned (it would need a

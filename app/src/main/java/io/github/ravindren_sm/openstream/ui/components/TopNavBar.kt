@@ -36,7 +36,9 @@ fun TopNavBar(
     Row(
         modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.S2),
+            // Each tab has S2 of inner padding, so shrink the bar's margin by that much to line the
+            // tab text up with the page content at the safe-area edge.
+            .padding(horizontal = Spacing.SafeHorizontal - Spacing.S2, vertical = Spacing.S2),
         horizontalArrangement = Arrangement.spacedBy(Spacing.S1),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -52,6 +54,8 @@ fun TopNavBar(
                         tab.label,
                         style = MaterialTheme.typography.titleMedium,
                         color = if (focused || tab == activeTab) Tokens.TextPrimary else Tokens.TextSecondary,
+                        maxLines = 1,
+                        softWrap = false,
                     )
                     // Active-tab underline (accent), reserved space when inactive so tabs do not jump.
                     Box(

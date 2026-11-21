@@ -141,3 +141,21 @@ Built from the OpenStream prototype (commit 01bcc7990f67) and verified offline; 
   `adb shell am start -n io.github.ravindren_sm.openstream/.DebugPlayerActivity`.
 - Tests: 10 in `:app` (4 contrast, 6 navigation) plus 80 in `:provider`.
 Remaining for M2.0's done condition: run the shell on the Fire TV; build the setup screen.
+
+
+## M2.0 on-device check (2026-11-21, Fire TV Stick 4K Plus, debug shell installed as a separate app)
+Driven with remote keys over ADB (select, arrows, Back) with screenshots at each step.
+- **Found: the TV's pixel grid.** The Fire TV runs a 1920x1080 interface at 320 dpi, so 1 dp = 2 px and
+  Android sees 960x540 dp. Using the prototype's token values unscaled made everything twice too big:
+  the 8-tab bar overflowed ("Favorites" wrapped, "Settings" fell off the edge) and the cards ran off
+  the bottom. Fix: `OpenStreamTheme` now provides a design density so 1 dp = 1 pixel of a 1920-px-wide
+  canvas on any screen (`designDensity`, unit-tested). Token values stay exactly as the prototype
+  specifies. Rule for all later UI code: write sizes in the prototype's pixel values.
+- **Verified on the device after the fix:** all 8 tabs fit on one row; focus ring (3 px white) and card
+  scale-up render; open a detail from a card and Back returns focus to that exact card; selecting a
+  tab changes the page and keeps focus on the tab; Back from a tab returns to Home with that tab
+  focused; Back at the root exits to the launcher; no crashes in the crash buffer.
+- Small fixes from the same check: the detail screen's "Opened from sample N" counted from 0 (now
+  1-based); tab text now lines up with page content at the 48 px safe margin.
+- Not yet verified: key repeat and fast navigation, long lists, overlays, and the setup screen.
+Remaining for M2.0's done condition: the setup screen with the sealed settings store.

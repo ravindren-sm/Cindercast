@@ -4,6 +4,7 @@ import io.github.ravindren_sm.openstream.nav.NavStack
 import io.github.ravindren_sm.openstream.nav.Route
 import io.github.ravindren_sm.openstream.nav.tabFocusId
 import io.github.ravindren_sm.openstream.ui.theme.Contrast
+import io.github.ravindren_sm.openstream.ui.theme.designDensity
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -106,5 +107,13 @@ class ContrastTest {
         assertEquals(Contrast.ratio(primary, canvas), Contrast.ratio(canvas, primary), 1e-9)
         assertNotNull(Contrast.ratio(0xFFFFFFL, 0x000000L))
         assertEquals(21.0, Contrast.ratio(0xFFFFFFL, 0x000000L), 0.01)
+    }
+}
+
+class DesignDensityTest {
+    @Test fun `density maps any screen width onto the 1920 pixel design canvas`() {
+        assertEquals(1.0f, designDensity(1920f), 1e-6f)     // Fire TV Stick 4K Plus UI: 1920 px wide
+        assertEquals(2.0f, designDensity(3840f), 1e-6f)     // a 4K render surface
+        assertEquals(1280f / 1920f, designDensity(1280f), 1e-6f)
     }
 }
