@@ -15,6 +15,7 @@ import java.io.File
  *
  *   adb shell am start -n io.github.ravindren_sm.openstream/.KeystoreSelfTestActivity
  *   ... --ez seed true     (writes placeholder settings, so the app starts on Home)
+ *   ... --ez import true   (copies files/dev-config.json into the sealed store)
  *   ... --ez clear true    (removes the saved settings, so the app starts on setup)
  */
 class KeystoreSelfTestActivity : ComponentActivity() {
@@ -44,6 +45,14 @@ class KeystoreSelfTestActivity : ComponentActivity() {
 
             val real = SettingsStore(File(filesDir, MainActivity.SETTINGS_FILE), AndroidKeystoreKey.box())
             if (intent.getBooleanExtra("seed", false)) { real.save(placeholder); report("seeded placeholder settings", true) }
+            if (intent.getBooleanExtra("import", false)) {
+                // Debug only: copy the pushed dev-config.json (private storage) into the sealed store, so the real app
+                // can be tried against a real portal without typing credentials. Values are never logged.
+                val dev = DevConfig.load(this)
+                val valid = dev?.let { PortalSettings.validate(it.portalUrl, it.mac) as? PortalSettings.Result.Valid }
+                if (valid != null) real.save(valid.settings)
+                report("imported dev-config into the sealed store", valid != null)
+            }
             if (intent.getBooleanExtra("clear", false)) { real.clear(); report("cleared saved settings", true) }
         } catch (e: Exception) {
             report("self-test", false, " (${e::class.simpleName})")

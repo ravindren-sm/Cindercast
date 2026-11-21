@@ -173,3 +173,9 @@ Remaining for M2.0's done condition: the setup screen with the sealed settings s
 - Verified on the Fire TV with placeholder settings (no provider contact): Home starts with saved settings, shows the fixed "could not reach" line, and survives background and resume. Placeholder settings cleared afterwards.
 - Not verified: a successful live session and a real keep-alive on device (needs a Phase 2 approval to contact the provider); re-auth on a real expiry is still unobserved.
 - Still to do in M2: debug-only OkHttp interceptor (rule 13).
+
+## M2 first live session of the app (2026-11-21, user-approved)
+- StbEmu and TiviMate confirmed not running before and after (read-only check). Real settings were imported into the sealed store from the pushed dev config (debug-only `--ez import true` on the self-test activity; the plaintext dev-config.json was deleted from the device afterwards).
+- Result: handshake and profile succeeded; the app showed "Portal connected" with the account end date. A second run, with the screen kept awake by D-pad presses, still showed connected about 150 s in, past the first 120 s keep-alive (a failed keep-alive would have shown the warning line). Keep-alive success is inferred from the status, not from a request log; the debug interceptor (rule 13) will make it directly visible.
+- Observed: the Fire TV screensaver started within about 2.5 minutes and the app paused its session as designed (foreground-only).
+- Save-from-setup with a real portal and re-auth on a real expiry remain unobserved. Real settings are now in the app's sealed store on the device.
