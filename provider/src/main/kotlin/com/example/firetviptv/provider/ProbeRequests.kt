@@ -51,7 +51,9 @@ enum class ProbeStep(val cliName: String, val planStep: String, val needs: List<
     PORTAL_CHANNELS("portal-channels", "Step 4c", listOf("PORTAL_URL", "EMU_MAC"), usesMac = true),
     PORTAL_LINK("portal-link", "Step 4d", listOf("PORTAL_URL", "EMU_MAC"), usesMac = true),
     /** 4d on a chosen channel (--genre="..." --channel="..."), for example one known to play in TiviMate. */
-    PORTAL_LINK_CHANNEL("portal-link-channel", "Step 4d (chosen channel)", listOf("PORTAL_URL", "EMU_MAC"), usesMac = true);
+    PORTAL_LINK_CHANNEL("portal-link-channel", "Step 4d (chosen channel)", listOf("PORTAL_URL", "EMU_MAC"), usesMac = true),
+    /** 4e: VOD catalog (movies and shows). Runs in the Fire TV debug player; listed here for dry runs. */
+    PORTAL_VOD_CATALOG("portal-vod-catalog", "Step 4e", listOf("PORTAL_URL", "EMU_MAC"), usesMac = true);
 
     companion object {
         fun fromCliName(name: String): ProbeStep? = entries.firstOrNull { it.cliName == name }
@@ -72,7 +74,7 @@ object ProbeRequests {
         )
         ProbeStep.DISCOVERY_PORTAL -> discovery(secrets.require("PORTAL_URL"))
         ProbeStep.PORTAL_HANDSHAKE, ProbeStep.PORTAL_PROFILE, ProbeStep.PORTAL_CHANNELS, ProbeStep.PORTAL_LINK,
-        ProbeStep.PORTAL_LINK_CHANNEL ->
+        ProbeStep.PORTAL_LINK_CHANNEL, ProbeStep.PORTAL_VOD_CATALOG ->
             portalPlan(step, secrets)
         ProbeStep.XTREAM_ACCOUNT -> listOf(xtreamAccount(secrets))
         ProbeStep.M3U_PLAYLIST -> listOf(
@@ -147,9 +149,20 @@ object ProbeRequests {
                 ProbeRequest("GET", "http://stream-url-from-create-link.invalid/", mapOf("User-Agent" to identity.userAgent),
                     "Step 4d: first 64 KB of the stream only (format check, no playback)"),
             )
+            ProbeStep.PORTAL_VOD_CATALOG -> vodCatalogPlan(first, after)
             else -> error("not a portal step")
         }
     }
+
+    /**
+     * Step 4e request plan, shared by the debug player and dry runs: 6 requests.
+     * handshake, profile, vod categories, vod page 1 (all), series categories, series page 1.
+     */
+    fun vodCatalogPlan(first: StalkerRequests.Context, after: StalkerRequests.Context): List<ProbeRequest> = listOf(
+        StalkerRequests.handshake(first), StalkerRequests.profile(after),
+        StalkerRequests.vodCategories(after, "vod"), StalkerRequests.vodPage(after, "vod"),
+        StalkerRequests.vodCategories(after, "series"), StalkerRequests.vodPage(after, "series"),
+    )
 
     /**
      * From a redirect response, the portal URL to store: the Location's scheme, host and

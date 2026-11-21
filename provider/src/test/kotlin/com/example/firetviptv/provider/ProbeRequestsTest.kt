@@ -95,12 +95,12 @@ class ProbeRequestsTest {
     @Test fun `only the Step 4 portal steps use the MAC`() {
         assertEquals(
             setOf(ProbeStep.PORTAL_HANDSHAKE, ProbeStep.PORTAL_PROFILE, ProbeStep.PORTAL_CHANNELS, ProbeStep.PORTAL_LINK,
-                ProbeStep.PORTAL_LINK_CHANNEL),
+                ProbeStep.PORTAL_LINK_CHANNEL, ProbeStep.PORTAL_VOD_CATALOG),
             ProbeStep.entries.filter { it.usesMac }.toSet(),
         )
-        assertEquals(listOf(1, 2, 4, 5, 6), listOf(
+        assertEquals(listOf(1, 2, 4, 5, 6, 6), listOf(
             ProbeStep.PORTAL_HANDSHAKE, ProbeStep.PORTAL_PROFILE, ProbeStep.PORTAL_CHANNELS, ProbeStep.PORTAL_LINK,
-            ProbeStep.PORTAL_LINK_CHANNEL,
+            ProbeStep.PORTAL_LINK_CHANNEL, ProbeStep.PORTAL_VOD_CATALOG,
         ).map { ProbeRequests.forStep(it, secrets).size })
     }
 

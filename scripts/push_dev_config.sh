@@ -2,8 +2,9 @@
 # Writes the debug player's config into the app's PRIVATE storage on the Fire TV:
 #   /data/data/<package>/files/dev-config.json
 #
-#   bash scripts/push_dev_config.sh [genre] [channel] [identity] [streamUserAgent]
-#   defaults: "ENGLISH USA LOCAL" "NEWS 12 LONG ISLAND" honest player
+#   bash scripts/push_dev_config.sh [genre] [channel] [identity] [streamUserAgent] [mode]
+#   defaults: "ENGLISH USA LOCAL" "NEWS 12 LONG ISLAND" honest player live
+#   mode: live (play one channel) | vod-catalog (Step 4e: VOD counts, no playback)
 #
 # How secrets stay out of sight (CLAUDE.md rules 3 and 10):
 # - PORTAL_URL and EMU_MAC are read from the local secrets file by Python (not the shell),
@@ -17,7 +18,7 @@ PKG="com.example.firetvhello"
 FILE="${FIRETV_IPTV_SECRETS:-$HOME/.config/firetv-iptv/secrets.env}"
 ADB="${ADB:-$HOME/Library/Android/sdk/platform-tools/adb}"
 GENRE="${1:-ENGLISH USA LOCAL}"; CHANNEL="${2:-NEWS 12 LONG ISLAND}"
-IDENTITY="${3:-honest}"; STREAM_UA="${4:-player}"
+IDENTITY="${3:-honest}"; STREAM_UA="${4:-player}"; MODE="${5:-live}"
 
 [ -f "$FILE" ] || { echo "push-config: secrets file not found"; exit 78; }
 SERIAL="${ADB_SERIAL:-$(python3 -I - "$FILE" <<'PY'
@@ -32,10 +33,10 @@ PY
 )}"
 [ -n "$SERIAL" ] || { echo "push-config: no FIRETV_IP in secrets file and no ADB_SERIAL"; exit 78; }
 
-python3 -I - "$FILE" "$GENRE" "$CHANNEL" "$IDENTITY" "$STREAM_UA" <<'PY' \
+python3 -I - "$FILE" "$GENRE" "$CHANNEL" "$IDENTITY" "$STREAM_UA" "$MODE" <<'PY' \
   | "$ADB" -s "$SERIAL" shell "run-as $PKG sh -c 'mkdir -p files && cat > files/dev-config.json && chmod 600 files/dev-config.json'"
 import json, shlex, sys
-path, genre, channel, identity, stream_ua = sys.argv[1:6]
+path, genre, channel, identity, stream_ua, mode = sys.argv[1:7]
 vals = {}
 for line in open(path, encoding="utf-8"):
     line = line.strip()
@@ -47,9 +48,10 @@ if missing:
 sys.stdout.write(json.dumps({
     "portalUrl": vals["PORTAL_URL"], "mac": vals["EMU_MAC"],
     "genre": genre, "channel": channel, "identity": identity, "streamUserAgent": stream_ua,
+    "mode": mode,
 }))
 PY
 
 # Confirm without printing contents: size and permissions only.
 "$ADB" -s "$SERIAL" shell "run-as $PKG sh -c 'ls -l files/dev-config.json'" | awk '{print "push-config: wrote files/dev-config.json (" $5 " bytes, " $1 ")"}'
-echo "push-config: genre='$GENRE' channel='$CHANNEL' identity=$IDENTITY streamUserAgent=$STREAM_UA"
+echo "push-config: mode=$MODE genre='$GENRE' channel='$CHANNEL' identity=$IDENTITY streamUserAgent=$STREAM_UA"

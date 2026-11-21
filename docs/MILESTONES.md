@@ -20,7 +20,7 @@ Done: our client obtained a session token (HANDSHAKE_ACCEPTED). Nothing else ver
 | 4b profile (DONE 2026-11-21) | 2 | Token activates; account status | `status` = 0, not blocked: passed, MAC only |
 | 4c live catalog (DONE 2026-11-21) | 4 | Genres, channel paging, total count | Counts close to TiviMate's 5,100: 4,900 (about 3% fewer; to explain) |
 | 4d live link (2026-11-21: link created; HLS; edge 403 to the probe, stopped) | 5 (+2 redirect hops) | `create_link` gives a stream; container | First 64 KB is MPEG-TS or HLS |
-| 4e VOD catalog (new, offline first) | about 4 | VOD categories, movie paging, series markers | Counts close to 99,500 movies / 27,700 shows |
+| 4e VOD catalog (DONE 2026-11-21, on device) | 6 | VOD categories, movie paging, series markers | 164 categories, 104,000 items; shows inside type=vod (is_series=1); no series module |
 | 4f VOD link (new, offline first) | about 5 | Movie and episode `create_link` | First bytes are a playable container |
 | 4g keep-alive (new, offline first) | small, spaced | Watchdog/events polling keeps the token valid | Token still valid after a timed wait |
 

@@ -63,6 +63,23 @@ object StalkerRequests {
         "Step 4d (chosen channel): channels in one genre, page $page",
         "type" to "itv", "action" to "get_ordered_list", "genre" to genreId, "fav" to "0", "sortby" to "number", "p" to page.toString())
 
+    /**
+     * VOD categories. [type] is "vod" (movies, and on many portals shows too) or "series"
+     * (separate series module on newer Ministra portals; may be absent).
+     */
+    fun vodCategories(ctx: Context, type: String) = build(ctx, "Step 4e: $type categories",
+        "type" to type, "action" to "get_categories")
+
+    /**
+     * One page of a VOD list. category "*" = all. movie_id/season_id/episode_id = 0 asks for
+     * the top level (titles), not a series' seasons or episodes.
+     */
+    fun vodPage(ctx: Context, type: String, category: String = "*", page: Int = 1) = build(ctx,
+        "Step 4e: $type list, category $category, page $page",
+        "type" to type, "action" to "get_ordered_list", "movie_id" to "0", "season_id" to "0",
+        "episode_id" to "0", "category" to category, "fav" to "0", "sortby" to "added",
+        "hd" to "0", "not_ended" to "0", "p" to page.toString())
+
     fun createLink(ctx: Context, cmd: String) = build(ctx, "Step 4d: create_link (turns a channel's cmd into a stream URL)",
         "type" to "itv", "action" to "create_link", "cmd" to cmd, "series" to "", "forced_storage" to "0",
         "disable_ad" to "0", "download" to "0")
@@ -141,7 +158,7 @@ class StalkerClient(
     fun genres(): StalkerResult = call(StalkerRequests.genres(ctx())) { js ->
         val arr = js as? JsonArray
         val titles = arr?.mapNotNull { (it as? JsonObject)?.str("title") }.orEmpty()
-        listOf("genres: ${arr?.size ?: "?"}", "first titles: ${titles.take(12).joinToString(" | ")}")
+        listOf("genres: ${arr?.size ?: "?"}", "first titles: ${titles.take(12).joinToString(" ; ")}")
     }
 
     /**
@@ -179,6 +196,43 @@ class StalkerClient(
         }
         return Triple(r, cmd, label)
     }
+
+    /** VOD categories as (id, title); summary: count, first titles, whether an "All" (*) entry exists. */
+    fun vodCategories(type: String): Pair<StalkerResult, List<Pair<String, String>>> {
+        var cats: List<Pair<String, String>> = emptyList()
+        val r = call(StalkerRequests.vodCategories(ctx(), type)) { js ->
+            val items = (js as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+            cats = items.mapNotNull { o -> o.str("id")?.let { id -> id to (o.str("title") ?: "?") } }
+            listOf(
+                "$type categories: ${items.size}",
+                "has All (*): ${if (cats.any { it.first == "*" }) "yes" else "no"}",
+                // " ; " separator: some portal category titles contain " | " themselves.
+                "first titles: ${cats.take(12).joinToString(" ; ") { it.second }}",
+            )
+        }
+        return r to cats
+    }
+
+    /**
+     * Page [page] of a VOD list. Summary is safe by construction: totals, page size, sample
+     * titles (with year), how many items on the page are series, cmd KINDS (never values),
+     * and the item field names.
+     */
+    fun vodPage(type: String, category: String = "*", page: Int = 1): StalkerResult =
+        call(StalkerRequests.vodPage(ctx(), type, category, page)) { js ->
+            val o = js as? JsonObject
+            val items = (o?.get("data") as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+            val seriesFlag = items.count { it.str("is_series") == "1" }
+            val withEpisodes = items.count { (it["series"] as? JsonArray)?.isNotEmpty() == true }
+            val cmdKinds = items.mapNotNull { it.str("cmd")?.let(::vodCmdKind) }.groupingBy { it }.eachCount()
+            listOf(
+                "$type total: ${o?.get("total_items")?.let(::shortValue) ?: "?"} (page size ${o?.get("max_page_items")?.let(::shortValue) ?: "?"})",
+                "page $page items: ${items.size}; is_series=1: $seriesFlag; with episode list: $withEpisodes",
+                "sample: ${items.take(5).joinToString(" | ") { "${it.str("name") ?: "?"} (${it.str("year") ?: "?"})" }}",
+                "cmd kinds: ${cmdKinds.entries.joinToString { "${it.key} x${it.value}" }.ifEmpty { "-" }}",
+                "item keys: ${items.firstOrNull()?.keys?.sorted()?.joinToString(",") ?: "-"}",
+            )
+        }
 
     /** Returns the first channel's cmd through [firstCmd] for create_link. */
     fun channelsPage1(): Pair<StalkerResult, String?> {
@@ -254,6 +308,21 @@ class StalkerClient(
                 ?: u?.rawAuthority?.substringAfterLast(':', "")?.toIntOrNull()
             val port = portNum?.let { " port $it" } ?: ""
             return "$prefix ${u?.scheme ?: url.substringBefore("://")} $hostKind$port"
+        }
+
+        /**
+         * Kind of a VOD cmd without revealing it: a URL (classified like [cmdShape]), a server
+         * path, base64-looking data (often encoded JSON with a file id), or other.
+         */
+        fun vodCmdKind(cmd: String): String {
+            val c = cmd.trim()
+            return when {
+                c.isEmpty() -> "empty"
+                c.contains("://") -> "url: " + cmdShape(c)
+                c.startsWith("/") -> "server path"
+                Regex("^[A-Za-z0-9+/=_-]{16,}$").matches(c) -> "base64-like (${c.length} chars)"
+                else -> "other (${c.length} chars)"
+            }
         }
 
         /** Identifies a stream from its first bytes: MPEG-TS sync pattern, HLS playlist, or unknown. */

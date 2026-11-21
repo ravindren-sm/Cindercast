@@ -15,7 +15,8 @@ import java.io.File
  *
  * File shape (values are the user's; never logged):
  *   {"portalUrl": "...", "mac": "...", "genre": "ENGLISH USA LOCAL",
- *    "channel": "NEWS 12 LONG ISLAND", "identity": "honest", "streamUserAgent": "player"}
+ *    "channel": "NEWS 12 LONG ISLAND", "identity": "honest", "streamUserAgent": "player",
+ *    "mode": "live" | "vod-catalog"}
  */
 data class DevConfig(
     val portalUrl: String,
@@ -26,12 +27,14 @@ data class DevConfig(
     val identity: StalkerIdentity,
     /** "player" (Media3 default), "mag" (MAG box UA) or "honest" (probe UA) for stream requests. */
     val streamUserAgent: String,
+    /** "live" (play one live channel) or "vod-catalog" (Step 4e: list VOD counts, no playback). */
+    val mode: String = "live",
 ) {
     /** Values the redactor must mask, labelled like the Mac probe's placeholders. */
     fun secretsForRedaction(): Map<String, String> = mapOf("PORTAL_URL" to portalUrl, "EMU_MAC" to mac)
 
     /** Safe description: no URL, no MAC. */
-    override fun toString() = "DevConfig(genre=$genre, channel=$channel, identity=$identity, streamUserAgent=$streamUserAgent)"
+    override fun toString() = "DevConfig(mode=$mode, genre=$genre, channel=$channel, identity=$identity, streamUserAgent=$streamUserAgent)"
 
     companion object {
         const val FILE_NAME = "dev-config.json"
@@ -48,6 +51,7 @@ data class DevConfig(
                     channel = j.optString("channel", "NEWS 12 LONG ISLAND"),
                     identity = if (j.optString("identity", "honest") == "mag") StalkerIdentity.MAG else StalkerIdentity.HONEST,
                     streamUserAgent = j.optString("streamUserAgent", "player"),
+                    mode = j.optString("mode", "live"),
                 ).takeIf { it.portalUrl.isNotEmpty() && it.mac.isNotEmpty() }
             }
         } catch (_: Exception) {

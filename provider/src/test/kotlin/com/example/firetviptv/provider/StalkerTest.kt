@@ -149,6 +149,53 @@ class StalkerTest {
         assertNull(cmd); assertNull(label)
     }
 
+    @Test fun `vod categories and first page are summarized without cmd values`() {
+        server.enqueue(json("""{"js":{"token":"t0k3n"}}"""))
+        server.enqueue(json("""{"js":[{"id":"*","title":"All"},{"id":"5","title":"English Movies"},{"id":"9","title":"Kids"}]}"""))
+        server.enqueue(json("""{"js":{"total_items":"99500","max_page_items":14,"data":[
+            {"id":"1","name":"Fake Movie","year":"2024","is_series":"0","cmd":"eyJ0eXBlIjoibW92aWUiLCJzdHJlYW1faWQiOjEyM30=","series":[]},
+            {"id":"2","name":"Fake Show","year":"2023","is_series":"1","cmd":"ffmpeg http://vod.example.test/series/77.mkv?token=SECRETVOD","series":[1,2,3]},
+            {"id":"3","name":"Other Film","year":"2022","is_series":"0","cmd":"/media/file_3.mpg"}]}}"""))
+        val c = client(); c.handshake()
+        val (cats, list) = c.vodCategories("vod")
+        assertEquals(listOf("*" to "All", "5" to "English Movies", "9" to "Kids"), list)
+        assertTrue(cats.summary.contains("vod categories: 3") && cats.summary.contains("has All (*): yes"), cats.summary.toString())
+
+        val page = c.vodPage("vod")
+        val text = page.summary.joinToString("\n")
+        assertTrue(text.contains("vod total: 99500 (page size 14)"), text)
+        assertTrue(text.contains("page 1 items: 3; is_series=1: 1; with episode list: 1"), text)
+        assertTrue(text.contains("Fake Movie (2024) | Fake Show (2023)"), text)
+        assertTrue(text.contains("base64-like") && text.contains("server path") && text.contains("url: ffmpeg http remote host"), text)
+        listOf("eyJ0eXBl", "SECRETVOD", "vod.example.test", "/media/file_3").forEach {
+            assertFalse(text.contains(it), "cmd value leaked: $it\n$text")
+        }
+
+        server.takeRequest(); server.takeRequest()
+        val req = server.takeRequest()
+        val u = req.requestUrl!!
+        assertEquals("vod", u.queryParameter("type")); assertEquals("get_ordered_list", u.queryParameter("action"))
+        assertEquals("*", u.queryParameter("category")); assertEquals("1", u.queryParameter("p"))
+        assertEquals("added", u.queryParameter("sortby")); assertEquals("0", u.queryParameter("movie_id"))
+        assertEquals("Bearer t0k3n", req.getHeader("Authorization"))
+    }
+
+    @Test fun `series module absent is reported, not fatal`() {
+        server.enqueue(json("""{"js":{"token":"t0k3n"}}"""))
+        server.enqueue(MockResponse().setResponseCode(200).setBody("Unknown action"))
+        val c = client(); c.handshake()
+        val (r, cats) = c.vodCategories("series")
+        assertFalse(r.ok); assertTrue(cats.isEmpty())
+        assertEquals(listOf("no JSON payload in the response"), r.summary)
+    }
+
+    @Test fun `vod cmd kinds`() {
+        assertEquals("server path", StalkerClient.vodCmdKind("/media/x.mpg"))
+        assertTrue(StalkerClient.vodCmdKind("eyJ0eXBlIjoibW92aWUifQ==").startsWith("base64-like"))
+        assertEquals("empty", StalkerClient.vodCmdKind(" "))
+        assertTrue(StalkerClient.vodCmdKind("ffmpeg http://203.0.113.5/m.mp4").startsWith("url: ffmpeg http remote IP"))
+    }
+
     @Test fun `stream signatures`() {
         val ts = ByteArray(188 * 3).also { for (i in 0 until 3) it[i * 188] = 0x47 }
         assertTrue(StalkerClient.streamSignature(ts).startsWith("MPEG-TS"))

@@ -86,7 +86,11 @@ class MainActivity : ComponentActivity() {
             return
         }
         log("Config loaded: $config")
-        Thread({ runPortalFlow(config, exo) }, "portal-flow").start()
+        if (config.mode == "vod-catalog") {
+            Thread({ runVodCatalog(config) }, "vod-catalog").start()
+        } else {
+            Thread({ runPortalFlow(config, exo) }, "portal-flow").start()
+        }
     }
 
     override fun onDestroy() {
@@ -145,6 +149,40 @@ class MainActivity : ComponentActivity() {
             }
         } catch (e: Exception) {
             log("Portal flow error: ${redactor.redact(e)}")
+        }
+    }
+
+    /**
+     * Step 4e: VOD catalog check, no playback. Exactly the 6 requests of
+     * ProbeRequests.vodCatalogPlan: handshake, get_profile, vod categories, vod page 1,
+     * series categories, series page 1. Budget 6, >= 2 s apart, no retries. A missing series
+     * module is logged and does not stop the run (it is the last step pair).
+     */
+    private fun runVodCatalog(config: DevConfig) {
+        val budget = RequestBudget(maxRequests = 6)
+        val client = StalkerClient(config.portalUrl, config.mac, HttpProbe(budget, maxBodyBytes = 1_000_000), config.identity)
+        fun step(label: String, r: StalkerResult): Boolean {
+            val status = (r.outcome as? ProbeOutcome.Response)?.status?.toString()
+                ?: "transport failure (${(r.outcome as ProbeOutcome.Failure).error::class.simpleName})"
+            log("$label: $status")
+            r.summary.forEach { log("  $it") }
+            return r.ok
+        }
+        try {
+            log("Step 4e VOD catalog: 6 requests planned, no playback")
+            if (!step("handshake", client.handshake()) || client.token == null) { log("STOP: no token"); return }
+            val profile = client.profile()
+            if (!step("get_profile", profile) || profile.field("status") != "0") { log("STOP: profile not authorized"); return }
+            if (!step("vod get_categories", client.vodCategories("vod").first)) { log("STOP at vod categories"); return }
+            if (!step("vod get_ordered_list (all, page 1)", client.vodPage("vod"))) { log("STOP at vod list"); return }
+            val (seriesCats, _) = client.vodCategories("series")
+            if (!step("series get_categories", seriesCats)) {
+                log("series module: not available (shows are probably inside type=vod)"); log("Step 4e done"); return
+            }
+            step("series get_ordered_list (all, page 1)", client.vodPage("series"))
+            log("Step 4e done")
+        } catch (e: Exception) {
+            log("VOD catalog error: ${redactor.redact(e)}")
         }
     }
 

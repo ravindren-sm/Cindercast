@@ -62,3 +62,14 @@ is the one MAG retry the plan allows (PHASE2_PROBE_PLAN.md section 9).
 If it returns 200, the app question becomes narrower: does the edge need the MAG User-Agent
 on stream requests, or only a normal player User-Agent (as Kodi sends)? That is best tested in
 the real player (Media3) on the Fire TV.
+
+## Known quirk: Mac CLI probe gets 403 at the stream edge (closed 2026-11-21)
+The Mac probe (`:probe`) reaches every portal API call and `create_link`, and follows the
+stream's `301` (Cloudflare) and `302` (HLS) redirects, but the third host answers `403`.
+The Fire TV debug player, with the same account, channel and public IPv4, gets `200` and plays.
+Tried from the Mac without change: honest and MAG User-Agents, two channels, a 210 s wait.
+Likely cause, unverified: address family (the Fire TV has global IPv6, the probe used IPv4) or
+another client/network-path difference at the edge. **Treated as a CLI-only environment quirk.**
+Investigation stopped by the user's decision; all further protocol checks (4e-4g) run in the
+Fire TV debug player. If it ever matters, log IPv4/IPv6 per stream connection in the debug
+build first.
