@@ -341,3 +341,12 @@ Design in `docs/HOME_AND_PROFILES.md`. Built: Room 2.7.1 with KSP (the owner cho
 ## Connection status moved (2026-11-21)
 - The "Portal connected · account active until …" line is now small type (18 sp) in the bottom-left corner on every screen except the players and setup, instead of a line under the tab bar, so content starts higher. Checked on the Fire TV with the fake portal.
 
+## Search on the real portal (2026-11-21, user-approved; StbEmu and TiviMate confirmed not running)
+Method: the current debug build installed over the real app, two searches with kid-safe words ("toy story", then "cartoon"), counts-only logging through a debug hook, the app force-stopped afterwards, screenshots deleted. No stream was played.
+- **Titles: the server does the matching.** The portal's `search` parameter on the VOD list works, across all categories, one request for a short result. It matches more than titles (descriptions or other fields), so results include titles that do not contain the words. Our part is only ordering: titles starting with the text first, then containing it, then the rest, and the split into Movies and Shows. The catalog has repeated titles (the same film in several quality or language versions, each with its own id), which show as repeats.
+- **Channels: we do the matching.** The portal ignores `search` on the channel list (it returned the unfiltered list, 4,939 entries in that view), so the app reads the full channel list once (`get_all_channels`, 5,092 channels, 1.3 s to download, about 2.5 s to read) and filters it by name or number on the device. The list is kept for the session, so later searches skip the download.
+- **Bug found and fixed:** the 1 MB response cap cut that list off, so channels reported "could not be searched". The call now has its own 8 MB cap. A list larger than that still fails gracefully (movies and shows are unaffected). The app skips the pointless server channel search after the first time it sees it ignored.
+- First search about 5 s (downloading and reading the channels), later ones about 1 s. Java heap read 75 MB right after the first channel read (a transient peak, not yet measured over time).
+- UI fixes from the screenshot: the bottom-left status line has a dark backing so it stays legible over scrolled posters; channel cards are taller so two-line names fit.
+- Mature-looking results can appear for harmless words (the server matches descriptions), which matters for a shared TV; the parental-control work (parked) would filter these.
+

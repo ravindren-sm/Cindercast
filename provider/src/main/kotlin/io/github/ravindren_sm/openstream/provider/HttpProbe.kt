@@ -44,13 +44,14 @@ class HttpProbe internal constructor(
     constructor(budget: RequestGate, maxBodyBytes: Int, interceptors: List<Interceptor>) :
         this(budget, maxBodyBytes, defaultClient(interceptors))
 
-    fun send(request: ProbeRequest): ProbeOutcome {
+    /** [bodyLimit] replaces the usual response size cap for this one call (for the rare answer that is known to be large). */
+    fun send(request: ProbeRequest, bodyLimit: Int = maxBodyBytes): ProbeOutcome {
         budget.acquire()
         val builder = Request.Builder().url(request.url).method(request.method, null)
         request.headers.forEach { (name, value) -> builder.header(name, value) }
         return try {
             client.newCall(builder.build()).execute().use { response ->
-                val body = response.body?.byteStream()?.use { readUpTo(it, maxBodyBytes) } ?: ByteArray(0)
+                val body = response.body?.byteStream()?.use { readUpTo(it, bodyLimit) } ?: ByteArray(0)
                 val tls = response.handshake?.let { hs ->
                     val leaf = hs.peerCertificates.firstOrNull() as? X509Certificate
                     TlsInfo(

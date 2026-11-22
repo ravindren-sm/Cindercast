@@ -1,6 +1,9 @@
 package io.github.ravindren_sm.openstream.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.sp
@@ -20,6 +23,9 @@ fun SessionStatusLine(status: SessionStatus, modifier: Modifier = Modifier) {
         SessionStatus.Degraded -> "Portal connection check failed; trying again shortly." to Tokens.StatusWarning
         is SessionStatus.Failed -> status.message to Tokens.StatusError
     }
+    // A dark backing keeps it legible when a row of posters scrolls underneath it.
     Text(text, style = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp, lineHeight = 24.sp), color = color,
-        modifier = modifier.padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.SafeVertical))
+        modifier = modifier.padding(start = Spacing.SafeHorizontal - Spacing.S1, bottom = Spacing.SafeVertical - Spacing.S1)
+            .background(Tokens.BgCanvas.copy(alpha = 0.9f), RoundedCornerShape(6.dp))
+            .padding(horizontal = Spacing.S1, vertical = 4.dp))
 }

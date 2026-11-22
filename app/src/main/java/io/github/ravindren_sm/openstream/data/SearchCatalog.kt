@@ -32,6 +32,12 @@ object SearchRanking {
         return items.withIndex().sortedWith(compareBy({ group(it.value) }, { it.index })).map { it.value }
     }
 
+    /** Channels the portal found for [query]: its order is kept, but names starting with the text come first and the list is capped. */
+    fun matchChannelsFromServer(found: List<LiveChannel>, query: String): List<LiveChannel> {
+        val q = normalize(query)
+        return found.distinctBy { it.id }.sortedBy { if (normalize(it.name).startsWith(q)) 0 else 1 }.take(MAX_CHANNELS)
+    }
+
     /** Channels whose name contains the query, or whose number equals it, name matches starting-with first; at most [MAX_CHANNELS]. */
     fun matchChannels(all: List<LiveChannel>, query: String): List<LiveChannel> {
         val q = normalize(query)
@@ -43,12 +49,20 @@ object SearchRanking {
     }
 }
 
+/** Debug-only observer of search steps: counts and which path was used, never the typed text. Set by the debug Application. */
+object SearchHooks {
+    @Volatile var onEvent: ((String) -> Unit)? = null
+    internal fun event(text: String) { onEvent?.invoke(text) }
+}
+
 /**
  * Search over the portal: titles through the portal's own `search` parameter (a few pages), channels by filtering the
  * list of all channels, which is read once per portal and kept for the session. Blocking: call off the main thread.
  */
 class SearchCatalog(private val session: PortalSession, private val maxPages: Int = 3) {
     @Volatile private var channelCache: List<LiveChannel>? = null
+    /** Set once the portal has shown it ignores `search` on the channel list, so later searches skip that request. */
+    @Volatile private var serverChannelSearchIgnored = false
 
     fun search(query: String): CatalogResult<SearchResults> {
         val q = query.trim()
@@ -67,13 +81,40 @@ class SearchCatalog(private val session: PortalSession, private val maxPages: In
             if (!p.hasMore(titles.size)) break
         }
         val ranked = rank(titles, q)
-        val channels = allChannels()
-        return CatalogResult.Ok(
-            SearchResults(
-                movies = ranked.filter { !it.isSeries }, shows = ranked.filter { it.isSeries },
-                channels = channels?.let { SearchRanking.matchChannels(it, q) }.orEmpty(), channelsFailed = channels == null,
-            ),
-        )
+        val (channels, failed) = findChannels(q)
+        SearchHooks.event("titles=${titles.size} movies=${ranked.count { !it.isSeries }} shows=${ranked.count { it.isSeries }} channels=${channels.size} channelsFailed=$failed")
+        return CatalogResult.Ok(SearchResults(movies = ranked.filter { !it.isSeries }, shows = ranked.filter { it.isSeries }, channels = channels, channelsFailed = failed))
+    }
+
+    /**
+     * Channels for [q]: first the portal's own `search` on the channel list (small answers). It is trusted only if it
+     * answers with nothing, or with at least one channel whose name contains the text; a list that ignores the
+     * parameter looks like the first page of everything. Otherwise the full channel list is filtered on the device.
+     * Returns the channels and whether searching them failed altogether.
+     */
+    private fun findChannels(q: String): Pair<List<LiveChannel>, Boolean> {
+        var page1: io.github.ravindren_sm.openstream.provider.LiveChannelPage? = null
+        val first = if (serverChannelSearchIgnored) null else session.withSession { m -> m.call { c -> val (r, p) = c.channelsSearch(q, 1); page1 = p; r } }
+        val p1 = page1
+        if (first != null && first.ok && p1 != null) {
+            val needle = SearchRanking.normalize(q)
+            val honoured = p1.items.isEmpty() || p1.items.any { SearchRanking.normalize(it.name).contains(needle) }
+            if (honoured) {
+                val found = p1.items.toMutableList()
+                if (p1.hasMore(found.size)) {
+                    var p2: io.github.ravindren_sm.openstream.provider.LiveChannelPage? = null
+                    val second = session.withSession { m -> m.call { c -> val (r, p) = c.channelsSearch(q, 2); p2 = p; r } }
+                    if (second != null && second.ok) p2?.let { page -> found += page.items.filter { n -> found.none { it.id == n.id } } }
+                }
+                SearchHooks.event("channels path=server total=${p1.totalItems}")
+                return SearchRanking.matchChannelsFromServer(found, q) to false
+            }
+            serverChannelSearchIgnored = true
+            SearchHooks.event("channels path=server-ignored total=${p1.totalItems}")
+        } else if (!serverChannelSearchIgnored) SearchHooks.event("channels path=server-failed")
+        val all = allChannels()
+        SearchHooks.event("channels path=client all=${all?.size ?: -1}")
+        return if (all == null) emptyList<LiveChannel>() to true else SearchRanking.matchChannels(all, q) to false
     }
 
     private fun rank(items: List<VodItem>, q: String) = SearchRanking.rank(items, q)
@@ -83,6 +124,7 @@ class SearchCatalog(private val session: PortalSession, private val maxPages: In
         channelCache?.let { return it }
         var parsed: List<LiveChannel>? = null
         val result = session.withSession { m -> m.call { c -> val (r, l) = c.allChannels(); parsed = l; r } } ?: return null
+        SearchHooks.event("all channels: " + result.summary.joinToString("; "))   // a count or a short reason, never content
         return parsed?.takeIf { result.ok }?.also { channelCache = it }
     }
 

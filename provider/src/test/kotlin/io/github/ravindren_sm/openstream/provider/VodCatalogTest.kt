@@ -117,3 +117,13 @@ class SearchRequestsTest {
         assertNull(LiveCatalogParser.allChannels(StalkerClient.parseJs("""{"js":"nope"}""".toByteArray())))
     }
 }
+
+class ChannelSearchRequestTest {
+    private val ctx = StalkerRequests.Context("http://portal.invalid/stalker_portal/c/", "00:1A:79:00:00:01", token = "tok")
+
+    @Test fun `a channel search asks the channel list with the text encoded and keeps it out of the purpose`() {
+        val r = StalkerRequests.channelsSearch(ctx, "cartoon net", page = 1)
+        assertTrue(r.url.contains("type=itv") && r.url.contains("action=get_ordered_list") && r.url.contains("search=cartoon+net"), r.url)
+        assertFalse(r.purpose.contains("cartoon"), r.purpose)
+    }
+}

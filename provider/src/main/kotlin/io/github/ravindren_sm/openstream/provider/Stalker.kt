@@ -90,6 +90,12 @@ object StalkerRequests {
         "episode_id" to "0", "category" to "*", "fav" to "0", "sortby" to "added",
         "hd" to "0", "not_ended" to "0", "search" to query, "p" to page.toString())
 
+    /** One page of live channels matching [query] (the portal's `search` parameter on the channel list, if it honours it). */
+    fun channelsSearch(ctx: Context, query: String, page: Int = 1) = build(ctx,
+        "Search: live channels matching the typed text, page $page",
+        "type" to "itv", "action" to "get_ordered_list", "genre" to "*", "fav" to "0", "sortby" to "number",
+        "search" to query, "p" to page.toString())
+
     /** Every live channel in one answer (the portal has no live search of its own; the app filters them). */
     fun allChannels(ctx: Context) = build(ctx, "Search: all live channels, for filtering on the device",
         "type" to "itv", "action" to "get_all_channels")
@@ -407,10 +413,20 @@ class StalkerClient(
         return r to parsed
     }
 
+    /** One page (1-based) of live channels matching [query]. Summary: counts only, never the text. */
+    fun channelsSearch(query: String, page: Int): Pair<StalkerResult, LiveChannelPage?> {
+        var parsed: LiveChannelPage? = null
+        val r = call(StalkerRequests.channelsSearch(ctx(), query, page)) { js ->
+            parsed = LiveCatalogParser.channelPage(js, page)
+            listOf("channel search page $page: ${parsed?.items?.size ?: "?"} of ${parsed?.totalItems ?: "?"}")
+        }
+        return r to parsed
+    }
+
     /** All live channels, for on-device search. Null if the payload is unusable. Summary: the count only. */
     fun allChannels(): Pair<StalkerResult, List<LiveChannel>?> {
         var parsed: List<LiveChannel>? = null
-        val r = call(StalkerRequests.allChannels(ctx())) { js ->
+        val r = call(StalkerRequests.allChannels(ctx()), bodyLimit = ALL_CHANNELS_MAX_BYTES) { js ->
             parsed = LiveCatalogParser.allChannels(js)
             listOf("all channels: ${parsed?.size ?: "?"}")
         }
@@ -544,20 +560,24 @@ class StalkerClient(
         return r to url
     }
 
-    private fun call(request: ProbeRequest, summarize: (JsonElement?) -> List<String>): StalkerResult {
-        val outcome = probe.send(request)
+    private fun call(request: ProbeRequest, bodyLimit: Int? = null, summarize: (JsonElement?) -> List<String>): StalkerResult {
+        val outcome = if (bodyLimit != null) probe.send(request, bodyLimit) else probe.send(request)
         val js = (outcome as? ProbeOutcome.Response)?.let { parseJs(it.bodyPrefix) }
         val body = (outcome as? ProbeOutcome.Response)?.bodyPrefix
         val summary = when {
             js != null -> summarize(js)
             body != null && String(body, Charsets.UTF_8).contains("Authorization failed", ignoreCase = true) ->
                 listOf("portal says: Authorization failed (session expired)")
+            body != null && bodyLimit != null && body.size >= bodyLimit -> listOf("response larger than the size cap ($bodyLimit bytes)")
             else -> listOf("no JSON payload in the response")
         }
         return StalkerResult(outcome, js, summary)
     }
 
     companion object {
+        /** The full channel list is several megabytes (about 5,000 entries with many fields each); the usual 1 MB cap cuts it off. */
+        const val ALL_CHANNELS_MAX_BYTES = 8_000_000
+
         private val JSON = Json { ignoreUnknownKeys = true; isLenient = true }
 
         /** Parses {"js": ...} and returns the inner element; null if not JSON or no "js". */

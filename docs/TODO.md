@@ -45,8 +45,11 @@ runs on the family TV still stands (see Environment notes).
 - Next-episode prompt at the end of an episode.
 
 ## Search follow-ups
-- Check the real portal's VOD `search` parameter and `get_all_channels` with one approved, kid-safe query (one session, both StbEmu and TiviMate stopped). If `get_all_channels` is slow or huge, search channels by genre instead or cache on disk.
-- Recent searches, a result count per group, and a "more results" page beyond the first three.
+- Recent searches, result counts per group, a "more results" page beyond the first three, and grouping repeated titles
+  (same name in several versions).
+- Measure memory over time after the full channel list is read (Java heap peaked at 75 MB right after the first read).
+- Results from the server can include titles that do not contain the words typed (it matches descriptions too): decide
+  whether to show those under a separate heading.
 
 ## Reliability
 - 30-minute soak on a live channel (the VOD soak passed; live was skipped because content cannot be vetted).

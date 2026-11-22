@@ -105,7 +105,7 @@ fun FavoritesScreen(
 @Composable
 fun ChannelCard(id: String, number: String, name: String, memory: FocusMemory, onSelect: () -> Unit, modifier: Modifier = Modifier) {
     OsFocusable(id = id, memory = memory, variant = FocusVariant.CARD, onSelect = onSelect, modifier = modifier.width(280.dp)) { _ ->
-        Column(Modifier.fillMaxWidth().height(110.dp).padding(Spacing.S2), verticalArrangement = Arrangement.Center) {
+        Column(Modifier.fillMaxWidth().height(150.dp).padding(Spacing.S2), verticalArrangement = Arrangement.Center) {
             Text(number, style = Tokens.Mono, color = Tokens.TextSecondary, maxLines = 1)
             Text(PortalText.decodeEntities(name), style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 2)
         }

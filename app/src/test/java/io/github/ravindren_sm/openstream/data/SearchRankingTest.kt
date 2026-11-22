@@ -28,6 +28,11 @@ class SearchRankingTest {
         assertEquals(listOf("1"), SearchRanking.matchChannels(all, "5").map { it.id })
     }
 
+    @Test fun serverChannelsKeepTheirOrderWithNameStartsFirstAndNoRepeats() {
+        val found = listOf(ch("1", "3", "The Cartoon Hour"), ch("2", "9", "Cartoon Net"), ch("1", "3", "The Cartoon Hour"), ch("3", "20", "Cartoon Plus"))
+        assertEquals(listOf("2", "3", "1"), SearchRanking.matchChannelsFromServer(found, "cartoon").map { it.id })
+    }
+
     @Test fun aSingleLetterFindsNoChannels() {
         assertTrue(SearchRanking.matchChannels(listOf(ch("1", "5", "A News")), "a").isEmpty())
     }

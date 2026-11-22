@@ -271,6 +271,10 @@ class H(BaseHTTPRequestHandler):
             if page >= 2 and flag("fail_pages"):
                 return self.reply(500, "fail")
             js = channels_page(q.get("genre", "*"), page)
+            if q.get("search"):
+                needle = q["search"].lower()
+                hits = [c for p in range(1, 10) for c in channels_page("*", p)["data"] if needle in c["name"].lower()]
+                js = {"total_items": str(len(hits)), "max_page_items": PAGE, "data": hits[(page - 1) * PAGE: page * PAGE]}
         if js is None:
             return self.reply(404, "not found")
         self.reply(200, json.dumps({"js": js}))
