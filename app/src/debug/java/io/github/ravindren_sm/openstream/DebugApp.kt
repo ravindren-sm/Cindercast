@@ -16,5 +16,6 @@ class DebugApp : Application() {
         io.github.ravindren_sm.openstream.data.SearchHooks.onEvent = { android.util.Log.i("OpenStream.search", it) }   // counts only
         PlayerHooks.networkInterceptors = listOf(StreamTrafficLog())
         PlayerHooks.newAnalyticsListeners = { listOf(PlayerDiagnostics()) }   // fresh metrics per player
+        HealthSampler(this).start()
     }
 }

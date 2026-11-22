@@ -34,7 +34,7 @@ import java.util.concurrent.TimeUnit
  */
 object PosterLoader {
     private const val MAX_CONCURRENT = 4
-    private const val CACHE_BYTES = 24 * 1024 * 1024
+    private const val CACHE_BYTES = 10 * 1024 * 1024
     private const val MAX_DOWNLOAD_BYTES = 4 * 1024 * 1024
 
     private val client = OkHttpClient.Builder()

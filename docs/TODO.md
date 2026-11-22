@@ -82,9 +82,15 @@ runs on the family TV still stands (see Environment notes).
 - At the time: stream segments arrived in 70 to 180 ms each (about 6 s of video per segment), Wi-Fi signal -52 dBm, CPU about 70 percent idle,
   so the feed and the network were not the limit; but the stick had about 40 MB of RAM free and 95 percent of its 800 MB swap in use,
   and this app held about 170 MB (Java heap 63 MB, up from 12 MB at the start of the title crawl). Memory pressure is the suspect.
-- Done: the poster cache is dropped when a player opens. To do: find what grows the Java heap during long sessions (heap dump), consider
-  a smaller player buffer, pause the title crawl's memory while playing, and add the health sampler listed above so rebuffers can be
-  matched to free memory over a long watch.
+- Done (2026-11-21): poster cache capped at 10 MB and dropped when a player opens; the other tab's loaded titles are dropped when a
+  player opens; player buffers cut to 10 to 25 s and 14 MB (was about 50 s and tens of MB); the title index already pauses while a
+  player is open; a debug health sampler writes memory numbers every 30 s to files/health-log.txt and logcat tag OpenStream.health.
+- Checked on the TV against the fake portal: live playback with the smaller buffers (first frame in 1.3 s, no errors) and the sampler output
+  (Java heap 4 to 12 MB, native 60 MB while playing). Not yet measured on the real portal: read health-log.txt after a long real watch
+  (`adb shell run-as io.github.ravindren_sm.openstream cat files/health-log.txt`) and see whether the decoder errors stop.
+- Seen once on the fake portal: Play on a movie ended in "This title is not available" with no player error (create_link answered 200).
+  Not yet explained (fake data or a real fault); recheck, and try a show episode.
+- Still to do: heap dump to find what grows the Java heap in long sessions; a sliding window for the loaded lists (Paging `maxSize`).
 
 ## Reliability
 - 30-minute soak on a live channel (the VOD soak passed; live was skipped because content cannot be vetted).

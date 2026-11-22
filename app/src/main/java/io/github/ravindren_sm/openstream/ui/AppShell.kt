@@ -605,7 +605,17 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     LaunchedEffect(stack.current.route == Route.VOD_PLAYER) { if (stack.current.route != Route.VOD_PLAYER) playOverride = null }
     // Memory is tight on this stick (about 1.7 GB for everything): when a player opens, let go of the poster pictures kept for browsing.
     val inPlayer = stack.current.route == Route.LIVE_PLAYER || stack.current.route == Route.VOD_PLAYER
-    LaunchedEffect(inPlayer) { if (inPlayer) { PosterLoader.clearCache(); System.gc() } else { delay(800); statsTick++ } }
+    // The screen a player was opened from keeps its loaded titles (Back returns to the same place); the other tab's pages are dropped.
+    val routeBeforePlayer = remember { arrayOf<Route?>(null) }
+    if (!inPlayer) routeBeforePlayer[0] = stack.current.route
+    LaunchedEffect(inPlayer) {
+        if (inPlayer) {
+            PosterLoader.clearCache()
+            if (routeBeforePlayer[0] != Route.MOVIES) moviesState.release()
+            if (routeBeforePlayer[0] != Route.SHOWS) showsState.release()
+            System.gc()
+        } else { delay(800); statsTick++ }
+    }
 
     // Read the history whenever Home is (re)entered; a short wait lets the player's last save land first.
     val onHome = stack.current.route == Route.HOME

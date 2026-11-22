@@ -134,6 +134,9 @@ class VodBrowseState(private val catalog: VodCatalog, val kind: VodKind) {
     /** Takes the profile's default rating floor (called when Settings changes it and when the screen starts). */
     fun applyProfilePolicy(policy: ContentPolicy) { minRating = policy.minRating; hideUnrated = policy.hideUnrated; if (categoriesLoaded) reload() }
 
+    /** Drops the loaded pages (memory is tight while a video plays); the list is rebuilt, from its first page, when the tab is shown again. */
+    fun release() { if (categoriesLoaded) { reload(); gridState.requestScrollToItem(0) } }
+
     /** Builds the list for the selected category: from the device copy when a sort, a rating floor or a default needs it and it is complete, else from the portal. */
     private fun reload() {
         val category = categories.getOrNull(selected) ?: run { titles = PagedTitles { CatalogResult.Ok(VodPage(1, emptyList(), 0, 14)) }; return }

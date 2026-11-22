@@ -88,7 +88,15 @@ internal fun createStreamPlayer(context: Context): ExoPlayer {
     val dataSource = OkHttpDataSource.Factory(client).setUserAgent("AndroidXMedia3/${MediaLibraryInfo.VERSION}")
     // If a hardware decoder fails, try the next one (a software decoder) before giving up.
     val renderers = DefaultRenderersFactory(context).setEnableDecoderFallback(true)
+    // A smaller buffer than Media3's default (50 s and up to about 50 MB for 1080p): this stick has little memory to spare, and a
+    // few seconds' margin is enough on a steady connection. Bytes decide before time, so the cap holds for high-bitrate streams.
+    val load = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+        .setBufferDurationsMs(10_000, 25_000, 2_500, 5_000)
+        .setTargetBufferBytes(14 * 1024 * 1024)
+        .setPrioritizeTimeOverSizeThresholds(false)
+        .build()
     return ExoPlayer.Builder(context, renderers)
+        .setLoadControl(load)
         .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(dataSource))
         .build()
         .also { p -> PlayerHooks.newAnalyticsListeners().forEach { p.addAnalyticsListener(it) } }
