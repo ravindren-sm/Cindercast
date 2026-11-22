@@ -14,7 +14,7 @@ Step 4f (on device): VOD_MOVIE_PLAYED and VOD_EPISODE_PLAYED (show > season > ep
 Step 4g: KEEPALIVE_VERIFIED (watchdog every 120 s; token valid with and without it over
 ~8 min; re-auth unit-tested only). M1 complete. Debug app logs to files/debug-log.txt (debug source set: start with
 .DebugPlayerActivity; MainActivity is the real app shell). Ask before changing any device setting
-(for example stay-awake), even temporarily. Playback unverified. Milestones: docs/MILESTONES.md. Findings: docs/PROVIDER_FINDINGS.md. Plan: docs/PHASE2_PROBE_PLAN.md
+(for example stay-awake), even temporarily. Playback unverified. Milestones: docs/MILESTONES.md. Findings: docs/private/PROVIDER_FINDINGS.md. Plan: docs/private/PHASE2_PROBE_PLAN.md
 Repo: ~/Developer/firetv-iptv (outside Google Drive). Build with ./gradlew using
 Android Studio's JBR as JAVA_HOME; wrapper pins Gradle 9.5.0 (AGP 8.x breaks on 9.6+).
 UI source: the OpenStream prototype (docs/OPENSTREAM_INTAKE.md), ported to Compose for TV.
@@ -99,3 +99,6 @@ Full plan: docs/PROJECT_PLAN.md
 - Code comments: generous and impersonal. Pseudocode: language-agnostic.
 - Diagrams: draw.io (.drawio plus timestamped PNG export; archive older versions).
 - Each phase ends with a stated done condition and a user approval.
+
+## Publishing note
+Provider-specific notes (docs/private/PROVIDER_FINDINGS.md, docs/private/PHASE2_PROBE_PLAN.md) are kept local and gitignored; the published history does not contain them (scrubbed 2026-11-21, backup tag backup/pre-scrub-2026-11-21 on this machine only).

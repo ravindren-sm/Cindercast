@@ -11,7 +11,7 @@ import java.net.URLEncoder
  * Scrubs secrets from any text before it is printed, logged or saved.
  *
  * Every log line, summary, exception message and saved response goes through
- * [redact]. Rules, applied in this order (docs/PHASE2_PROBE_PLAN.md, section 5):
+ * [redact]. Rules, applied in this order (docs/private/PHASE2_PROBE_PLAN.md, section 5):
  *  1. JSON bodies: values under sensitive keys become "<REDACTED>", at any depth.
  *  2. Known secret values become <NAME> placeholders: raw, URL-encoded, any letter
  *     case, and for MAC addresses with ':' or '-' separators or none.

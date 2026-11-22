@@ -27,7 +27,7 @@ Done: our client obtained a session token (HANDSHAKE_ACCEPTED). Nothing else ver
 Small offline fixes before 4b: show the handshake's `not_valid` flag (0/1, not identifying).
 If 4b fails on device fields (serial, device IDs, signature), add them as optional local
 secrets read from StbEmu's settings screen by the user (looking only).
-Done: all six steps pass, recorded in docs/PROVIDER_FINDINGS.md.
+Done: all six steps pass, recorded in docs/private/PROVIDER_FINDINGS.md.
 
 M1 status 2026-11-21: complete on the device (4a-4g). Only a live re-authentication is unobserved.
 

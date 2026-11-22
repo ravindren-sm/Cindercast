@@ -4,7 +4,7 @@ Date: 2026-11-20. Status (2026-11-21): **custom build PAUSED.**
 Phases 0–1 done; Phase 2 done through Step 3b (Step 4 built offline, never run).
 The provider is Stalker/MAG portal only, and TiviMate on the Fire TV works with it, which
 meets the immediate goal. Resume if TiviMate falls short on something specific; see
-docs/PROVIDER_FINDINGS.md and docs/PHASE2_PROBE_PLAN.md.
+docs/private/PROVIDER_FINDINGS.md and docs/private/PHASE2_PROBE_PLAN.md.
 
 ## Problem
 StbEmu emulates a MAG set-top box (Stalker-style portal client) with a dated UI.
@@ -72,7 +72,7 @@ modern interface, without touching StbEmu.
 
 ## Phase 2: Provider compatibility probe (GATE; needs explicit approval first)
 Purpose: find out what the provider speaks before any UI work.
-Detailed step-by-step plan: docs/PHASE2_PROBE_PLAN.md (supersedes the outline below where they differ).
+Detailed step-by-step plan: docs/private/PHASE2_PROBE_PLAN.md (supersedes the outline below where they differ).
 - Step A, offline: write the secret-entry workflow (see CLAUDE.md). User fills
   ~/.config/firetv-iptv/secrets.env. No values shown to Claude.
 - Step B, probe tool on the Mac (small script or JVM CLI), TLS validation on, redacted logs.
@@ -83,7 +83,7 @@ Detailed step-by-step plan: docs/PHASE2_PROBE_PLAN.md (supersedes the outline be
   3. M3U/XMLTV playlist URL if the provider issues one.
 - Record per path: reachable, auth outcome, channel count, stream URL scheme, container
   (HLS/TS), token expiry, concurrent-session behavior, geo/IP restrictions.
-- Capture nothing that includes secrets. Write findings to docs/PROVIDER_FINDINGS.md using placeholders.
+- Capture nothing that includes secrets. Write findings to docs/private/PROVIDER_FINDINGS.md using placeholders.
 - Risks to check before probing: provider terms of service on non-approved clients, one-device
   MAC binding (a probe from the Mac using the registered MAC may log out StbEmu or trigger
   a ban; confirm with the user before using the MAC), connection limits.

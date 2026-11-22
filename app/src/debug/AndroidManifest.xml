@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Debug-only manifest overlay:
      - network security config that permits cleartext HTTP (the provider has no HTTPS; TLS
-       validation is untouched; see docs/PHASE2_PROBE_PLAN.md section 9);
+       validation is untouched; see docs/private/PHASE2_PROBE_PLAN.md section 9);
      - the debug player activity, started with:
          adb shell am start -n io.github.ravindren_sm.openstream/.DebugPlayerActivity
        Release builds get neither. -->

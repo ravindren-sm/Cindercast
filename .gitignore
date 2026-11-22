@@ -29,3 +29,6 @@ build/
 *.apk
 *.aab
 .DS_Store
+
+# Provider-specific notes (findings, probe plan): kept on this machine, never published.
+docs/private/

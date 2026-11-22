@@ -22,7 +22,7 @@ import java.time.format.DateTimeFormatter
 import kotlin.system.exitProcess
 
 /*
- * Phase 2 probe command line (docs/PHASE2_PROBE_PLAN.md).
+ * Phase 2 probe command line (docs/private/PHASE2_PROBE_PLAN.md).
  *
  *   ./gradlew :probe:run --args="list"
  *   ./gradlew :probe:run --args="secrets-check"

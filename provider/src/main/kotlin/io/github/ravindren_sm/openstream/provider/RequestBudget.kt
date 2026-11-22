@@ -36,7 +36,7 @@ class RequestPacer(
 }
 
 /**
- * Hard limits on provider traffic for one probe run (docs/PHASE2_PROBE_PLAN.md, section 3).
+ * Hard limits on provider traffic for one probe run (docs/private/PHASE2_PROBE_PLAN.md, section 3).
  *
  * - At most [maxRequests] requests per run.
  * - At least [minIntervalMillis] between the start of consecutive requests.
