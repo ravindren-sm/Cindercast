@@ -71,7 +71,7 @@ class SearchCatalog(private val session: PortalSession, private val maxPages: In
      * channels (only when no filter is on, since channels have no category, genre or rating). Genre and rating filters
      * are applied here to what the portal returns.
      */
-    fun search(query: String, filters: SearchFilters = SearchFilters(), categories: List<VodCategory> = emptyList()): CatalogResult<SearchResults> {
+    fun search(query: String, filters: SearchFilters = SearchFilters(), categories: List<VodCategory> = emptyList(), policy: ContentPolicy = ContentPolicy()): CatalogResult<SearchResults> {
         val q = query.trim()
         val plan = FilterRules.plan(categories, filters)
         if (plan.none) return CatalogResult.Ok(SearchResults(emptyList(), emptyList(), emptyList(), note = "No category matches the language and category choices."))
@@ -98,7 +98,8 @@ class SearchCatalog(private val session: PortalSession, private val maxPages: In
                 if (!p.hasMore(p.items.size * page)) break
             }
         }
-        val kept = titles.filter { FilterRules.passes(it, filters, categoryHint = it.id in hinted) }
+        // The profile's rating floor applies unless the viewer chose a rating filter for this search.
+        val kept = titles.filter { FilterRules.passes(it, filters, categoryHint = it.id in hinted) && (filters.minRating != null || policy.passes(it)) }
         val ranked = rank(kept, q)
         val (channels, failed) = if (filters.isActive) emptyList<LiveChannel>() to false else findChannels(q)
         val movies = TitleMerge.group(ranked.filter { !it.isSeries })

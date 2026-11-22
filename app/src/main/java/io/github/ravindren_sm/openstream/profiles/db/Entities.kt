@@ -138,6 +138,11 @@ data class CatalogTitleEntity(
     val cmd: String?,
     val age: String?,
     val categoryId: String,
+    /** The portal's own ratings (null when it gave none or zero). The one shown is IMDb when present, else Kinopoisk. */
+    val imdbRating: Double? = null,
+    val kinopoiskRating: Double? = null,
+    /** Position in the category as the portal lists it, newest added first (0 is the newest). */
+    @androidx.room.ColumnInfo(defaultValue = "0") val ord: Int = 0,
 )
 
 /** How far the title crawl has got in one category. */

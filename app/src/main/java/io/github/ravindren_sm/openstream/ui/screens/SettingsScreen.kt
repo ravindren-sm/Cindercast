@@ -48,6 +48,9 @@ class SettingsModel(
     val onClearFavorites: () -> Unit,
     val onToggleAutoPlay: () -> Unit,
     val onClearPosterCache: () -> Unit,
+    val contentPolicy: io.github.ravindren_sm.openstream.data.ContentPolicy,
+    val onSetMinRating: (Double?) -> Unit,
+    val onToggleHideUnrated: () -> Unit,
 )
 
 private class Row_(val title: String, val value: String, val action: String, val confirm: String? = null, val run: () -> Unit)
@@ -59,6 +62,7 @@ private class Row_(val title: String, val value: String, val action: String, val
 @Composable
 fun SettingsScreen(model: SettingsModel, memory: FocusMemory, modifier: Modifier = Modifier) {
     var confirming: Row_? by remember { mutableStateOf(null) }
+    var ratingPicker by remember { mutableStateOf(false) }
     val indexValue = when {
         model.index.complete && model.index.enabled -> "Ready · %,d titles".format(model.index.titles)
         model.index.enabled -> "Building ${model.index.percent}%% · %,d titles".format(model.index.titles)
@@ -68,6 +72,10 @@ fun SettingsScreen(model: SettingsModel, memory: FocusMemory, modifier: Modifier
     val sections: List<Pair<String, List<Row_>>> = listOf(
         "Portal" to listOf(
             Row_("Portal", model.portalStatus, "Change portal…", run = model.onChangePortal),
+        ),
+        "Content filter · this profile" to listOf(
+            Row_("Hide movies and shows rated below", model.contentPolicy.summary(), "Change") { ratingPicker = true },
+            Row_("Titles with no rating", if (model.contentPolicy.hideUnrated) "Hidden" else "Shown", if (model.contentPolicy.hideUnrated) "Show" else "Hide", run = model.onToggleHideUnrated),
         ),
         "Search" to listOf(
             Row_("Title index", indexValue, if (model.index.enabled) "Pause" else if (model.index.titles > 0) "Resume" else "Build",
@@ -111,6 +119,14 @@ fun SettingsScreen(model: SettingsModel, memory: FocusMemory, modifier: Modifier
             Text("About", style = Tokens.TitleMedium, color = Tokens.AccentPrimary, modifier = Modifier.padding(top = Spacing.S2))
             Text("OpenStream ${model.version} · MIT licence", style = Tokens.Body, color = Tokens.TextPrimary)
             Text("Your portal details, favorites and history stay on this device. Nothing is sent anywhere except to your portal.", style = Tokens.Body, color = Tokens.TextSecondary)
+        }
+        if (ratingPicker) {
+            ChoicePicker(
+                "Hide titles rated below", listOf(Choice("any", "Show everything")) + io.github.ravindren_sm.openstream.data.ContentPolicy.STEPS.map { Choice("$it", "${"%.0f".format(it)}") },
+                setOf(model.contentPolicy.minRating?.toString() ?: "any"), multi = false,
+                note = "Uses the portal's rating: IMDb when it has one, otherwise Kinopoisk. Applies to lists, search and Home rows for this profile.",
+                memory = memory, returnFocusId = null, onToggle = { id -> model.onSetMinRating(id.toDoubleOrNull()) }, onClose = { ratingPicker = false },
+            )
         }
         confirming?.let { row ->
             ChoicePicker(

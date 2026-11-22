@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -34,7 +35,13 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
 import io.github.ravindren_sm.openstream.data.CatalogResult
 import io.github.ravindren_sm.openstream.data.LiveCatalog
+import io.github.ravindren_sm.openstream.data.BrowseSort
+import io.github.ravindren_sm.openstream.data.ContentPolicy
+import io.github.ravindren_sm.openstream.data.IndexedTitles
 import io.github.ravindren_sm.openstream.data.PagedTitles
+import io.github.ravindren_sm.openstream.ui.components.Choice
+import io.github.ravindren_sm.openstream.ui.components.ChoicePicker
+import androidx.compose.runtime.mutableIntStateOf
 import io.github.ravindren_sm.openstream.data.PosterUrl
 import io.github.ravindren_sm.openstream.data.VodCatalog
 import io.github.ravindren_sm.openstream.data.VodCategory
@@ -71,6 +78,23 @@ class VodBrowseState(private val catalog: VodCatalog, val kind: VodKind) {
     var titles: PagedTitles by mutableStateOf(PagedTitles { CatalogResult.Failed(LiveCatalog.NOT_CONNECTED) })
         private set
 
+    /** The order and rating floor in force for this view. The rating floor starts from the profile's default (Settings). */
+    var sort: BrowseSort by mutableStateOf(BrowseSort.NEWEST)
+        private set
+    var minRating: Double? by mutableStateOf(null)
+        private set
+    var hideUnrated: Boolean = false
+
+    /** Set by the shell: the on-device copy of the catalog, and which categories it holds completely. */
+    var indexed: IndexedTitles? = null
+    var ready: (String) -> Boolean = { false }
+    /** The list on screen is read from the device (sorted and filtered there), not from the portal. */
+    var usingIndex: Boolean by mutableStateOf(false)
+        private set
+    /** A sort was chosen that needs the on-device copy of this category, which is not there yet. */
+    var sortUnavailable: Boolean by mutableStateOf(false)
+        private set
+
     val categoryListState = LazyListState()
     val gridState = LazyGridState()
 
@@ -84,10 +108,32 @@ class VodBrowseState(private val catalog: VodCatalog, val kind: VodKind) {
 
     /** Shows the titles of category [index], from the first page. */
     fun select(index: Int, resetScroll: Boolean = true) {
-        val category = categories.getOrNull(index) ?: return
+        if (categories.getOrNull(index) == null) return
         selected = index
-        titles = PagedTitles { page -> catalog.titles(category.id, page) }
+        reload()
         if (resetScroll) gridState.requestScrollToItem(0)
+    }
+
+    fun changeSort(newSort: BrowseSort) { sort = newSort; reload(); gridState.requestScrollToItem(0) }
+    fun changeMinRating(value: Double?) { minRating = value; reload(); gridState.requestScrollToItem(0) }
+
+    /** Takes the profile's default rating floor (called when Settings changes it and when the screen starts). */
+    fun applyProfilePolicy(policy: ContentPolicy) { minRating = policy.minRating; hideUnrated = policy.hideUnrated; if (categoriesLoaded) reload() }
+
+    /** Builds the list for the selected category: from the device copy when a sort or rating floor needs it and it is complete, else from the portal. */
+    private fun reload() {
+        val category = categories.getOrNull(selected) ?: return
+        val policy = ContentPolicy(minRating, hideUnrated)
+        val local = indexed
+        val haveCopy = local != null && ready(category.id)
+        if (haveCopy && (sort != BrowseSort.NEWEST || policy.active)) {
+            usingIndex = true; sortUnavailable = false
+            titles = PagedTitles { page -> local!!.page(category.id, sort, policy, page) }
+        } else {
+            usingIndex = false; sortUnavailable = sort != BrowseSort.NEWEST
+            // The portal's pages, with the rating floor applied to each page as it arrives.
+            titles = PagedTitles(keep = { policy.passes(it) }) { page -> catalog.titles(category.id, page) }
+        }
     }
 }
 
@@ -112,12 +158,14 @@ fun VodBrowseScreen(
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
+    var picker by remember { mutableIntStateOf(0) }       // 0 none, 1 sort, 2 rating floor
     LaunchedEffect(connected) {
         if (connected && !state.categoriesLoaded) withContext(Dispatchers.IO) { state.loadCategories() }
     }
 
+    Box(modifier.fillMaxSize()) {
     Row(
-        modifier.fillMaxSize().padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.S2),
+        Modifier.fillMaxSize().padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.S2),
         horizontalArrangement = Arrangement.spacedBy(Spacing.S4),
     ) {
         Column(Modifier.width(440.dp).fillMaxHeight()) {
@@ -148,13 +196,34 @@ fun VodBrowseScreen(
         }
 
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            if (state.categoriesLoaded && state.categories.isNotEmpty()) TitleGrid(state, portalUrl, memory, onOpen, isFavorite)
+            if (state.categoriesLoaded && state.categories.isNotEmpty()) TitleGrid(state, portalUrl, memory, onOpen, isFavorite) { picker = it }
         }
+    }
+    when (picker) {
+        1 -> {
+            val category = state.categories.getOrNull(state.selected)
+            val copy = category != null && state.indexed != null && state.ready(category.id)
+            ChoicePicker(
+                "Sort", BrowseSort.entries.map { Choice(it.name, it.label + if (it.needsIndex && !copy) "  (needs the title index)" else "") }, setOf(state.sort.name), multi = false,
+                note = if (copy) "Sorted on this device from the saved title list." else "Only the portal's order (newest added) is available until the title index has this category: Settings, Search, Build.",
+                memory = memory, returnFocusId = BROWSE_SORT_ID, onToggle = { id -> state.changeSort(BrowseSort.valueOf(id)) }, onClose = { picker = 0 },
+            )
+        }
+        2 -> ChoicePicker(
+            "Hide titles rated below", listOf(Choice("any", "Show everything")) + ContentPolicy.STEPS.map { Choice("$it", "${"%.0f".format(it)}") },
+            setOf(state.minRating?.toString() ?: "any"), multi = false,
+            note = "The portal's rating: IMDb when it has one, otherwise Kinopoisk. This view only; the default is in Settings.",
+            memory = memory, returnFocusId = BROWSE_RATING_ID, onToggle = { id -> state.changeMinRating(id.toDoubleOrNull()) }, onClose = { picker = 0 },
+        )
+    }
     }
 }
 
+const val BROWSE_SORT_ID = "browse-sort"
+const val BROWSE_RATING_ID = "browse-rating"
+
 @Composable
-private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMemory, onOpen: (Int, VodItem) -> Unit, isFavorite: (VodItem) -> Boolean) {
+private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMemory, onOpen: (Int, VodItem) -> Unit, isFavorite: (VodItem) -> Boolean, onOpenPicker: (Int) -> Unit) {
     val paged = state.titles
     val gridState = state.gridState
     val scope = rememberCoroutineScope()
@@ -169,10 +238,22 @@ private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMem
             }
     }
 
-    Text(
-        paged.total?.let { "%,d titles".format(it) } ?: " ",
-        style = Tokens.Body, color = Tokens.TextSecondary, modifier = Modifier.padding(bottom = Spacing.S1),
-    )
+    Row(Modifier.padding(bottom = Spacing.S1), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.S2)) {
+        Text(paged.total?.let { "%,d titles".format(it) } ?: " ", style = Tokens.Body, color = Tokens.TextSecondary)
+        OsFocusable(id = BROWSE_SORT_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = { onOpenPicker(1) }) { _ ->
+            Text("Sort: ${state.sort.label}", style = Tokens.Body, color = if (state.sort != BrowseSort.NEWEST) Tokens.AccentPrimary else Tokens.TextPrimary, maxLines = 1,
+                modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1))
+        }
+        OsFocusable(id = BROWSE_RATING_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = { onOpenPicker(2) }) { _ ->
+            Text(state.minRating?.let { "Rating ${"%.0f".format(it)}+" } ?: "Rating: any", style = Tokens.Body,
+                color = if (state.minRating != null) Tokens.AccentPrimary else Tokens.TextPrimary, maxLines = 1,
+                modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1))
+        }
+    }
+    when {
+        state.sortUnavailable -> Text("Sorting this category needs the title index (Settings). Showing the portal's order.", style = Tokens.Body, color = Tokens.StatusWarning)
+        state.usingIndex -> Text("Sorted on this device", style = Tokens.Body, color = Tokens.TextSecondary)
+    }
     Box(Modifier.fillMaxSize()) {
         when {
             paged.items.isEmpty() && paged.error == null && !paged.exhausted -> Message("Loading titles…")

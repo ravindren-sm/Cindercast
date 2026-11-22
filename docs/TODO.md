@@ -68,6 +68,11 @@ runs on the family TV still stands (see Environment notes).
 - Use the real list fields: keep `category_id` on each title so category filters work on one request; read `country` for an
   origin or language filter; use `hd`, `high_quality` and `low_quality` to rank versions; use `o_name` when merging and matching.
 
+## Sort, filter and content-filter follow-ups
+- Check on the TV: the sort picker, the rating chip, the Settings rows, opening a title from the device copy; then on the real portal once the index has ratings.
+- Filter by genre, year range and language inside a category; remember the chosen sort per category.
+- The content filter is rating-based only. Age labels (G, PG, R) are in the data and could back a proper parental filter (deferred with profiles).
+
 ## Title index follow-ups
 - The index is building on the real portal (started 2026-11-21 21:17; about 1.75 hours). When it finishes record the final title count, size and any errors; check suggestions against real titles; tune the pause between requests (the portal did not complain at 0.3 s).
 - Use the index for instant results (not only suggestions) and offline-ish search while the portal is slow.

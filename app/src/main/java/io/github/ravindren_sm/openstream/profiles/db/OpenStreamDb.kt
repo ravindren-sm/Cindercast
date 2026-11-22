@@ -18,7 +18,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PinnedCategoryEntity::class, KidsAllowedCategoryEntity::class, RecentSearchEntity::class,
         CatalogTitleEntity::class, IndexProgressEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class OpenStreamDb : RoomDatabase() {
@@ -59,9 +59,18 @@ abstract class OpenStreamDb : RoomDatabase() {
             }
         }
 
+        /** Version 5: index rows carry ratings and the portal's order, so a category can be sorted and filtered on the device. */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE catalog_titles ADD COLUMN imdbRating REAL")
+                db.execSQL("ALTER TABLE catalog_titles ADD COLUMN kinopoiskRating REAL")
+                db.execSQL("ALTER TABLE catalog_titles ADD COLUMN ord INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun get(context: Context): OpenStreamDb = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, OpenStreamDb::class.java, "openstream.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { instance = it }
         }
 
         /** An in-memory database for tests. */

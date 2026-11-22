@@ -146,7 +146,7 @@ class VodPlayback(private val session: PortalSession) {
  * whole catalog). Same rules as [PagedChannels]: a failed page does not advance, a repeated title is kept once,
  * and a total reached or an empty page ends paging.
  */
-class PagedTitles(private val fetchPage: (Int) -> CatalogResult<VodPage>) {
+class PagedTitles(private val keep: (VodItem) -> Boolean = { true }, private val fetchPage: (Int) -> CatalogResult<VodPage>) {
     var items: List<VodItem> by mutableStateOf(emptyList())
         private set
     var total: Int? by mutableStateOf(null)
@@ -168,21 +168,37 @@ class PagedTitles(private val fetchPage: (Int) -> CatalogResult<VodPage>) {
         }
         error = null
         try {
-            when (val r = fetchPage(nextPage)) {
-                is CatalogResult.Ok -> {
-                    val page = r.value
-                    val known = items.mapTo(HashSet()) { it.id }
-                    items = items + page.items.filter { it.id !in known }
-                    total = page.totalItems
-                    nextPage++
-                    exhausted = !page.hasMore(items.size)
+            // A page can come back with nothing the filter keeps: read on (a few pages at most) so the list still grows.
+            val before = items.size
+            var tries = 0
+            while (items.size == before && !exhausted && tries++ < MAX_PAGES_PER_LOAD) {
+                when (val r = fetchPage(nextPage)) {
+                    is CatalogResult.Ok -> {
+                        val page = r.value
+                        val known = items.mapTo(HashSet()) { it.id }
+                        val fresh = page.items.filter { it.id !in known }
+                        val kept = fresh.filter(keep)
+                        dropped += fresh.size - kept.size
+                        items = items + kept
+                        total = page.totalItems
+                        nextPage++
+                        exhausted = !page.hasMore(items.size + dropped)
+                    }
+                    is CatalogResult.Failed -> { error = r.message; break }
                 }
-                is CatalogResult.Failed -> error = r.message
             }
         } finally {
             loading = false
         }
     }
+
+    /** Titles the filter left out so far: the portal's total is compared with shown plus these, not with what is shown. */
+    private var dropped = 0
+
+    /** Replaces the entry at [index] (for example a lean row with its full entry). */
+    fun replaceAt(index: Int, item: VodItem) { if (index in items.indices) items = items.toMutableList().also { it[index] = item } }
+
+    private companion object { const val MAX_PAGES_PER_LOAD = 5 }
 }
 
 /** Remembers where each title was left, so playback can resume. Keys are portal title ids. */

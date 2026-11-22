@@ -91,6 +91,30 @@ interface CatalogIndexDao {
     suspend fun match(prefix: String, wordPrefix: String, limit: Int): List<CatalogTitleEntity>
     @Query("DELETE FROM catalog_titles") suspend fun clearTitles()
 
+    /**
+     * One category's titles in a chosen order, with a minimum rating. [sort]: 1 newest added (the portal's order), 2 release year,
+     * 3 best rated (IMDb, else Kinopoisk), 4 IMDb, 5 Kinopoisk, 6 name. Unrated titles come last in the rating orders, and are
+     * kept or dropped by [keepUnrated] (1 or 0) when [minRating] is set.
+     */
+    @Query("""SELECT * FROM catalog_titles WHERE categoryId = :categoryId
+        AND (:minRating IS NULL OR COALESCE(imdbRating, kinopoiskRating) >= :minRating
+             OR (COALESCE(imdbRating, kinopoiskRating) IS NULL AND :keepUnrated = 1))
+        ORDER BY
+          CASE :sort WHEN 1 THEN ord END ASC,
+          CASE :sort WHEN 2 THEN CAST(year AS INTEGER) END DESC,
+          CASE :sort WHEN 3 THEN COALESCE(imdbRating, kinopoiskRating) END DESC,
+          CASE :sort WHEN 4 THEN imdbRating END DESC,
+          CASE :sort WHEN 5 THEN kinopoiskRating END DESC,
+          CASE :sort WHEN 6 THEN nameKey END ASC,
+          ord ASC
+        LIMIT :limit OFFSET :offset""")
+    suspend fun browse(categoryId: String, minRating: Double?, keepUnrated: Int, sort: Int, limit: Int, offset: Int): List<CatalogTitleEntity>
+
+    @Query("""SELECT COUNT(*) FROM catalog_titles WHERE categoryId = :categoryId
+        AND (:minRating IS NULL OR COALESCE(imdbRating, kinopoiskRating) >= :minRating
+             OR (COALESCE(imdbRating, kinopoiskRating) IS NULL AND :keepUnrated = 1))""")
+    suspend fun browseCount(categoryId: String, minRating: Double?, keepUnrated: Int): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putProgress(p: IndexProgressEntity)
     @Query("SELECT * FROM index_progress") suspend fun progress(): List<IndexProgressEntity>
     @Query("DELETE FROM index_progress") suspend fun clearProgress()

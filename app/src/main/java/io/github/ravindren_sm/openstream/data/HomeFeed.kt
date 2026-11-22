@@ -38,10 +38,12 @@ class HomeFeed(private val vod: VodCatalog, private val live: LiveCatalog, priva
     private val titles = java.util.concurrent.ConcurrentHashMap<String, Entry<List<VodItem>>>()
     private val channels = java.util.concurrent.ConcurrentHashMap<String, Entry<List<LiveChannel>>>()
 
-    fun titlesOf(categoryId: String, limit: Int = 12): List<VodItem>? {
-        titles[categoryId]?.let { if (nowMillis() - it.at < ttlMillis) return it.value }
+    /** The first [limit] titles of the category's newest page that [keep] allows (the profile's rating floor). The page is cached whole. */
+    fun titlesOf(categoryId: String, limit: Int = 12, keep: (VodItem) -> Boolean = { true }): List<VodItem>? {
+        titles[categoryId]?.let { if (nowMillis() - it.at < ttlMillis) return it.value.filter(keep).take(limit) }
         val r = vod.titles(categoryId, 1) as? CatalogResult.Ok ?: return null
-        return r.value.items.take(limit).also { titles[categoryId] = Entry(it, nowMillis()) }
+        titles[categoryId] = Entry(r.value.items, nowMillis())
+        return r.value.items.filter(keep).take(limit)
     }
 
     fun channelsOf(genreId: String, limit: Int = 12): List<LiveChannel>? {

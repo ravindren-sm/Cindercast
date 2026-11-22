@@ -22,7 +22,11 @@ import io.github.ravindren_sm.openstream.data.PortalSession
 import io.github.ravindren_sm.openstream.data.PrefsResumeStore
 import io.github.ravindren_sm.openstream.data.CatalogResult
 import io.github.ravindren_sm.openstream.data.PagedChannels
+import io.github.ravindren_sm.openstream.data.ContentPolicy
+import io.github.ravindren_sm.openstream.data.ContentPolicyStore
 import io.github.ravindren_sm.openstream.data.GuideLoader
+import io.github.ravindren_sm.openstream.data.IndexedTitles
+import io.github.ravindren_sm.openstream.data.VodHydrator
 import io.github.ravindren_sm.openstream.data.HomeFeed
 import io.github.ravindren_sm.openstream.data.HomeRowPlan
 import io.github.ravindren_sm.openstream.data.PinKinds
@@ -175,9 +179,13 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     val searchCatalog = remember(portalEpoch) { SearchCatalog(session) }
     val searchState = remember(portalEpoch) { SearchState() }
     val db = remember { OpenStreamDb.get(appContext) }
+    // The profile's content filter (rating floor), kept per profile on the device.
+    val policyStore = remember { ContentPolicyStore(appContext.getSharedPreferences("search", android.content.Context.MODE_PRIVATE)) }
+    var contentPolicy by remember { mutableStateOf(ContentPolicy()) }
+    LaunchedEffect(profileId) { if (profileId > 0L) contentPolicy = policyStore.load(profileId) }
     val tileScopeForSearch = rememberCoroutineScope()
     fun recordSearch(text: String) { tileScopeForSearch.launch(Dispatchers.IO) { repo.recordSearch(profileId, text) } }
-    LaunchedEffect(searchState.query, searchState.submitTick, connected, searchState.filters) {
+    LaunchedEffect(searchState.query, searchState.submitTick, connected, searchState.filters, contentPolicy) {
         val q = searchState.query.trim()
         if (q.length < SearchRanking.MIN_QUERY) { searchState.phase = SearchPhase.Idle; return@LaunchedEffect }
         if (!connected) { searchState.phase = SearchPhase.Idle; return@LaunchedEffect }
@@ -186,7 +194,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         delay(if (submitted) 0L else if (q.length >= 3) 350L else 800L)
         lastSubmitHandled = searchState.submitTick
         searchState.phase = SearchPhase.Loading
-        val result = withContext(Dispatchers.IO) { searchCatalog.search(q, searchState.filters, searchState.categories) }
+        val result = withContext(Dispatchers.IO) { searchCatalog.search(q, searchState.filters, searchState.categories, contentPolicy) }
         searchState.phase = when (result) {
             is CatalogResult.Ok -> SearchPhase.Done(result.value)
             is CatalogResult.Failed -> SearchPhase.Failed(result.message)
@@ -247,6 +255,13 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     // The title index: opt-in, gentle, runs only while connected and not playing.
     val indexer = remember(portalEpoch) { TitleIndexer(vodCatalog, db.catalogIndex(), appContext.getSharedPreferences("search", android.content.Context.MODE_PRIVATE)) }
     var indexTick by remember { mutableIntStateOf(0) }
+    // The profile's content filter (rating floor), kept per profile on the device, and the on-device copy of the catalog.
+    val indexedTitles = remember { IndexedTitles(db.catalogIndex()) }
+    val hydrator = remember(portalEpoch) { VodHydrator(session) }
+    androidx.compose.runtime.SideEffect {
+        for (st in listOf(moviesState, showsState)) { st.indexed = indexedTitles; st.ready = { id -> id in indexer.readyCategories } }
+    }
+    LaunchedEffect(contentPolicy, moviesState, showsState) { moviesState.applyProfilePolicy(contentPolicy); showsState.applyProfilePolicy(contentPolicy) }
     val canIndex = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     androidx.compose.runtime.SideEffect {
         canIndex.set(connected && stack.current.route !in setOf(Route.LIVE_PLAYER, Route.VOD_PLAYER, Route.SETUP) && searchState.phase !is SearchPhase.Loading)
@@ -376,11 +391,23 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                     state = browse, connected = connected, portalUrl = portalUrl, memory = memory, isFavorite = favorites::isVod,
                     isPinned = { c -> pins.any { it.kind == (if (browse.kind == VodKind.SHOWS) PinKinds.SHOWS else PinKinds.MOVIES) && it.categoryId == c.id } },
                     onTogglePin = { c -> togglePin(if (browse.kind == VodKind.SHOWS) PinKinds.SHOWS else PinKinds.MOVIES, c.id, c.title) },
-                    onOpen = { index, item ->
+                    onOpen = { index, entry ->
                         // The portal keeps shows among the movies: the title's own flag decides which page opens.
-                        val route = if (item.isSeries) Route.SHOW_DETAIL else Route.MOVIE_DETAIL
-                        if (item.isSeries && showDetail?.show?.id != item.id) showDetail = ShowDetailState(item, vodCatalog)
-                        stack = stack.navigate(route, mapOf("item" to "$index", "kind" to browse.kind.name), currentFocusId = titleFocusId(index))
+                        val focusId = titleFocusId(index)
+                        fun open(item: VodItem) {
+                            val route = if (item.isSeries) Route.SHOW_DETAIL else Route.MOVIE_DETAIL
+                            if (item.isSeries && showDetail?.show?.id != item.id) showDetail = ShowDetailState(item, vodCatalog)
+                            stack = stack.navigate(route, mapOf("item" to "$index", "kind" to browse.kind.name), currentFocusId = focusId)
+                        }
+                        val category = browse.categories.getOrNull(browse.selected)
+                        if (browse.usingIndex && entry.description == null && category != null) {
+                            // A row from the device copy has no description or cast: fetch the full entry, then open.
+                            tileScopeForSearch.launch {
+                                val full = withContext(Dispatchers.IO) { hydrator.hydrate(entry, category.id) }
+                                browse.titles.replaceAt(index, full)
+                                open(full)
+                            }
+                        } else open(entry)
                     },
                 )
             } else if (stack.current.route == Route.MOVIE_DETAIL) {
@@ -456,6 +483,9 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                         onClearFavorites = { tileScopeForSearch.launch(Dispatchers.IO) { repo.clearFavorites(profileId); favorites.reload() } },
                         onToggleAutoPlay = { autoPlayNext = !autoPlayNext; searchPrefs.edit().putBoolean("autoplay_next", autoPlayNext).apply() },
                         onClearPosterCache = { PosterLoader.clearCache() },
+                        contentPolicy = contentPolicy,
+                        onSetMinRating = { v -> contentPolicy = contentPolicy.copy(minRating = v).also { policyStore.save(profileId, it) } },
+                        onToggleHideUnrated = { contentPolicy = contentPolicy.copy(hideUnrated = !contentPolicy.hideUnrated).also { policyStore.save(profileId, it) } },
                     ),
                 )
             } else if (stack.current.route == Route.TV_GUIDE) {
@@ -554,14 +584,14 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     }
 
     // Pinned rows: placeholders at once, then one portal request per row (cached), only while Home is showing and connected.
-    LaunchedEffect(onHome, connected, pins) {
+    LaunchedEffect(onHome, connected, pins, contentPolicy) {
         if (!onHome || !connected) return@LaunchedEffect
         val wanted = HomeRowPlan.titlePins(pins) + listOfNotNull(HomeRowPlan.livePin(pins))
         pinnedRows = wanted.map { PinnedRow(it, null, null, false) }
         wanted.forEachIndexed { i, pin ->
             val row = withContext(Dispatchers.IO) {
                 if (pin.kind == PinKinds.LIVE) homeFeed.channelsOf(pin.categoryId)?.let { PinnedRow(pin, null, it, false) }
-                else homeFeed.titlesOf(pin.categoryId)?.let { PinnedRow(pin, it, null, false) }
+                else homeFeed.titlesOf(pin.categoryId, keep = contentPolicy::passes)?.let { PinnedRow(pin, it, null, false) }
             } ?: PinnedRow(pin, null, null, true)
             pinnedRows = pinnedRows.toMutableList().also { if (i < it.size) it[i] = row }
         }

@@ -35,17 +35,29 @@ class TitleIndexer(
 
     val enabled: Boolean get() = prefs.getBoolean(KEY_ENABLED, false)
 
+    /** Categories whose every page is in the index with ratings and order, so they can be sorted and filtered on the device. */
+    var readyCategories: Set<String> by mutableStateOf(emptySet())
+        private set
+
+    /** An index built before ratings were stored cannot sort by them: start the pass over (rows are replaced as pages come in). */
+    private suspend fun ensureCurrentVersion() {
+        if (prefs.getInt(KEY_VERSION, 0) >= INDEX_VERSION) return
+        dao.clearProgress()
+        prefs.edit().remove(KEY_COMPLETED_AT).putInt(KEY_VERSION, INDEX_VERSION).apply()
+    }
+
     fun enable() { prefs.edit().putBoolean(KEY_ENABLED, true).apply() }
     fun pause() { prefs.edit().putBoolean(KEY_ENABLED, false).apply() }
 
     /** Forgets everything (the next [enable] starts over). */
     suspend fun clear() {
-        pause(); dao.clearTitles(); dao.clearProgress(); prefs.edit().remove(KEY_COMPLETED_AT).apply(); status = IndexStatus.OFF
+        pause(); dao.clearTitles(); dao.clearProgress(); prefs.edit().remove(KEY_COMPLETED_AT).apply(); readyCategories = emptySet(); status = IndexStatus.OFF
     }
 
     /** Reads the stored counts into [status] (cheap; call when the screen opens). */
     suspend fun refreshStatus(message: String? = null) {
         val progress = dao.progress()
+        readyCategories = if (prefs.getInt(KEY_VERSION, 0) >= INDEX_VERSION) progress.filter { it.done }.mapTo(HashSet()) { it.categoryId } else emptySet()
         val complete = prefs.getLong(KEY_COMPLETED_AT, 0) > 0
         status = IndexStatus(enabled, dao.titleCount(), percentOf(progress, knownCategories), complete, message)
     }
@@ -58,6 +70,7 @@ class TitleIndexer(
      */
     suspend fun run(canWork: () -> Boolean) {
         var failures = 0
+        ensureCurrentVersion()
         while (enabled) {
             if (!canWork()) { delay(2_000); continue }
             if (knownCategories.isEmpty()) {
@@ -80,7 +93,8 @@ class TitleIndexer(
             when (val r = catalog.titles(next.id, page)) {
                 is CatalogResult.Ok -> {
                     failures = 0
-                    dao.putTitles(r.value.items.map { entityOf(it, next.id) })
+                    val base = (page - 1) * r.value.pageSize.coerceAtLeast(1)
+                    dao.putTitles(r.value.items.mapIndexed { i, item -> entityOf(it = item, categoryId = next.id, ord = base + i) })
                     val pages = pageCount(r.value.totalItems, r.value.pageSize)
                     val done = r.value.items.isEmpty() || page >= pages
                     dao.putProgress(IndexProgressEntity(next.id, page + 1, r.value.totalItems, done))
@@ -99,6 +113,9 @@ class TitleIndexer(
     companion object {
         const val KEY_ENABLED = "index_enabled"
         const val KEY_COMPLETED_AT = "index_completed_at"
+        const val KEY_VERSION = "index_version"
+        /** 2: rows carry ratings and the portal's order. */
+        const val INDEX_VERSION = 2
         const val REFRESH_MILLIS = 7L * 24 * 3600 * 1000
         const val MAX_FAILURES = 5
 
@@ -121,9 +138,12 @@ class TitleIndexer(
             return (sum * 100 / ids.size).toInt().coerceIn(0, 100)
         }
 
-        fun entityOf(item: VodItem, categoryId: String) = CatalogTitleEntity(
+        fun entityOf(it: VodItem, categoryId: String, ord: Int = 0): CatalogTitleEntity = entityOf0(it, categoryId, ord)
+
+        private fun entityOf0(item: VodItem, categoryId: String, ord: Int) = CatalogTitleEntity(
             kind = if (item.isSeries) "SHOW" else "MOVIE", id = item.id, name = PortalText0.clean(item.name), nameKey = SearchRanking.normalize(item.name),
             year = item.year, posterUri = item.posterUri, cmd = item.cmd ?: item.fileCmds.firstOrNull(), age = item.age, categoryId = categoryId,
+            imdbRating = item.imdbRating, kinopoiskRating = item.kinopoiskRating, ord = ord,
         )
     }
 }
