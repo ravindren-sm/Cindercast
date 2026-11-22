@@ -54,6 +54,7 @@ import androidx.media3.datasource.HttpDataSource
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.Text
 import io.github.ravindren_sm.openstream.data.PlayTarget
+import io.github.ravindren_sm.openstream.data.PlaybackRecovery
 import io.github.ravindren_sm.openstream.data.PosterUrl
 import io.github.ravindren_sm.openstream.data.SubtitleMime
 import io.github.ravindren_sm.openstream.data.TrackLabels
@@ -101,6 +102,7 @@ fun VodPlayerScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val player = remember { createStreamPlayer(context) }
+    val recovery = remember { PlaybackRecovery() }
     var tracks by remember { mutableStateOf(Tracks.EMPTY) }
     var tracksOpen by remember { mutableStateOf(false) }
     var phase: VodPhase by remember { mutableStateOf(VodPhase.Resolving) }
@@ -142,6 +144,12 @@ fun VodPlayerScreen(
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) { paused = !playWhenReady }
             override fun onTracksChanged(t: Tracks) { tracks = t }
             override fun onPlayerError(error: PlaybackException) {
+                if (recovery.shouldRecover(error.errorCode)) {
+                    // A momentary failure: pick up again from where it stopped, without the viewer doing anything.
+                    notice = "Recovering…"
+                    scope.launch { delay(PlaybackRecovery.RETRY_DELAY_MILLIS); player.prepare() }
+                    return
+                }
                 val http = (error.cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode
                 phase = VodPhase.Failed(PlaybackMessages.forError(error.errorCode, http))
             }
@@ -164,6 +172,7 @@ fun VodPlayerScreen(
         if (target == null) { phase = VodPhase.Failed("This title is not available."); return@LaunchedEffect }
         phase = VodPhase.Resolving
         resumeApplied = false
+        recovery.reset()
         player.stop()
         when (val link = withContext(Dispatchers.IO) { playback.resolve(target.file) }) {
             is StreamLink.Failed -> phase = VodPhase.Failed(link.message)

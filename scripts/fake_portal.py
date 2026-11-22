@@ -26,6 +26,8 @@ Control files, created in --dir (default: the folder of this script); delete the
   slow         channel pages wait 2 s (tests the loading state)
   stream_403   the stream answers HTTP 403 (tests the player error and its message)
   stream_slow  the stream is sent at about 4 KB/s (tests buffering and rebuffering with a low-bitrate file)
+  stream_down  the stream connection is dropped without an answer (tests automatic recovery: combine with
+               stream_slow so the player is still waiting for data, then delete the file to let it back in)
 requests.log in --dir records type/action/genre/page and stream hits only: no headers, no addresses.
 All of these are scratch files: delete them when done.
 """
@@ -152,6 +154,9 @@ class H(BaseHTTPRequestHandler):
         log("stream GET")
         if flag("stream_403"):
             return self.reply(403, "forbidden")
+        if flag("stream_down"):
+            self.close_connection = True       # answer nothing at all: the player sees a dropped connection
+            return
         path = ARGS.stream_file
         if not path or not os.path.exists(path):
             return self.reply(404, "no stream file configured")
@@ -183,6 +188,9 @@ class H(BaseHTTPRequestHandler):
                 if not chunk:
                     break
                 remaining -= len(chunk)
+                if flag("stream_down"):            # an outage also cuts a transfer that is already running
+                    self.close_connection = True
+                    return
                 try:
                     self.wfile.write(chunk)
                 except (BrokenPipeError, ConnectionResetError):

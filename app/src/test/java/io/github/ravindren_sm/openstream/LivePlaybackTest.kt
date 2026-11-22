@@ -115,6 +115,11 @@ class LivePlaybackTest {
         assertTrue("could not be read" in PlaybackMessages.forError(PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED))
     }
 
+    @Test fun `a decoder that failed mid-stream is not called a format problem`() {
+        assertEquals("The video decoder stopped unexpectedly.", PlaybackMessages.forError(PlaybackException.ERROR_CODE_DECODING_FAILED))
+        assertTrue("cannot play" in PlaybackMessages.forError(PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES))
+    }
+
     @Test fun `unknown codes give a generic message with the number only`() {
         assertEquals("Playback failed (code 9999).", PlaybackMessages.forError(9999))
     }

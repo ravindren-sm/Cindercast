@@ -46,6 +46,7 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
@@ -54,6 +55,7 @@ import io.github.ravindren_sm.openstream.data.LivePlayback
 import io.github.ravindren_sm.openstream.data.LiveZapper
 import io.github.ravindren_sm.openstream.data.PagedChannels
 import io.github.ravindren_sm.openstream.data.PlaybackMessages
+import io.github.ravindren_sm.openstream.data.PlaybackRecovery
 import io.github.ravindren_sm.openstream.data.PlayerHooks
 import io.github.ravindren_sm.openstream.data.StreamLink
 import io.github.ravindren_sm.openstream.data.ZapResult
@@ -82,7 +84,9 @@ internal fun createStreamPlayer(context: Context): ExoPlayer {
         .apply { PlayerHooks.networkInterceptors.forEach { addNetworkInterceptor(it) } }
         .build()
     val dataSource = OkHttpDataSource.Factory(client).setUserAgent("AndroidXMedia3/${MediaLibraryInfo.VERSION}")
-    return ExoPlayer.Builder(context)
+    // If a hardware decoder fails, try the next one (a software decoder) before giving up.
+    val renderers = DefaultRenderersFactory(context).setEnableDecoderFallback(true)
+    return ExoPlayer.Builder(context, renderers)
         .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(dataSource))
         .build()
         .also { p -> PlayerHooks.newAnalyticsListeners().forEach { p.addAnalyticsListener(it) } }
@@ -125,6 +129,7 @@ fun LivePlayerScreen(
     var typed by remember { mutableStateOf("") }
     var notice: String? by remember { mutableStateOf(null) }
     val player = remember { createStreamPlayer(context) }
+    val recovery = remember { PlaybackRecovery() }
     var tracks by remember { mutableStateOf(Tracks.EMPTY) }
     var tracksOpen by remember { mutableStateOf(false) }
     var phase: Phase by remember { mutableStateOf(Phase.Resolving) }
@@ -141,6 +146,12 @@ fun LivePlayerScreen(
                 if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
                     // A live window moved past the playhead (for example after a long pause): rejoin live.
                     player.seekToDefaultPosition(); player.prepare(); return
+                }
+                if (recovery.shouldRecover(error.errorCode)) {
+                    // A momentary failure: rejoin the live edge without the viewer doing anything.
+                    notice = "Recovering…"
+                    scope.launch { delay(PlaybackRecovery.RETRY_DELAY_MILLIS); player.seekToDefaultPosition(); player.prepare() }
+                    return
                 }
                 val http = (error.cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode
                 phase = Phase.Failed(PlaybackMessages.forError(error.errorCode, http))
@@ -169,6 +180,7 @@ fun LivePlayerScreen(
     LaunchedEffect(channel?.id, attempt) {
         if (channel == null) { phase = Phase.Failed("This channel is not available."); return@LaunchedEffect }
         phase = Phase.Resolving
+        recovery.reset()
         player.stop()
         if (zapped) delay(350)   // a held key moves on before this runs (the effect restarts), so only the last channel resolves
         when (val link = withContext(Dispatchers.IO) { playback.resolve(channel) }) {

@@ -56,10 +56,11 @@ object PlaybackMessages {
             "The stream could not be read (unsupported or damaged data)."
         PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
         PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED,
-        PlaybackException.ERROR_CODE_DECODING_FAILED,
         PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
         PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED ->
             "This device cannot play the stream's video or audio format."
+        // A decoder that fails part-way through a stream (as seen on the Fire TV) is not a format problem.
+        PlaybackException.ERROR_CODE_DECODING_FAILED -> "The video decoder stopped unexpectedly."
         else -> "Playback failed (code $errorCode)."
     }
 }

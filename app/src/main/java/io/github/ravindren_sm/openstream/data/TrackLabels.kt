@@ -37,9 +37,24 @@ object TrackLabels {
         return if (name.isNullOrBlank() || name.equals(tag, ignoreCase = true)) c.uppercase() else name
     }
 
-    /** The line shown for a track: its label if it has one, else its language name, else "Track n" (1-based [ordinal]). */
+    /** Streams often label a track with a language code and a counter ("eng t1", "en_2"): show the language. */
+    private val CODE_AND_COUNTER = Regex("(?i)^([a-z]{2,3})[\\s_-]*t?\\d+$")
+
+    private fun cleanLabel(label: String): String? {
+        val l = label.trim().takeIf { it.isNotEmpty() } ?: return null
+        val code = CODE_AND_COUNTER.matchEntire(l)?.groupValues?.get(1) ?: return l
+        // Only when the code really is a language ("CC1" is not one): an unknown code comes back upper-cased.
+        return languageName(code)?.takeIf { it != code.uppercase() } ?: l
+    }
+
+    /**
+     * The line shown for a track: its label if it has one (a language code with a counter becomes the language
+     * name), else its language name, else "Closed captions" for broadcast captions, else "Track n" (1-based [ordinal]).
+     */
     fun title(info: TrackInfo, ordinal: Int): String =
-        info.label?.trim()?.takeIf { it.isNotEmpty() } ?: languageName(info.language) ?: "Track $ordinal"
+        info.label?.let(::cleanLabel)
+            ?: languageName(info.language)
+            ?: if ("CC" in textTags(info)) "Closed captions" else "Track $ordinal"
 
     /** Channel layout and role tags for an audio track: 5.1, 2.0, AD, SAP, DUB, ORIG. */
     fun audioTags(info: TrackInfo): List<String> = buildList {

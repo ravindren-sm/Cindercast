@@ -60,4 +60,20 @@ class TrackLabelsTest {
         assertEquals("application/ttml+xml", SubtitleMime.forUrl("http://x.invalid/d.ttml"))
         assertEquals("application/x-subrip", SubtitleMime.forUrl("http://x.invalid/download?id=5"))   // no extension: the common case
     }
+
+    @Test fun `a language code with a counter becomes the language, as found on the real portal`() {
+        assertEquals("English", TrackLabels.title(TrackInfo(label = "eng t1"), 1))
+        assertEquals("Hindi", TrackLabels.title(TrackInfo(label = "hin_2"), 2))
+        assertEquals("Spanish", TrackLabels.title(TrackInfo(label = "es-3"), 1))
+        assertEquals("CC1", TrackLabels.title(TrackInfo(label = "CC1"), 1))              // not a language: left alone
+        assertEquals("Director's cut", TrackLabels.title(TrackInfo(label = "Director's cut"), 1))
+        assertEquals("Track 1", TrackLabels.title(TrackInfo(), 1))                      // real audio tracks have no name at all
+    }
+
+    @Test fun `broadcast captions with no name are called closed captions`() {
+        assertEquals("Closed captions", TrackLabels.title(TrackInfo(mimeType = "application/cea-608"), 1))
+        assertEquals("Closed captions", TrackLabels.title(TrackInfo(mimeType = "application/cea-708"), 2))
+        assertEquals("English", TrackLabels.title(TrackInfo(language = "en", mimeType = "application/cea-608"), 1))
+        assertEquals("Track 1", TrackLabels.title(TrackInfo(mimeType = "text/vtt"), 1))
+    }
 }

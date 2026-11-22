@@ -41,13 +41,21 @@ private fun Format.toTrackInfo(text: Boolean) = TrackInfo(
     label = label,
     // A side-loaded subtitle is parsed on load: its original type (SRT, VTT) is kept in the codecs field, the
     // container type or, for broadcast captions, the sample type.
-    mimeType = if (text) (codecs ?: containerMimeType ?: sampleMimeType) else sampleMimeType,
+    mimeType = if (text) textType() else sampleMimeType,
     channelCount = channelCount.takeIf { it != Format.NO_VALUE } ?: 0,
     describesVideo = roleFlags and C.ROLE_FLAG_DESCRIBES_VIDEO != 0,
     isAlternate = roleFlags and C.ROLE_FLAG_ALTERNATE != 0,
     isDub = roleFlags and C.ROLE_FLAG_DUB != 0,
     isMain = roleFlags and C.ROLE_FLAG_MAIN != 0,
 )
+
+/** Broadcast captions keep their type in the sample type; a side-loaded or HLS subtitle file in the codecs or container field. */
+@androidx.annotation.OptIn(UnstableApi::class)
+private fun Format.textType(): String? {
+    val sample = sampleMimeType
+    val broadcast = sample != null && (sample.startsWith("application/cea-") || sample == "application/dvbsubs" || sample == "application/x-teletext")
+    return if (broadcast) sample else (codecs ?: containerMimeType ?: sample)
+}
 
 /** The playable audio tracks of [tracks], with the one in use marked. Empty or one entry means there is nothing to choose. */
 @androidx.annotation.OptIn(UnstableApi::class)
