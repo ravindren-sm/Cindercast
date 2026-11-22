@@ -252,6 +252,10 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         canIndex.set(connected && stack.current.route !in setOf(Route.LIVE_PLAYER, Route.VOD_PLAYER, Route.SETUP) && searchState.phase !is SearchPhase.Loading)
         searchState.index = indexer.status
     }
+    // While the title index is building keep this window awake, or the screensaver would stop the crawl (the app releases its
+    // portal session when it is not in front). A flag on this app's own window: no device setting changes.
+    val rootView = androidx.compose.ui.platform.LocalView.current
+    androidx.compose.runtime.SideEffect { rootView.keepScreenOn = indexer.status.enabled && !indexer.status.complete }
     LaunchedEffect(portalEpoch) { if (portalEpoch > 0) indexer.clear() }
     LaunchedEffect(indexer) { withContext(Dispatchers.IO) { indexer.refreshStatus() } }
     LaunchedEffect(indexer, indexTick) { if (indexer.enabled) withContext(Dispatchers.IO) { indexer.run { canIndex.get() } } }

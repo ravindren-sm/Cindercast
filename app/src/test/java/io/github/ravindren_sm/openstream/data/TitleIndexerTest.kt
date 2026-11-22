@@ -35,3 +35,11 @@ class TitleIndexerTest {
         assertNull(null)
     }
 }
+
+/** The Settings wording for index progress is built with String.format; a stray percent sign once crashed the app. */
+class IndexTextTest {
+    @org.junit.Test fun progressTextWithAPercentSignFormatsWithoutError() {
+        val text = "Building ${37}%% · %,d titles".format(12345)
+        org.junit.Assert.assertEquals("Building 37% · 12,345 titles", text)
+    }
+}

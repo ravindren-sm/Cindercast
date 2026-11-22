@@ -61,8 +61,8 @@ fun SettingsScreen(model: SettingsModel, memory: FocusMemory, modifier: Modifier
     var confirming: Row_? by remember { mutableStateOf(null) }
     val indexValue = when {
         model.index.complete && model.index.enabled -> "Ready · %,d titles".format(model.index.titles)
-        model.index.enabled -> "Building ${model.index.percent}% · %,d titles".format(model.index.titles)
-        model.index.titles > 0 -> "Paused at ${model.index.percent}% · %,d titles".format(model.index.titles)
+        model.index.enabled -> "Building ${model.index.percent}%% · %,d titles".format(model.index.titles)
+        model.index.titles > 0 -> "Paused at ${model.index.percent}%% · %,d titles".format(model.index.titles)
         else -> "Not built"
     }
     val sections: List<Pair<String, List<Row_>>> = listOf(

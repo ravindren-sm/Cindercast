@@ -69,7 +69,7 @@ runs on the family TV still stands (see Environment notes).
   origin or language filter; use `hd`, `high_quality` and `low_quality` to rank versions; use `o_name` when merging and matching.
 
 ## Title index follow-ups
-- Run the index on the real portal once (the user starts it from the Search page) and record the real size, time and any errors; tune the pause between requests.
+- The index is building on the real portal (started 2026-11-21 21:17; about 1.75 hours). When it finishes record the final title count, size and any errors; check suggestions against real titles; tune the pause between requests (the portal did not complain at 0.3 s).
 - Use the index for instant results (not only suggestions) and offline-ish search while the portal is slow.
 - Show the category of a title in the version picker, since real names may not differ.
 
