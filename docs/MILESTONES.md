@@ -395,3 +395,9 @@ Method: a debug-only activity (`VodShapeProbeActivity`), one request for the fir
 - A debug log line records the stream's window (live, seekable, length in seconds) so the real channels' rewind depth can be read once a real channel is played.
 - Checked on the Fire TV against the fake portal (a progressive file, not live): pause and the Paused label. The real portal's channels are not yet measured; that needs a (kid-safe) channel played once.
 
+## TV Guide screen (2026-11-21; fake portal for the app; the real guide format seen in the earlier probe)
+- The TV Guide tab lists the channels of a group (the favorites when there are some, otherwise "All channels"; the Group button picks any favorite or portal group) with what is on now (title, start to end time, a progress bar) and what is next. Select a row to watch; the listed channels are what Up and Down then zap through, and Back returns to the same row.
+- **How it loads.** The portal gives a guide one channel at a time (`get_short_epg`), so each row asks for its channel when it first appears on screen (about a quarter of a second each, one at a time through the shared session) and the answer is kept for ten minutes, including "this channel has no guide". The times shown follow the device clock and refresh every 30 s. A channel with no data says "No guide data"; if the portal cannot be asked a row says "Guide unavailable".
+- Tests: `EpgParserTest` (time order, dropped entries, the older time fields, unusable payloads) and `GuideLogicTest` (now, next, boundaries, gaps, before and after the listings, progress). Fake portal: `get_short_epg` with programmes around the current time and one channel with none. Checked on the Fire TV: rows, progress bars, "No guide data", opening a channel and Back.
+- Not built: a time grid across channels, programme descriptions on selection, and searching programmes (see docs/TODO.md).
+

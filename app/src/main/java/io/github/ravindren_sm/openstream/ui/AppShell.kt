@@ -22,7 +22,14 @@ import io.github.ravindren_sm.openstream.data.PortalSession
 import io.github.ravindren_sm.openstream.data.PrefsResumeStore
 import io.github.ravindren_sm.openstream.data.CatalogResult
 import io.github.ravindren_sm.openstream.data.PagedChannels
+import io.github.ravindren_sm.openstream.data.GuideLoader
 import io.github.ravindren_sm.openstream.data.NextEpisodeFinder
+import io.github.ravindren_sm.openstream.provider.PortalText
+import io.github.ravindren_sm.openstream.ui.screens.FAVORITES_GROUP
+import io.github.ravindren_sm.openstream.ui.screens.GUIDE_GROUP_ID
+import io.github.ravindren_sm.openstream.ui.screens.GuideScreen
+import io.github.ravindren_sm.openstream.ui.screens.GuideState
+import io.github.ravindren_sm.openstream.ui.screens.guideRowFocusId
 import io.github.ravindren_sm.openstream.data.SearchCatalog
 import io.github.ravindren_sm.openstream.data.SearchFilters
 import io.github.ravindren_sm.openstream.data.SearchSources
@@ -107,6 +114,10 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     var portalEpoch by remember { mutableIntStateOf(0) }
     val liveState = remember(portalEpoch) { LiveBrowseState(LiveCatalog(session)) }
     val livePlayback = remember(portalEpoch) { LivePlayback(session) }
+    // TV Guide: which channels it lists, and the per-channel guide cache.
+    val liveCatalog = remember(portalEpoch) { LiveCatalog(session) }
+    val guideLoader = remember(portalEpoch) { GuideLoader(session) }
+    val guideState = remember(portalEpoch) { GuideState() }
     // Movies and Shows get the same treatment, plus the portal address (poster paths are relative to it) and
     // the resume positions, which live on the device.
     var portalUrl by remember { mutableStateOf((loaded as? SettingsStore.Loaded.Found)?.settings?.portalUrl.orEmpty()) }
@@ -190,6 +201,15 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
             }
         }
     }
+    // The guide's first group: favorites when there are some, otherwise the portal's first group ("All channels").
+    val onGuide = stack.current.route == Route.TV_GUIDE
+    LaunchedEffect(onGuide, connected, favorites.all.size) {
+        if (!onGuide || !connected || guideState.groupId != null) return@LaunchedEffect
+        if (!liveState.genresLoaded) withContext(Dispatchers.IO) { liveState.loadGenres() }
+        val favs = favorites.channels()
+        if (favs.isNotEmpty()) guideState.select(FAVORITES_GROUP, "Favorites", PagedChannels.fixed(favs.map(FavoriteItems::toChannel)))
+        else liveState.genres.firstOrNull()?.let { g -> guideState.select(g.id, PortalText.decodeEntities(g.title), PagedChannels { page -> liveCatalog.channels(g.id, page) }) }
+    }
     // Type-ahead suggestions from text already on the device; the channel list is read ahead once Search is first opened.
     val onSearchRoute = stack.current.route == Route.SEARCH
     var channelsWarm by remember(portalEpoch) { mutableStateOf(false) }
@@ -245,7 +265,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 onChannelChanged = { i ->
                     // Back should land on the channel being watched, with its row on screen.
                     if (fromFavorites) {
-                        stack = stack.withPreviousFocus(when (from) { "home" -> homeFavChannelFocusId(i); "search" -> searchChannelFocusId(i); else -> favChannelFocusId(i) })
+                        stack = stack.withPreviousFocus(when (from) { "home" -> homeFavChannelFocusId(i); "search" -> searchChannelFocusId(i); "guide" -> guideRowFocusId(i); else -> favChannelFocusId(i) })
                     } else {
                         stack = stack.withPreviousFocus(channelFocusId(i))
                         liveState.channelListState.requestScrollToItem(maxOf(i - 3, 0))
@@ -362,6 +382,20 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                     },
                     onRemove = { f -> favorites.toggle(f.kind, f.refId, f.name, f.posterUri, f) },
                 )
+            } else if (stack.current.route == Route.TV_GUIDE) {
+                GuideScreen(
+                    state = guideState, favoriteCount = favorites.channels().size, genres = liveState.genres, loader = guideLoader,
+                    connected = connected, memory = memory,
+                    onChooseGroup = { id, title ->
+                        guideState.select(id, title,
+                            if (id == FAVORITES_GROUP) PagedChannels.fixed(favorites.channels().map(FavoriteItems::toChannel))
+                            else PagedChannels { page -> liveCatalog.channels(id, page) })
+                    },
+                    onOpenChannel = { list, i ->
+                        favPlayer = PagedChannels.fixed(list)
+                        stack = stack.navigate(Route.LIVE_PLAYER, mapOf("item" to "$i", "src" to "fav", "from" to "guide"), currentFocusId = memory.focusedId)
+                    },
+                )
             } else if (stack.current.route == Route.SEARCH) {
                 SearchScreen(
                     state = searchState, portalUrl = portalUrl, memory = memory, connected = connected,
@@ -448,6 +482,6 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         if (!homeReady) return@LaunchedEffect
         androidx.compose.runtime.withFrameNanos { }   // let the new screen compose and attach
         memory.tryFocusFirst(stack.restoreFocusId, initialFocusId(stack.current.route), if (onHome) recentFocusId(0) else null, if (onHome) homeFavChannelFocusId(0) else null, if (onHome) doorFocusId(0) else null,
-            *(if (stack.current.route == Route.FAVORITES) FAVORITES_INITIAL_IDS else emptyArray()), topTab?.let(::tabFocusId))
+            *(if (stack.current.route == Route.FAVORITES) FAVORITES_INITIAL_IDS else emptyArray()), if (stack.current.route == Route.TV_GUIDE) GUIDE_GROUP_ID else null, topTab?.let(::tabFocusId))
     }
 }

@@ -437,6 +437,16 @@ class StalkerClient(
         return r to parsed
     }
 
+    /** The next few programmes of one channel, parsed. Null programmes if the payload is unusable. Summary: a count only. */
+    fun epgProgrammes(channelId: String, size: Int = 4): Pair<StalkerResult, List<EpgProgramme>?> {
+        var parsed: List<EpgProgramme>? = null
+        val r = call(StalkerRequests.epgShort(ctx(), channelId, size)) { js ->
+            parsed = EpgParser.programmes(js)
+            listOf("guide: ${parsed?.size ?: 0} programmes")
+        }
+        return r to parsed
+    }
+
     /** Guide probe: the shape (key names, counts, time spread) of one channel's short guide. Never programme text. */
     fun epgShort(channelId: String, size: Int = 10): StalkerResult =
         call(StalkerRequests.epgShort(ctx(), channelId, size)) { js -> EpgShape.describe(js, System.currentTimeMillis() / 1000) }

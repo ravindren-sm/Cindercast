@@ -248,6 +248,16 @@ class H(BaseHTTPRequestHandler):
             js = {"data": {"msgs": 0}}
         elif (t, a) == ("itv", "get_genres"):
             js = GENRES
+        elif (t, a) == ("itv", "get_short_epg"):
+            # Three 30-minute programmes around now (the first began 10 minutes ago); channel 3 has no guide at all.
+            now = int(time.time()); chid = q.get("ch_id", "")
+            if chid.endswith("-3"):
+                js = []
+            else:
+                first = now - 600
+                js = [{"id": f"{chid}-{k}", "ch_id": chid, "name": f"Programme {k + 1} on {chid}", "descr": "An invented programme.",
+                       "category": "Drama", "start_timestamp": str(first + k * 1800), "stop_timestamp": str(first + (k + 1) * 1800)}
+                      for k in range(4)]
         elif (t, a) == ("itv", "get_all_channels"):
             js = {"data": channels_page("*", 1)["data"] + [c for p in range(2, 10) for c in channels_page("*", p)["data"]]}
         elif (t, a) == ("itv", "create_link"):

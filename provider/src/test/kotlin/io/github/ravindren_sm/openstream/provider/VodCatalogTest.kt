@@ -164,3 +164,26 @@ class VodShapeTest {
         assertTrue(VodShape.describe(js("""{"data":[]}""")).joinToString().contains("empty"))
     }
 }
+
+class EpgParserTest {
+    private fun js(body: String) = StalkerClient.parseJs("""{"js":$body}""".toByteArray())
+
+    @Test fun `programmes are read in time order with entries missing a name or times dropped`() {
+        val list = EpgParser.programmes(js("""[
+            {"name":"Late","start_timestamp":"1700003600","stop_timestamp":"1700007200","descr":" About ","category":"News"},
+            {"name":"Early","start_timestamp":"1700000000","stop_timestamp":"1700003600"},
+            {"name":"","start_timestamp":"1700000000","stop_timestamp":"1700003600"},
+            {"name":"No times"},
+            {"name":"Backwards","start_timestamp":"1700009000","stop_timestamp":"1700008000"}]"""))
+        assertEquals(listOf("Early", "Late"), list.map { it.name })
+        assertEquals("About", list[1].description); assertEquals("News", list[1].category)
+        assertEquals(3600L, list[0].durationSec)
+    }
+
+    @Test fun `a data object and the older time fields are accepted, and nothing usable gives an empty list`() {
+        val a = EpgParser.programmes(js("""{"data":[{"name":"X","time":"1700000000","time_to":"1700001800"}]}"""))
+        assertEquals(1, a.size); assertEquals(1800L, a[0].durationSec)
+        assertTrue(EpgParser.programmes(js(""""nope"""")).isEmpty())
+        assertTrue(EpgParser.programmes(null).isEmpty())
+    }
+}
