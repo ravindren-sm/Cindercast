@@ -82,6 +82,18 @@ class NavStack private constructor(
         )
     }
 
+    /**
+     * Replaces the focus remembered by the screen below the current one. For a screen that changes
+     * what the screen below should return to, such as the live player after a channel change: Back then
+     * lands on the channel being watched. No effect at the root.
+     */
+    fun withPreviousFocus(focusId: String): NavStack {
+        if (frames.size < 2) return this
+        val below = frames.size - 2
+        val updated = frames.toMutableList().also { it[below] = it[below].copy(savedFocusId = focusId) }
+        return NavStack(updated, restoreFocusId = restoreFocusId)
+    }
+
     companion object {
         fun start(route: Route = Route.HOME) = NavStack(listOf(RouteEntry(route)))
     }

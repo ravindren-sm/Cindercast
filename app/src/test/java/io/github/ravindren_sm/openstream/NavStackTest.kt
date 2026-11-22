@@ -32,6 +32,21 @@ class NavStackTest {
         assertEquals("home-continue-0", back2.restoreFocusId)
     }
 
+    @Test fun `the focus remembered below can be updated, so back lands on the channel being watched`() {
+        val list = NavStack.start(Route.LIVE_TV).navigate(Route.LIVE_PLAYER, mapOf("item" to "3"), currentFocusId = "channel-3")
+        val zapped = list.withPreviousFocus("channel-7")
+        assertEquals("channel-7", zapped.goBack()!!.restoreFocusId)
+        assertEquals("channel-3", list.goBack()!!.restoreFocusId)   // the original stack is unchanged
+        assertEquals(Route.LIVE_PLAYER, zapped.current.route)
+        assertEquals(zapped.current.params, list.current.params)
+    }
+
+    @Test fun `updating the focus below at the root does nothing`() {
+        val root = NavStack.start(Route.HOME)
+        assertEquals(root.depth, root.withPreviousFocus("x").depth)
+        assertEquals(null, root.withPreviousFocus("x").goBack())
+    }
+
     @Test fun `back at the root returns null so the caller can exit`() {
         assertNull(NavStack.start().goBack())
         assertTrue(!NavStack.start().canGoBack)

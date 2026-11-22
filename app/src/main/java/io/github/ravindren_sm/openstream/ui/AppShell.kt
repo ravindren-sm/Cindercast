@@ -28,6 +28,7 @@ import io.github.ravindren_sm.openstream.ui.screens.LiveTvScreen
 import io.github.ravindren_sm.openstream.ui.screens.PlaceholderScreen
 import io.github.ravindren_sm.openstream.ui.screens.SessionStatusLine
 import io.github.ravindren_sm.openstream.ui.screens.SetupScreen
+import io.github.ravindren_sm.openstream.ui.screens.channelFocusId
 import io.github.ravindren_sm.openstream.ui.screens.initialFocusId
 import io.github.ravindren_sm.openstream.ui.theme.Tokens
 
@@ -74,7 +75,14 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         } else if (stack.current.route == Route.LIVE_PLAYER) {
             // Full screen: no tab bar or status line over the video (a focused tab would leave on Select).
             val index = stack.current.params["item"]?.toIntOrNull() ?: -1
-            LivePlayerScreen(channel = liveState.channels.items.getOrNull(index), playback = livePlayback, memory = memory)
+            LivePlayerScreen(
+                channels = liveState.channels, startIndex = index, playback = livePlayback, memory = memory,
+                onChannelChanged = { i ->
+                    // Back should land on the channel being watched, with its row on screen.
+                    stack = stack.withPreviousFocus(channelFocusId(i))
+                    liveState.channelListState.requestScrollToItem(maxOf(i - 3, 0))
+                },
+            )
         } else {
             TopNavBar(
                 activeTab = topTab,

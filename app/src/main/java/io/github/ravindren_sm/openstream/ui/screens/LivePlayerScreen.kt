@@ -15,6 +15,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -22,7 +23,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
@@ -40,9 +45,12 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.Text
 import io.github.ravindren_sm.openstream.data.LivePlayback
+import io.github.ravindren_sm.openstream.data.LiveZapper
+import io.github.ravindren_sm.openstream.data.PagedChannels
 import io.github.ravindren_sm.openstream.data.PlaybackMessages
 import io.github.ravindren_sm.openstream.data.PlayerHooks
 import io.github.ravindren_sm.openstream.data.StreamLink
+import io.github.ravindren_sm.openstream.data.ZapResult
 import io.github.ravindren_sm.openstream.provider.LiveChannel
 import io.github.ravindren_sm.openstream.ui.components.FocusVariant
 import io.github.ravindren_sm.openstream.ui.components.OsFocusable
@@ -51,6 +59,9 @@ import io.github.ravindren_sm.openstream.ui.theme.Spacing
 import io.github.ravindren_sm.openstream.ui.theme.Tokens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 
@@ -79,20 +90,34 @@ private sealed interface Phase {
 
 /**
  * Full-screen live playback. Resolves the channel with create_link, plays it, and shows the channel
- * for a few seconds on start and on any key. Errors show fixed text and a retry button; Back is
- * handled by the shell (it leaves the screen, which releases the player).
+ * for a few seconds on start and on any key. Up and Down (or Channel Up and Down) zap to the next and
+ * previous channel of the genre; typing digits goes to that channel number after a short pause or on
+ * Enter. A zap waits 350 ms before asking the portal for a stream, so holding a key does not request
+ * every channel it passes. Errors show fixed text and a retry button; Back is handled by the shell (it
+ * leaves the screen, which releases the player). [onChannelChanged] reports the new list position, so
+ * Back can return to the channel being watched.
  *
  * The stream address stays in this function's memory: it is never logged, shown or saved.
  */
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun LivePlayerScreen(
-    channel: LiveChannel?,
+    channels: PagedChannels,
+    startIndex: Int,
     playback: LivePlayback,
     memory: FocusMemory,
+    onChannelChanged: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val zapper = remember(channels) { LiveZapper(channels) }
+    val zapLock = remember { Mutex() }
+    var index by remember { mutableIntStateOf(startIndex) }
+    val channel: LiveChannel? = channels.items.getOrNull(index)
+    var zapped by remember { mutableStateOf(false) }
+    var typed by remember { mutableStateOf("") }
+    var notice: String? by remember { mutableStateOf(null) }
     val player = remember { createLivePlayer(context) }
     var phase: Phase by remember { mutableStateOf(Phase.Resolving) }
     var buffering by remember { mutableStateOf(false) }
@@ -136,6 +161,7 @@ fun LivePlayerScreen(
         if (channel == null) { phase = Phase.Failed("This channel is not available."); return@LaunchedEffect }
         phase = Phase.Resolving
         player.stop()
+        if (zapped) delay(350)   // a held key moves on before this runs (the effect restarts), so only the last channel resolves
         when (val link = withContext(Dispatchers.IO) { playback.resolve(channel) }) {
             is StreamLink.Failed -> phase = Phase.Failed(link.message)
             is StreamLink.Ok -> {
@@ -149,6 +175,39 @@ fun LivePlayerScreen(
 
     // Channel overlay: shown on start and on any key press, hidden after 4 s.
     LaunchedEffect(overlayTick) { overlayVisible = true; delay(4_000); overlayVisible = false }
+
+    fun go(i: Int) { zapped = true; index = i; overlayTick++; onChannelChanged(i) }
+
+    fun zap(forward: Boolean) {
+        scope.launch {
+            zapLock.withLock {
+                when (val r = withContext(Dispatchers.IO) { if (forward) zapper.next(index) else zapper.previous(index) }) {
+                    is ZapResult.To -> go(r.index)
+                    ZapResult.AtEnd -> notice = if (forward) "Last channel" else "First channel"
+                    ZapResult.NotFound -> {}
+                }
+            }
+        }
+    }
+
+    fun commitTyped() {
+        val number = typed
+        typed = ""
+        if (number.isEmpty()) return
+        scope.launch {
+            zapLock.withLock {
+                when (val r = withContext(Dispatchers.IO) { zapper.byNumber(number) }) {
+                    is ZapResult.To -> go(r.index)
+                    else -> notice = "No channel $number"
+                }
+            }
+        }
+    }
+
+    // Typed digits go to that channel after a 2 s pause (each digit restarts the wait).
+    LaunchedEffect(typed) { if (typed.isNotEmpty()) { delay(2_000); commitTyped() } }
+    // Messages ("Last channel", "No channel 123") fade after a moment.
+    LaunchedEffect(notice) { if (notice != null) { delay(2_500); notice = null } }
 
     // Focus: the surface while playing (so keys reach it), the retry button on an error.
     LaunchedEffect(phase is Phase.Failed) {
@@ -166,7 +225,18 @@ fun LivePlayerScreen(
             .focusRequester(requester)
             .onFocusChanged { if (it.isFocused) memory.focusedId = PLAYER_SURFACE_ID }
             .focusable()
-            .onKeyEvent { overlayTick++; false },   // observe only; Back still reaches the shell
+            .onKeyEvent { e ->
+                if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
+                overlayTick++
+                val digit = digitOf(e.key)
+                when {
+                    digit != null -> { if (typed.length < 5) typed += digit; true }
+                    e.key == Key.DirectionUp || e.key == Key.ChannelUp -> { zap(forward = true); true }
+                    e.key == Key.DirectionDown || e.key == Key.ChannelDown -> { zap(forward = false); true }
+                    typed.isNotEmpty() && (e.key == Key.Enter || e.key == Key.NumPadEnter || e.key == Key.DirectionCenter) -> { commitTyped(); true }
+                    else -> false   // Back and everything else still reach the shell
+                }
+            },
     ) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
@@ -194,9 +264,20 @@ fun LivePlayerScreen(
             )
         }
 
+        if (typed.isNotEmpty()) {
+            Text(
+                "Channel $typed", style = Tokens.TitleMedium, color = Tokens.AccentPrimary,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(Spacing.SafeHorizontal, Spacing.SafeVertical)
+                    .background(Tokens.BgCanvas.copy(alpha = 0.7f))
+                    .padding(Spacing.S2),
+            )
+        }
+
         when (val p = phase) {
-            Phase.Resolving -> StatusText("Starting channel…")
-            Phase.Playing -> if (buffering) StatusText("Buffering…")
+            Phase.Resolving -> StatusText(notice ?: "Starting channel…")
+            Phase.Playing -> if (notice != null) StatusText(notice!!) else if (buffering) StatusText("Buffering…")
             is Phase.Failed -> Column(
                 Modifier.align(Alignment.Center).background(Tokens.BgCanvas.copy(alpha = 0.85f)).padding(Spacing.S3),
                 verticalArrangement = Arrangement.spacedBy(Spacing.S2),
@@ -219,4 +300,13 @@ private fun androidx.compose.foundation.layout.BoxScope.StatusText(text: String)
         text, style = Tokens.BodyLarge, color = Tokens.TextPrimary,
         modifier = Modifier.align(Alignment.BottomCenter).padding(Spacing.S4).background(Tokens.BgCanvas.copy(alpha = 0.7f)).padding(Spacing.S2),
     )
+}
+
+/** The digit a key stands for (main row or number pad), or null. */
+private fun digitOf(key: Key): Char? = when (key) {
+    Key.Zero, Key.NumPad0 -> '0'; Key.One, Key.NumPad1 -> '1'; Key.Two, Key.NumPad2 -> '2'
+    Key.Three, Key.NumPad3 -> '3'; Key.Four, Key.NumPad4 -> '4'; Key.Five, Key.NumPad5 -> '5'
+    Key.Six, Key.NumPad6 -> '6'; Key.Seven, Key.NumPad7 -> '7'; Key.Eight, Key.NumPad8 -> '8'
+    Key.Nine, Key.NumPad9 -> '9'
+    else -> null
 }
