@@ -338,3 +338,6 @@ Design in `docs/HOME_AND_PROFILES.md`. Built: Room 2.7.1 with KSP (the owner cho
 - Tests: `SearchRankingTest` (ordering, entities and spaces, channel name and number matching, the cap, empty results) and `SearchRequestsTest` in the provider module (encoded text, purpose without it, all-channels payload as a bare array or a data array). Fake portal: `search` on VOD lists and `get_all_channels`.
 - Not verified on the real portal: that its VOD `search` parameter filters as expected and what `get_all_channels` returns and costs (5,100 channels). Needs an approved, kid-safe query run. Until then channel search may report "Channels could not be searched" on that portal; movies and shows are unaffected.
 
+## Connection status moved (2026-11-21)
+- The "Portal connected · account active until …" line is now small type (18 sp) in the bottom-left corner on every screen except the players and setup, instead of a line under the tab bar, so content starts higher. Checked on the Fire TV with the fake portal.
+

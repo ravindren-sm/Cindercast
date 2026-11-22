@@ -168,7 +168,8 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
 
     val topTab: Route? = stack.frames.lastOrNull { it.route.isTab }?.route
 
-    Column(Modifier.fillMaxSize().background(Tokens.BgCanvas)) {
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(Tokens.BgCanvas)) {
+    Column(Modifier.fillMaxSize()) {
         if (stack.current.route == Route.SETUP) {
             SetupScreen(
                 store = store,
@@ -213,7 +214,6 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 memory = memory,
                 onSelectTab = { tab -> stack = stack.resetToTab(tab) },
             )
-            SessionStatusLine(session.status)
             if (stack.current.route == Route.HOME) {
                 HomeScreen(
                     continueTiles = continueTiles, recentTiles = recentTiles, portalUrl = portalUrl, memory = memory,
@@ -337,6 +337,9 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 )
             }
         }
+    }
+    // Connection state: small, bottom left, off the player screens.
+    if (stack.current.route !in setOf(Route.SETUP, Route.LIVE_PLAYER, Route.VOD_PLAYER)) SessionStatusLine(session.status, Modifier.align(androidx.compose.ui.Alignment.BottomStart))
     }
 
     // Read the history whenever Home is (re)entered; a short wait lets the player's last save land first.
