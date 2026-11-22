@@ -32,6 +32,13 @@ themoviedb.org (TMDB) service about each title and keeps what it says on the dev
   page and drives the Search "Rotten Tomatoes" filter (60, 70, 80, 90 percent and above).
 - Tested with a fake service only (`OmdbTest`).
 
+## Data sources and terms (to settle before a public release)
+- **TMDB:** community-contributed, free for non-commercial use, and requires an attribution notice ("This product uses the TMDB API but is not endorsed or
+  certified by TMDB"), now shown in Settings > About; a logo is also expected in the store listing. A commercial release needs TMDB's commercial terms.
+- **OMDb:** a one-person aggregator whose answers carry IMDb and Rotten Tomatoes data with no public licence from those owners (grey area). It stays optional and
+  per-user (the viewer's own key, nothing bundled or redistributed, data kept on the viewer's device). Do not bundle its data; say so in the store listing; the app must
+  work fully without it. If OMDb changes its terms or disappears, the scores already read stay on the device.
+
 ## First real run (2026-11-22)
 Key entered through the Settings box; the crawl started on the real service. First 300 titles (newest first, no portal label): 61 percent matched, 33 percent got a
 certification (51 percent of movies, 13 percent of shows); labels were mostly Indian (U/A 16+, 16, U/A 13+) plus some TV-14, PG, R. One worker did 2 titles a second;

@@ -158,7 +158,8 @@ fun SettingsScreen(model: SettingsModel, memory: FocusMemory, modifier: Modifier
             }
             Text("About", style = Tokens.TitleMedium, color = Tokens.AccentPrimary, modifier = Modifier.padding(top = Spacing.S2))
             Text("OpenStream ${model.version} · MIT licence", style = Tokens.Body, color = Tokens.TextPrimary)
-            Text("Your portal details, favorites and history stay on this device. Nothing is sent anywhere except to your portal.", style = Tokens.Body, color = Tokens.TextSecondary)
+            Text("Your portal details, favorites and history stay on this device. Nothing is sent anywhere except to your portal, and, only if you add a key above, title names and years to themoviedb.org and IMDb ids to omdbapi.com.", style = Tokens.Body, color = Tokens.TextSecondary)
+            Text("This product uses the TMDB API but is not endorsed or certified by TMDB.", style = Tokens.Body, color = Tokens.TextSecondary)
         }
         if (ratingPicker) {
             ChoicePicker(
