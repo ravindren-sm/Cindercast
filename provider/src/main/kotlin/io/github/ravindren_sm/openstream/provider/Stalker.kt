@@ -416,6 +416,18 @@ class StalkerClient(
     }
 
     /** VOD create_link; returns the playable URL (prefix word stripped). */
+    /** VOD create_link with its external subtitles, if the portal sent any. Null link if there is no stream address. */
+    fun vodLink(cmd: String, series: String = ""): Pair<StalkerResult, VodLink?> {
+        var link: VodLink? = null
+        val r = call(StalkerRequests.vodCreateLink(ctx(), cmd, series)) { js ->
+            val url = ((js as? JsonObject)?.str("cmd"))?.let(::streamUrlFromCmd)
+            val subs = SubtitleParser.fromLink(js)
+            link = url?.let { VodLink(it, subs) }
+            listOf("vod link returned: ${if (url != null) "yes" else "no"}", "subtitles offered: ${subs.size}")
+        }
+        return r to link
+    }
+
     fun vodCreateLink(cmd: String, series: String = ""): Pair<StalkerResult, String?> {
         var url: String? = null
         val r = call(StalkerRequests.vodCreateLink(ctx(), cmd, series)) { js ->

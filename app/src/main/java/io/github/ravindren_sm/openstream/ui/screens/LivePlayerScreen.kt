@@ -22,6 +22,10 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
+import androidx.activity.compose.BackHandler
+import io.github.ravindren_sm.openstream.ui.components.LanguageSubtitlesOverlay
+import io.github.ravindren_sm.openstream.ui.components.audioChoices
+import io.github.ravindren_sm.openstream.ui.components.subtitleChoices
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -29,6 +33,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -37,6 +42,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaLibraryInfo
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
@@ -119,6 +125,8 @@ fun LivePlayerScreen(
     var typed by remember { mutableStateOf("") }
     var notice: String? by remember { mutableStateOf(null) }
     val player = remember { createStreamPlayer(context) }
+    var tracks by remember { mutableStateOf(Tracks.EMPTY) }
+    var tracksOpen by remember { mutableStateOf(false) }
     var phase: Phase by remember { mutableStateOf(Phase.Resolving) }
     var buffering by remember { mutableStateOf(false) }
     var attempt by remember { mutableIntStateOf(0) }
@@ -128,6 +136,7 @@ fun LivePlayerScreen(
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) { buffering = state == Player.STATE_BUFFERING }
+            override fun onTracksChanged(t: Tracks) { tracks = t }
             override fun onPlayerError(error: PlaybackException) {
                 if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
                     // A live window moved past the playhead (for example after a long pause): rejoin live.
@@ -215,6 +224,10 @@ fun LivePlayerScreen(
         memory.tryFocus(if (phase is Phase.Failed) PLAYER_RETRY_ID else PLAYER_SURFACE_ID)
     }
 
+    // Back closes the drawer first and hands focus back to the player.
+    fun closeTracks() { tracksOpen = false; scope.launch { withFrameNanos { }; memory.tryFocus(PLAYER_SURFACE_ID) } }
+    BackHandler(enabled = tracksOpen) { closeTracks() }
+
     val requester = remember { memory.requesterFor(PLAYER_SURFACE_ID) }
     DisposableEffect(Unit) { onDispose { memory.release(PLAYER_SURFACE_ID) } }
 
@@ -226,10 +239,15 @@ fun LivePlayerScreen(
             .onFocusChanged { if (it.isFocused) memory.focusedId = PLAYER_SURFACE_ID }
             .focusable()
             .onKeyEvent { e ->
+                // While the drawer is open it owns the keys. Back closes it here (on key release, consuming both events)
+                // so it works wherever focus is; the system Back handler below stays as a fallback.
+                if (tracksOpen && e.key == Key.Back) { if (e.type == KeyEventType.KeyUp) closeTracks(); return@onKeyEvent true }
                 if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
+                if (tracksOpen) return@onKeyEvent false
                 overlayTick++
                 val digit = digitOf(e.key)
                 when {
+                    e.key == Key.Menu || e.key == Key.Captions || e.key == Key.L -> { tracksOpen = true; true }
                     digit != null -> { if (typed.length < 5) typed += digit; true }
                     e.key == Key.DirectionUp || e.key == Key.ChannelUp -> { zap(forward = true); true }
                     e.key == Key.DirectionDown || e.key == Key.ChannelDown -> { zap(forward = false); true }
@@ -264,6 +282,13 @@ fun LivePlayerScreen(
             )
         }
 
+        if (overlayVisible && channel != null && !tracksOpen) {
+            Text(
+                "Menu: audio & subtitles", style = Tokens.Body, color = Tokens.TextSecondary,
+                modifier = Modifier.align(Alignment.TopStart).padding(Spacing.SafeHorizontal, Spacing.SafeVertical + 76.dp),
+            )
+        }
+
         if (typed.isNotEmpty()) {
             Text(
                 "Channel $typed", style = Tokens.TitleMedium, color = Tokens.AccentPrimary,
@@ -290,6 +315,13 @@ fun LivePlayerScreen(
                 }
                 Text("Back returns to the channel list.", style = Tokens.Body, color = Tokens.TextSecondary)
             }
+        }
+
+        if (tracksOpen) {
+            LanguageSubtitlesOverlay(
+                audio = audioChoices(player, tracks), subtitles = subtitleChoices(player, tracks), memory = memory,
+                onDone = ::closeTracks,
+            )
         }
     }
 }

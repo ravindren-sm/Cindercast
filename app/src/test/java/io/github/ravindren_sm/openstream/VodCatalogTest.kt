@@ -54,6 +54,7 @@ class VodCatalogTest {
     }
 
     private val childRequests = CopyOnWriteArrayList<String>()
+    @Volatile private var linkBody = """{"js":{"cmd":"http://stream.invalid/vod/1.m3u8?token=abc","id":"1"}}"""
 
     private fun param(q: String, name: String) = Regex("[?&]$name=([^&]*)").find(q)?.groupValues?.get(1)
 
@@ -88,7 +89,7 @@ class VodCatalogTest {
                         "handshake" in q -> ok("""{"js":{"token":"t0k3n"}}""")
                         "get_profile" in q -> ok("""{"js":{"status":0}}""")
                         "get_categories" in q -> ok("""{"js":[{"id":"*","title":"All"},{"id":"10","title":"ENGLISH MOVIES 4K"},{"id":"20","title":"HULU &#124; ENGLISH SERIES"},{"id":"30","title":"HINDI MOVIES"},{"id":"40","title":"HINDI WEB SERIES"}]}""")
-                        "action=create_link" in q -> { linkRequests += q; ok("""{"js":{"cmd":"http://stream.invalid/vod/1.m3u8?token=abc","id":"1"}}""") }
+                        "action=create_link" in q -> { linkRequests += q; ok(linkBody) }
                         "get_ordered_list" in q && param(q, "movie_id").let { it != null && it != "0" } -> childResponse(q)
                         "get_ordered_list" in q -> {
                             listRequests += q
@@ -177,6 +178,14 @@ class VodCatalogTest {
         assertEquals("http://stream.invalid/vod/1.m3u8?token=abc", link.url)
         assertTrue(linkRequests.single().let { "type=vod" in it && "action=create_link" in it })
         assertFalse(link.toString().contains("stream.invalid"))
+    }
+
+    @Test fun `a movie link carries the portal's external subtitles`() {
+        connect()
+        linkBody = """{"js":{"cmd":"http://stream.invalid/vod/1.m3u8","subtitles":[{"lang":"English","file":"http://s.invalid/en.srt"},{"lang":"Hindi","file":"/subs/hi.vtt"}]}}"""
+        val link = VodPlayback(session).resolve(VodItem("1", "One", false, false, false, "/media/1.mpg", emptyList())) as StreamLink.Ok
+        assertEquals(listOf("English", "Hindi"), link.subtitles.map { it.language })
+        assertEquals(listOf("http://s.invalid/en.srt", "/subs/hi.vtt"), link.subtitles.map { it.url })
     }
 
     @Test fun `a title without a cmd, and a disconnected session, fail with fixed text`() {

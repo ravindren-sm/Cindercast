@@ -30,13 +30,13 @@ Milestone column: where the work is planned (M3 live, M4 VOD, M5 everything else
 |---|---|---|---|---|
 | 1 | Home | Not started | Placeholder. Needs Continue Watching, Recently Watched, Favorite Channels, Recently Added (movies, shows), Live Now in News, clock. Resume positions are already stored, so Continue Watching can read them. | M5 |
 | 2 | Live TV browser | Partial | Done: genre rail, channel list, 14-per-page focus-triggered paging, real data. Missing: 3-column layout with preview and programme panel, sort (number or A-Z), channel logos, HD/4K badges, parental lock badge, programme title, skeleton rows, digit tuning inside the browser. | M3 |
-| 3 | Live player | Partial | Done: full screen, overlay, buffering, errors with retry, channel up/down, digit entry, Back to the watched channel. Missing: stream readout on screen (we only log it), info banner with programme and actions, mini channel list (Left), Language and Subtitles overlay. | M3 / M4 |
+| 3 | Live player | Partial | Done: full screen, overlay, buffering, errors with retry, channel up/down, digit entry, Back to the watched channel, Language and Subtitles drawer (Menu key). Missing: stream readout on screen (we only log it), info banner with programme and actions, mini channel list (Left). | M3 |
 | 4 | TV Guide (EPG) | Not started | Waiting for an EPG probe (the portal may not supply guide data; the prototype already plans a "No information" cell). | M5 |
 | 5 | Movies browser | Partial | Done: category sidebar (163 real categories), 5-column poster grid, 14-per-page paging, rating badge (IMDb, else Kinopoisk labelled), real data. Missing: minimum-rating filter, genre filter, sort bar (added, year, rating), year on cards, parental lock badge, skeleton cards, Rotten Tomatoes. | M4 / M5 |
 | 6 | Movie detail | Partial | Done: poster, title, year, age, genres, synopsis, director, cast, rating, Play with initial focus, resume on play. Missing: hero backdrop, original title, runtime, Rotten Tomatoes and audience badges, explicit Resume button, Favorites button, PIN gate. | M4 / M5 |
 | 7 | Shows browser | Partial | Same as Movies (same screen, show categories). Same gaps. | M4 / M5 |
 | 8 | Show detail | Partial | Done: poster, title, year, age, rating (IMDb else Kinopoisk), genres, synopsis, Play (first episode of the season), season chips, paged episode list with real season and episode names, version chooser when an episode has several files (language and quality), per-episode resume with a "Resume m:ss" label, Back to the episode just watched. Missing: explicit Resume button on the show, Favorites, Rotten Tomatoes badges, next-episode prompt. | M4 |
-| 9 | VOD player | Partial | Done: bar with position and length, pause, 10 s seek, saved position and resume. Missing: accelerating seek (30 s, 60 s when held), Continue Watching feed, next-episode prompt, Language and Subtitles overlay. | M4 |
+| 9 | VOD player | Partial | Done: bar with position and length, pause, 10 s seek, saved position and resume, Language and Subtitles drawer (Menu key) with the portal's external subtitle files. Missing: accelerating seek (30 s, 60 s when held), Continue Watching feed, next-episode prompt. | M4 |
 | 10 | Search | Not started | D-pad keyboard and grouped results (live, movies, shows). Needs a check of the portal's server-side search. | M5 |
 | 11 | Favorites | Not started | Local store for channels, movies and shows, plus the screen and the add/remove buttons. | M5 |
 | 12 | Settings | Not started | Account, Connection (masked URL and MAC, setup wizard, sync), Playback (buffer presets, preferred audio, surface), Parental Lock, Appearance (theme, channel numbers, clock, ratings toggle and cache reset), About. | M5 |
@@ -48,7 +48,7 @@ Milestone column: where the work is planned (M3 live, M4 VOD, M5 everything else
 
 | Spec item | Status | Notes |
 |---|---|---|
-| Language and Subtitles overlay (audio tracks, subtitle tracks, live caption preview, focus trap) | Not started | Media3 track selection; the portal's create_link also returns a `subtitles` field. Planned for both players. M4. |
+| Language and Subtitles overlay (audio tracks, subtitle tracks, live caption preview, focus trap) | Partial | Done in both players: right-hand drawer, audio and subtitle columns, check on the active track, format and channel tags (1.0, 2.0, 5.1, AD, SAP, SRT, VTT, CC, DVB), summary line, Done, Back closes it, focus returns to the player; the portal's external subtitle files are side-loaded. Opens with the remote's Menu button (also the Captions key, or L on a keyboard). Missing: the on-canvas caption preview inside the drawer, a button in an info banner (there is no banner yet). Checked on the Fire TV against the fake portal only; the real portal's subtitle format and real live captions (CC, DVB) are unverified. |
 | Parental PIN gate modal (verify, set PIN; unlocks R, TV-MA, U/A 16+ and locked channels) | Not started | The portal sends an age/MPAA field on most titles, so the gate has real input. M5. |
 | Global Remote Menu (15-route directory, simulate session expired) | Reference only | Dev aid. |
 | Ratings service: lazy fetch per visible page, cache with a 7 to 30 day TTL, toggle and cache reset | Partial | Today the portal's own rating fields are used (IMDb, else Kinopoisk). Real IMDb and Rotten Tomatoes need an outside service with a user-supplied key (OMDb or MDBList) and a local cache. Open decision. M5. |
@@ -68,6 +68,6 @@ Milestone column: where the work is planned (M3 live, M4 VOD, M5 everything else
 Built and checked: setup, live TV (browse, play, zap), movies (browse, detail, play, seek, resume) and shows (browse, detail,
 seasons, episodes, versions, resume). Movies and the shows browser were checked on the real portal; the show page and
 episode playback were checked against the fake portal only.
-Next in order: the rest of M4 (Language and Subtitles overlay, next-episode prompt, accelerating
+Next in order: the rest of M4 (next-episode prompt, accelerating
 seek, filters and sort), the remaining M3 live items (bracket keys, stream readout, info banner, mini list, sort,
 badges), then M5 (Home, Search, Favorites, Settings, PIN gate, themes, transitions, EPG, ratings enrichment).

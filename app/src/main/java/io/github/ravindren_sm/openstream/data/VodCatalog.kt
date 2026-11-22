@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.github.ravindren_sm.openstream.provider.PortalText
 import io.github.ravindren_sm.openstream.provider.VodItem
+import io.github.ravindren_sm.openstream.provider.VodLink
 import io.github.ravindren_sm.openstream.provider.VodPage
 
 /** The two VOD tabs. The portal keeps movies and shows in one list; see [VodCategory.kindOf]. */
@@ -116,12 +117,12 @@ class VodPlayback(private val session: PortalSession) {
     /** Blocking: call off the main thread. [item] must carry a playable cmd. */
     fun resolve(item: VodItem): StreamLink {
         val cmd = item.playableCmd ?: return StreamLink.Failed(LivePlayback.NO_ADDRESS)
-        var url: String? = null
+        var link: VodLink? = null
         val result = session.withSession { m ->
-            m.call { c -> val (r, u) = c.vodCreateLink(cmd); url = u; r }
+            m.call { c -> val (r, l) = c.vodLink(cmd); link = l; r }
         } ?: return StreamLink.Failed(LiveCatalog.NOT_CONNECTED)
-        val link = url
-        return if (result.ok && link != null) StreamLink.Ok(link) else StreamLink.Failed(LivePlayback.NO_LINK)
+        val found = link
+        return if (result.ok && found != null) StreamLink.Ok(found.url, found.subtitles) else StreamLink.Failed(LivePlayback.NO_LINK)
     }
 }
 

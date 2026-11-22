@@ -15,7 +15,8 @@ Then install a side-by-side debug build so the real app's saved settings are not
 
 What it serves: handshake, get_profile, watchdog, live genres (30) and channels (14 per page),
 create_link (points at this server's /stream/ endpoint) and, if --stream-file is given, that file
-as video/mp4 at /stream/<anything> (byte ranges supported, so seeking works). Also VOD shows: 3 seasons,
+as video/mp4 at /stream/<anything> (byte ranges supported, so seeking works). VOD create_link offers two subtitle files (an SRT with an absolute address and a WebVTT with a
+host-relative one). Also VOD shows: 3 seasons,
 16 episodes each (2 pages), 1 or 2 files per episode. Also VOD: 9 categories
 (movies and series, one with an HTML entity in its title), 26 to 49 titles each with ratings (every 4th
 unrated), metadata and a generated poster at /poster/<n>.png.
@@ -103,6 +104,19 @@ def vod_children(show, season, episode, page):
     return {"total_items": str(len(files)), "max_page_items": PAGE, "data": files}
 
 
+def subtitle_text(kind, seconds=150):
+    """A cue every 5 s lasting 4 s: SRT for English, WebVTT for Hindi. Invented text."""
+    def stamp(t, sep):
+        return f"{t // 3600:02d}:{t % 3600 // 60:02d}:{t % 60:02d}{sep}000"
+    cues = []
+    for i, start in enumerate(range(0, seconds, 5), 1):
+        if kind == "srt":
+            cues.append(f"{i}\n{stamp(start, ',')} --> {stamp(start + 4, ',')}\nEnglish subtitle {i}\n")
+        else:
+            cues.append(f"{stamp(start, '.')} --> {stamp(start + 4, '.')}\nHindi subtitle {i}\n")
+    return ("WEBVTT\n\n" if kind == "vtt" else "") + "\n".join(cues)
+
+
 def poster_png(n, w=200, h=300):
     color = bytes(((n * 53) % 170 + 60, (n * 97) % 170 + 60, (n * 17) % 170 + 60))
     raw = b"".join(b"\x00" + color * w for _ in range(h))
@@ -180,6 +194,10 @@ class H(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         if url.path.startswith("/stream/"):
             return self.stream()
+        if url.path.startswith("/subs/"):
+            log("subtitle GET")
+            kind = "srt" if url.path.endswith(".srt") else "vtt"
+            return self.reply(200, subtitle_text(kind), "application/x-subrip" if kind == "srt" else "text/vtt")
         if url.path.startswith("/poster/"):
             log("poster GET")
             try:
@@ -215,7 +233,9 @@ class H(BaseHTTPRequestHandler):
                 js = vod_page(q.get("category", "*"), int(q.get("p", "1") or "1"), host)
         elif (t, a) == ("vod", "create_link"):
             host = self.headers.get("Host", f"localhost:{ARGS.port}")
-            js = {"cmd": f"http://{host}/stream/vod.mp4?token=faketoken", "id": "1"}
+            js = {"cmd": f"http://{host}/stream/vod.mp4?token=faketoken", "id": "1",
+                  "subtitles": [{"lang": "English", "file": f"http://{host}/subs/en.srt"},
+                                {"lang": "Hindi", "file": "/subs/hi.vtt"}]}   # one absolute, one host-relative
         elif (t, a) == ("itv", "get_ordered_list"):
             page = int(q.get("p", "1") or "1")
             if flag("slow"):

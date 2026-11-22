@@ -2,11 +2,12 @@ package io.github.ravindren_sm.openstream.data
 
 import androidx.media3.common.PlaybackException
 import io.github.ravindren_sm.openstream.provider.LiveChannel
+import io.github.ravindren_sm.openstream.provider.SubtitleRef
 
 /** A playable stream address, or fixed user-facing failure text (no addresses, MACs or tokens). */
 sealed interface StreamLink {
     /** [url] lives in memory only: it is never logged and never part of any message. */
-    class Ok(val url: String) : StreamLink {
+    class Ok(val url: String, val subtitles: List<SubtitleRef> = emptyList()) : StreamLink {
         override fun toString() = "StreamLink.Ok"
     }
     class Failed(val message: String) : StreamLink

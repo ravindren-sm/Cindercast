@@ -117,7 +117,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 browse.titles.items.getOrNull(stack.current.params["item"]?.toIntOrNull() ?: -1)
                     ?.let { PlayTarget(it, it.name, ResumeKeys.movie(it.id)) }
             }
-            VodPlayerScreen(target = target, playback = vodPlayback, resume = resumeStore, memory = memory)
+            VodPlayerScreen(target = target, playback = vodPlayback, resume = resumeStore, memory = memory, portalUrl = portalUrl)
         } else {
             TopNavBar(
                 activeTab = topTab,

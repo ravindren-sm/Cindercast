@@ -63,3 +63,36 @@ class VodCatalogTest {
         assertNull(VodCatalogParser.page(null, 1)); assertNull(VodCatalogParser.page(js("[1]"), 1))
     }
 }
+
+/** External subtitles from a VOD create_link, in the three shapes a portal might use. */
+class SubtitleParserTest {
+    private fun js(body: String) = StalkerClient.parseJs("""{"js":$body}""".toByteArray())
+
+    @Test fun `a list of objects reads the address and the language`() {
+        val subs = SubtitleParser.fromLink(js("""{"cmd":"http://x/a.m3u8","subtitles":[
+            {"lang":"English","file":"http://s.invalid/en.srt"},{"language":"hi","url":"/subs/hi.vtt"},{"title":"No address"}]}"""))
+        assertEquals(listOf("English", "hi"), subs.map { it.language })
+        assertEquals(listOf("http://s.invalid/en.srt", "/subs/hi.vtt"), subs.map { it.url })
+    }
+
+    @Test fun `a list of plain addresses has no language`() {
+        val subs = SubtitleParser.fromLink(js("""{"subtitles":["http://s.invalid/a.srt","not an address","//cdn.invalid/b.vtt"]}"""))
+        assertEquals(listOf("http://s.invalid/a.srt", "//cdn.invalid/b.vtt"), subs.map { it.url })
+        assertTrue(subs.all { it.language == null })
+    }
+
+    @Test fun `a map of language to address is read`() {
+        val subs = SubtitleParser.fromLink(js("""{"subtitles":{"English":"http://s.invalid/en.srt","":"http://s.invalid/x.srt","Hindi":5}}"""))
+        assertEquals(listOf("English", null), subs.map { it.language })
+    }
+
+    @Test fun `missing, empty or oddly shaped subtitles give an empty list, and the address stays out of toString`() {
+        assertTrue(SubtitleParser.fromLink(js("""{"cmd":"x"}""")).isEmpty())
+        assertTrue(SubtitleParser.fromLink(js("""{"subtitles":[]}""")).isEmpty())
+        assertTrue(SubtitleParser.fromLink(js("""{"subtitles":"none"}""")).isEmpty())
+        assertTrue(SubtitleParser.fromLink(null).isEmpty())
+        val one = SubtitleParser.fromLink(js("""{"subtitles":[{"lang":"English","file":"http://secret.invalid/en.srt"}]}"""))[0]
+        assertFalse(one.toString().contains("secret.invalid"))
+        assertFalse(VodLink("http://secret.invalid/s.m3u8", listOf(one)).toString().contains("secret.invalid"))
+    }
+}
