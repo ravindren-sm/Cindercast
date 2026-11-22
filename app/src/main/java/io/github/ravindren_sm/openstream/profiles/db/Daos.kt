@@ -97,14 +97,14 @@ interface CatalogIndexDao {
      * kept or dropped by [keepUnrated] (1 or 0) when [minRating] is set.
      */
     @Query("""SELECT c.* FROM catalog_titles c LEFT JOIN title_tags t ON t.kind = c.kind AND t.id = c.id WHERE c.categoryId = :categoryId
-        AND (:minRating IS NULL OR COALESCE(c.imdbRating, c.kinopoiskRating, t.rating) >= :minRating
-             OR (COALESCE(c.imdbRating, c.kinopoiskRating, t.rating) IS NULL AND :keepUnrated = 1))
+        AND (:minRating IS NULL OR COALESCE(c.imdbRating, t.imdbScore, c.kinopoiskRating, t.rating) >= :minRating
+             OR (COALESCE(c.imdbRating, t.imdbScore, c.kinopoiskRating, t.rating) IS NULL AND :keepUnrated = 1))
         AND (:g1 IS NULL OR COALESCE(c.genres, t.genres) LIKE '%' || :g1 || '%'
              OR (:g2 IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g2 || '%') OR (:g3 IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g3 || '%'))
         ORDER BY
           CASE :sort WHEN 1 THEN c.ord END ASC,
           CASE :sort WHEN 2 THEN CAST(c.year AS INTEGER) END DESC,
-          CASE :sort WHEN 3 THEN COALESCE(c.imdbRating, c.kinopoiskRating, t.rating) END DESC,
+          CASE :sort WHEN 3 THEN COALESCE(c.imdbRating, t.imdbScore, c.kinopoiskRating, t.rating) END DESC,
           CASE :sort WHEN 4 THEN c.imdbRating END DESC,
           CASE :sort WHEN 5 THEN c.kinopoiskRating END DESC,
           CASE :sort WHEN 6 THEN c.nameKey END ASC,
@@ -113,8 +113,8 @@ interface CatalogIndexDao {
     suspend fun browse(categoryId: String, minRating: Double?, keepUnrated: Int, g1: String?, g2: String?, g3: String?, sort: Int, limit: Int, offset: Int): List<CatalogTitleEntity>
 
     @Query("""SELECT COUNT(*) FROM catalog_titles c LEFT JOIN title_tags t ON t.kind = c.kind AND t.id = c.id WHERE c.categoryId = :categoryId
-        AND (:minRating IS NULL OR COALESCE(c.imdbRating, c.kinopoiskRating, t.rating) >= :minRating
-             OR (COALESCE(c.imdbRating, c.kinopoiskRating, t.rating) IS NULL AND :keepUnrated = 1))
+        AND (:minRating IS NULL OR COALESCE(c.imdbRating, t.imdbScore, c.kinopoiskRating, t.rating) >= :minRating
+             OR (COALESCE(c.imdbRating, t.imdbScore, c.kinopoiskRating, t.rating) IS NULL AND :keepUnrated = 1))
         AND (:g1 IS NULL OR COALESCE(c.genres, t.genres) LIKE '%' || :g1 || '%'
              OR (:g2 IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g2 || '%') OR (:g3 IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g3 || '%'))""")
     suspend fun browseCount(categoryId: String, minRating: Double?, keepUnrated: Int, g1: String?, g2: String?, g3: String?): Int
@@ -142,6 +142,13 @@ interface TitleTagDao {
         WHERE t.id IS NULL ORDER BY (c.age IS NULL) DESC, c.ord ASC LIMIT :limit""")
     suspend fun untagged(limit: Int): List<CatalogTitleEntity>
     @Query("SELECT * FROM title_tags WHERE id IN (:ids) AND tmdbId > 0") suspend fun byIds(ids: List<String>): List<TitleTagEntity>
+    /** Matched titles whose IMDb id has not been asked for yet (rows made before the id was stored). */
+    @Query("SELECT * FROM title_tags WHERE tmdbId > 0 AND imdbId IS NULL LIMIT :limit") suspend fun needingImdbId(limit: Int): List<TitleTagEntity>
+    @Query("SELECT imdbId FROM title_tags WHERE imdbId IS NOT NULL AND imdbId <> ''") suspend fun imdbIds(): List<String>
+    @Query("UPDATE title_tags SET imdbScore = :score WHERE imdbId = :imdbId") suspend fun setImdbScore(imdbId: String, score: Double)
+    @Query("SELECT COUNT(*) FROM title_tags WHERE imdbScore IS NOT NULL") suspend fun imdbScored(): Int
+    @Query("SELECT COUNT(*) FROM title_tags WHERE imdbId IS NOT NULL AND imdbId <> ''") suspend fun withImdbId(): Int
+    @Query("UPDATE title_tags SET imdbScore = NULL") suspend fun forgetImdbScores()
     @Query("SELECT COUNT(*) FROM title_tags") suspend fun checked(): Int
     @Query("SELECT COUNT(*) FROM title_tags WHERE tmdbId > 0") suspend fun matched(): Int
     @Query("SELECT COUNT(*) FROM title_tags WHERE certAge IS NOT NULL") suspend fun graded(): Int

@@ -65,6 +65,12 @@ class SettingsModel(
     val onSetTagKey: () -> Unit,
     val onToggleTagging: () -> Unit,
     val onClearTags: () -> Unit,
+    val imdbWithId: Int,
+    val imdbScored: Int,
+    val imdbBusy: Boolean,
+    val imdbMessage: String?,
+    val onDownloadImdb: () -> Unit,
+    val onClearImdb: () -> Unit,
 )
 
 private class Row_(val title: String, val value: String, val action: String, val confirm: String? = null, val run: () -> Unit)
@@ -118,6 +124,18 @@ fun SettingsScreen(model: SettingsModel, memory: FocusMemory, modifier: Modifier
             Row_("What is sent", "Title names and years, with your key. Nothing else.", "", run = {}),
             Row_("Checking titles", tagSummary(model.tagStatus), if (!model.tagStatus.hasKey) "" else if (model.tagStatus.running) "Pause" else "Start", run = if (model.tagStatus.hasKey) model.onToggleTagging else ({})),
             Row_("Tags on this device", "%,d checked · %,d matched · %,d with an age certification".format(model.tagStatus.counts.checked, model.tagStatus.counts.matched, model.tagStatus.counts.graded), "Remove key and tags", "Remove the key and every tag? Titles keep the portal's own labels.", model.onClearTags),
+        ),
+        "IMDb ratings (personal use, optional)" to listOf(
+            Row_("IMDb ratings file", when {
+                model.imdbBusy -> "Downloading…"
+                model.imdbMessage != null -> model.imdbMessage
+                model.imdbWithId == 0 -> "Needs the online tags first (no IMDb ids yet)"
+                model.imdbScored > 0 -> "%,d titles rated".format(model.imdbScored)
+                else -> "Not downloaded"
+            }, if (model.imdbBusy || model.imdbWithId == 0) "" else if (model.imdbScored > 0) "Update" else "Download", run = if (model.imdbBusy || model.imdbWithId == 0) ({}) else model.onDownloadImdb),
+            Row_("What is downloaded", "IMDb's free ratings file (about 8 MB) comes to this device. Nothing about you or your titles is sent.", "", run = {}),
+            Row_("Credit", io.github.ravindren_sm.openstream.data.imdb.ImdbRatings.CREDIT, "", run = {}),
+            Row_("Ratings on this device", "%,d of %,d titles with an IMDb id".format(model.imdbScored, model.imdbWithId), "Remove", "Remove the IMDb ratings from this device?", model.onClearImdb),
         ),
         "Memory" to listOf(
             Row_("Poster cache", "${model.posterCacheMb} MB in use", "Clear", run = model.onClearPosterCache),

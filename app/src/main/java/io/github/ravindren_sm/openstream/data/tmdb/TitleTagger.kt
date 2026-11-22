@@ -13,6 +13,8 @@ import kotlinx.coroutines.delay
 /** Where the tagger reads the next titles and keeps its results (the database in the app, a fake in tests). */
 interface TagStorage {
     suspend fun nextUntagged(limit: Int): List<CatalogTitleEntity>
+    /** Matched titles whose IMDb id was never asked for (rows from before the id was stored). */
+    suspend fun nextNeedingImdbId(limit: Int): List<TitleTagEntity>
     suspend fun save(tag: TitleTagEntity)
     suspend fun counts(): TaggerCounts
 }
@@ -28,7 +30,7 @@ class TaggerStatus(val hasKey: Boolean, val running: Boolean, val counts: Tagger
  * Looks the portal's titles up in the online tag service, a few at a time, and keeps the age certification, genres, keywords and IMDb id
  * it finds. Opt-in (a key and Start), gentle (a pause between groups, nothing while a video plays), resumable (a title with a row is never
  * asked about again) and cautious (only a confident match is kept; the rest are marked so they are not retried). Titles the portal gave
- * no age label are done first.
+ * no age label are done first. When every title has a row, matched titles that lack an IMDb id are asked for it (one request each).
  * The crawl stops at once when the key is refused.
  */
 class TitleTagger(
@@ -51,8 +53,9 @@ class TitleTagger(
             val client = api()
             if (client == null) { setEnabled(false); refreshStatus(false, "No key saved."); return }
             val fresh = storage.nextUntagged(BATCH)
-            if (fresh.isEmpty()) { setEnabled(false); refreshStatus(true, "Every title has been checked."); return }
-            val jobs: List<suspend () -> Outcome> = fresh.map { t -> suspend { tagOne(client, t) } }
+            val fill = if (fresh.isEmpty()) storage.nextNeedingImdbId(BATCH) else emptyList()
+            if (fresh.isEmpty() && fill.isEmpty()) { setEnabled(false); refreshStatus(true, "Every title has been checked."); return }
+            val jobs: List<suspend () -> Outcome> = fresh.map { t -> suspend { tagOne(client, t) } } + fill.map { row -> suspend { addImdbId(client, row) } }
             for (group in jobs.chunked(WORKERS)) {
                 if (!enabled()) return
                 while (!canWork()) delay(2_000)
@@ -104,6 +107,18 @@ class TitleTagger(
             keywords = details.keywords.take(30).joinToString(", ").ifEmpty { null }, flagged = TagFlags.flagged(details.genres, details.keywords), taggedAt = nowMillis(),
             imdbId = details.imdbId ?: "",
         ))
+        return Outcome.Done
+    }
+
+    /** One request for a title that already has a tag: its IMDb id (empty text if the service has none, so it is not asked again). */
+    private suspend fun addImdbId(client: TmdbApi, row: TitleTagEntity): Outcome {
+        val details = when (val r = client.details(row.tmdbId, row.kind == "SHOW")) {
+            is TmdbResult.Ok -> r.value
+            TmdbResult.KeyRefused -> return Outcome.KeyRefused
+            is TmdbResult.Slow -> return Outcome.Wait(r.seconds)
+            is TmdbResult.Failed -> return Outcome.Failed
+        }
+        storage.save(row.copy(imdbId = details?.imdbId ?: ""))
         return Outcome.Done
     }
 

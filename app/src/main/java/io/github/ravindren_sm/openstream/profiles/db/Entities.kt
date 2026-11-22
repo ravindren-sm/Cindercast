@@ -189,9 +189,11 @@ data class TitleTagEntity(
     val taggedAt: Long,
     /** The IMDb id (tt1234567) from the tag service; empty text when it has none (so the title is not asked about again), null before it was asked. */
     val imdbId: String? = null,
-    /** Unused. Reserved by database version 7 for IMDb and Rotten Tomatoes scores from a second source; the OMDb idea was dropped (2026-11-22), and SQLite on this device cannot drop columns. */
+    /** The IMDb average rating read from IMDb's free non-commercial ratings file, for personal use only. Never uploaded or shared. */
     val imdbScore: Double? = null,
+    /** Unused (a Rotten Tomatoes percentage; no source). Kept because SQLite here cannot drop columns. */
     val rtScore: Int? = null,
+    /** Unused (reserved for a second source that was dropped). */
     val omdbAt: Long? = null,
 )
 

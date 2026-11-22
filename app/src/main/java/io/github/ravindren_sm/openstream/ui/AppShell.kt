@@ -54,6 +54,8 @@ import io.github.ravindren_sm.openstream.data.tmdb.TaggerCounts
 import io.github.ravindren_sm.openstream.data.tmdb.TitleTagger
 import io.github.ravindren_sm.openstream.data.tmdb.TmdbClient
 import io.github.ravindren_sm.openstream.data.tmdb.TmdbKeyStore
+import io.github.ravindren_sm.openstream.data.imdb.ImdbRatingsLoader
+import io.github.ravindren_sm.openstream.data.imdb.ImdbResult
 import io.github.ravindren_sm.openstream.ui.components.TextEntryDialog
 import io.github.ravindren_sm.openstream.profiles.CategoryRules
 import io.github.ravindren_sm.openstream.profiles.ParentalPolicy
@@ -226,6 +228,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         TitleTagger(
             storage = object : TagStorage {
                 override suspend fun nextUntagged(limit: Int) = tags.untagged(limit)
+                override suspend fun nextNeedingImdbId(limit: Int) = tags.needingImdbId(limit)
                 override suspend fun save(tag: io.github.ravindren_sm.openstream.profiles.db.TitleTagEntity) = tags.put(tag)
                 override suspend fun counts() = TaggerCounts(tags.checked(), tags.matched(), tags.graded())
             },
@@ -233,6 +236,11 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         )
     }
     LaunchedEffect(tagger, tagTick) { withContext(Dispatchers.IO) { tagger.refreshStatus(tagKey != null) } }
+    // IMDb's free ratings file, for personal use (the viewer presses Download; nothing is sent, the file comes to the device).
+    var imdbBusy by remember { mutableStateOf(false) }
+    var imdbMessage by remember { mutableStateOf<String?>(null) }
+    var imdbCounts by remember { mutableStateOf(0 to 0) }                  // titles with an id, titles rated
+    LaunchedEffect(tagTick, imdbBusy, tagger.status.counts.checked / 1000) { imdbCounts = withContext(Dispatchers.IO) { db.titleTags().withImdbId() to db.titleTags().imdbScored() } }
     var kidsTags by remember { mutableStateOf(KidsTags.NONE) }
     LaunchedEffect(profileId, profiles, tagger.status.counts.checked / 200) {
         kidsTags = if (profile?.isKids == true) withContext(Dispatchers.IO) {
@@ -651,6 +659,16 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                         onSetTagKey = { tagKeyDialog = true },
                         onToggleTagging = { tagPrefs.edit().putBoolean("tagging_on", !tagPrefs.getBoolean("tagging_on", false)).apply(); tagTick++ },
                         onClearTags = { shellScope.launch(Dispatchers.IO) { tagPrefs.edit().putBoolean("tagging_on", false).apply(); tagKeyStore.clear(); db.titleTags().clear(); tagKey = null; tagTick++ } },
+                        imdbWithId = imdbCounts.first, imdbScored = imdbCounts.second, imdbBusy = imdbBusy, imdbMessage = imdbMessage,
+                        onDownloadImdb = {
+                            imdbBusy = true; imdbMessage = null
+                            shellScope.launch(Dispatchers.IO) {
+                                val result = ImdbRatingsLoader(db.titleTags()).load()
+                                imdbMessage = when (result) { is ImdbResult.Done -> null; is ImdbResult.Failed -> result.message }
+                                imdbBusy = false
+                            }
+                        },
+                        onClearImdb = { shellScope.launch(Dispatchers.IO) { db.titleTags().forgetImdbScores(); tagTick++ } },
                         onToggleHideUnrated = { contentPolicy = contentPolicy.copy(hideUnrated = !contentPolicy.hideUnrated).also { policyStore.save(profileId, it) } },
                     ),
                 )

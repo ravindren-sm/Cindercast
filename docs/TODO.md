@@ -56,7 +56,7 @@ runs on the family TV still stands (see Environment notes).
 - Reminders for a future programme are out of scope until the guide screen exists.
 
 ## Ratings and filters follow-ups
-- Online tags (themoviedb.org) are built and running (docs/ONLINE_TAGS.md). OMDb was dropped; waiting on IMDb's licensing reply (email sent 2026-11-22) before showing IMDb or Rotten Tomatoes scores.
+- Online tags (themoviedb.org) are built and running (docs/ONLINE_TAGS.md). OMDb was dropped. IMDb ratings come from IMDb's free personal-use file (Settings, Download; credit line shown); waiting on IMDb's licensing reply (email sent 2026-11-22) before any public release shows IMDb scores. No Rotten Tomatoes source.
 - Rotten Tomatoes (and real IMDb scores, since the portal's IMDb value is usually 0): an optional outside ratings service
   with a key entered by the owner, looked up per result and cached on the device. Needs the owner's decision: it sends title
   names to that service.

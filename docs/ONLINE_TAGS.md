@@ -20,21 +20,26 @@ themoviedb.org (TMDB) service about each title and keeps what it says on the dev
 - **Use:** a Kids profile now takes the TMDB certification when the portal has none, and hides a title whose tag is flagged. Adult profiles are unchanged.
 - **Remove:** Settings, "Remove key and tags" deletes the key and every tag.
 
-## Second source: dropped (2026-11-22)
+## IMDb ratings from IMDb's free file (personal use), and OMDb dropped (2026-11-22)
+Correction: an earlier note here said OMDb was the only practical way to get IMDb scores. That was wrong. IMDb publishes free non-commercial datasets (daily, datasets.imdbws.com), and its help page (help.imdb.com, "Can I use IMDb data in my software?") allows limited non-commercial, personal use with local copies, provided the credit line is shown, the data is not republished or turned into a movie database for others, nothing is scraped, and with permission withdrawable at any time. Credit: "Information courtesy of IMDb (https://www.imdb.com). Used with permission."
+- **Built:** Settings, "IMDb ratings (personal use, optional)": a Download button fetches `title.ratings.tsv.gz` (about 8 MB) straight to the device, keeps the average rating only for titles that have an IMDb id (from TMDB), and shows it as the star badge (portal IMDb, then IMDb file, then Kinopoisk, then TMDB). Credit line shown in that section. Remove deletes the ratings. Nothing about the viewer or titles is sent. The id backfill pass was restored so titles tagged before the id was stored get one (one request each).
+- **Public release:** IMDb's licensing FAQ lists apps that show where or what to watch as commercial uses that need a licence, so a public player showing IMDb ratings likely needs one even if free. Treat this as personal use only until IMDb answers the email sent 2026-11-22; consider switching it off in public builds.
+
+## OMDb (dropped)
 OMDb (IMDb score and Rotten Tomatoes through a one-person aggregator) was built and then removed: its data comes from IMDb and Rotten Tomatoes with no public
 licence from those owners. The official routes are commercial: IMDb licenses its data through AWS Data Exchange (pricing by contract), and the Rotten Tomatoes API is
 partner-only through Fandango (reported in the tens of thousands of dollars a year, unconfirmed; no open keys). On 2026-11-22 an email went to imdb-licensing@imdb.com asking
 whether IMDb offers any licence or terms for a free, non-commercial, open-source app, what the commercial price range is, and what its free datasets permit. Until an answer
-arrives, the app shows only the portal's own scores and TMDB's. Left over: database version 7 columns `imdbScore`, `rtScore`, `omdbAt` (unused; SQLite here cannot drop columns)
-and the IMDb id that TMDB returns, stored on new tags. The Search screen has no Rotten Tomatoes filter.
+arrives, public builds should not show IMDb scores; this install uses IMDb's free file under its personal-use terms. Left over: database version 7 columns `imdbScore`, `rtScore`, `omdbAt` (unused; SQLite here cannot drop columns)
+and the IMDb id that TMDB returns (now used to join IMDb's ratings file). The Search screen has no Rotten Tomatoes filter and there is no Rotten Tomatoes source.
 
 ## Data sources and terms (to settle before a public release)
 - **TMDB:** community-contributed, free for non-commercial use, and requires an attribution notice ("This product uses the TMDB API but is not endorsed or
   certified by TMDB"), now shown in Settings > About; a logo is also expected in the store listing. A commercial release needs TMDB's commercial terms.
-- **IMDb and Rotten Tomatoes:** no licence; see the section above. Do not show their scores in a public release without one.
+- **IMDb:** personal, non-commercial use of the free datasets only; see the section above. **Rotten Tomatoes:** no source, no licence.
 
 ## First real run (2026-11-22)
-Key entered through the Settings box; the crawl started on the real service. First 300 titles (newest first, no portal label): 61 percent matched, 33 percent got a
+Key entered through the Settings box; the crawl started on the real service. (By 13:18 the crawl had checked 72,504 titles: 76 percent matched, 45 percent graded with an age certification.) First 300 titles (newest first, no portal label): 61 percent matched, 33 percent got a
 certification (51 percent of movies, 13 percent of shows); labels were mostly Indian (U/A 16+, 16, U/A 13+) plus some TV-14, PG, R. One worker did 2 titles a second;
 five workers do about 8. The crawl resumes by itself after the app restarts.
 
