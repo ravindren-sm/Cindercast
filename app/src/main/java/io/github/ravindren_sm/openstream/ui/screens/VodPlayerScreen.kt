@@ -106,6 +106,8 @@ fun VodPlayerScreen(
     /** Finds and prepares the episode after the one playing (blocking; null if there is none). Set for episodes only. */
     findNext: ((PlayTarget) -> PlayTarget?)? = null,
     onPlayNext: (PlayTarget) -> Unit = {},
+    /** Start the next episode by itself 8 s after the end (the Settings choice). */
+    autoPlayNext: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -233,7 +235,7 @@ fun VodPlayerScreen(
     }
     LaunchedEffect(ended, nextTarget) {
         val next = nextTarget ?: return@LaunchedEffect
-        if (!ended) return@LaunchedEffect
+        if (!ended || !autoPlayNext) return@LaunchedEffect
         for (s in AUTO_NEXT_SECONDS downTo 1) { countdown = s; delay(1_000) }
         onPlayNext(next)
     }
@@ -326,7 +328,7 @@ fun VodPlayerScreen(
                 ) {
                     Text("Up next", style = Tokens.Body, color = Tokens.TextSecondary)
                     Text(PortalText.decodeEntities(next.subtitle ?: next.title), style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 1)
-                    Text(if (ended && countdown > 0) "Starting in $countdown s · Back to stay out" else "OK to play now", style = Tokens.Body, color = Tokens.AccentPrimary)
+                    Text(if (ended && countdown > 0 && autoPlayNext) "Starting in $countdown s · Back to stay out" else "OK to play now", style = Tokens.Body, color = Tokens.AccentPrimary)
                 }
             }
         }

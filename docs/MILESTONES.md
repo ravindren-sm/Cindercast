@@ -401,3 +401,9 @@ Method: a debug-only activity (`VodShapeProbeActivity`), one request for the fir
 - Tests: `EpgParserTest` (time order, dropped entries, the older time fields, unusable payloads) and `GuideLogicTest` (now, next, boundaries, gaps, before and after the listings, progress). Fake portal: `get_short_epg` with programmes around the current time and one channel with none. Checked on the Fire TV: rows, progress bars, "No guide data", opening a channel and Back.
 - Not built: a time grid across channels, programme descriptions on selection, and searching programmes (see docs/TODO.md).
 
+## Settings screen (2026-11-21; fake portal)
+- Sections: **Portal** (connection state and expiry, Change portal, which returns to the setup form); **Search** (title index: build, pause or resume, delete the data; clear the default filters; clear recent searches); **Watching** (play the next episode automatically on or off; clear Continue watching and the watched list; clear favorites); **Memory** (poster cache size and a clear button); **About** (version, licence, where data is kept).
+- Anything that deletes asks first ("Yes, clear" or Cancel). The next-episode choice is saved on the device and the player honours it (the Up next card still shows; only the automatic start is skipped).
+- No device setting is changed by this screen. Checked on the Fire TV against the fake portal: the layout, the automatic-play toggle and the confirmation for clearing favorites.
+- Not here yet: the parental-control and profile settings (deferred), and a theme choice.
+

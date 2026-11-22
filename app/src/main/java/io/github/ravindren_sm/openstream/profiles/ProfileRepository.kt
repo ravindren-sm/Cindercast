@@ -111,6 +111,7 @@ class ProfileRepository(private val db: OpenStreamDb, private val nowMillis: () 
         ))
         else db.favorites().remove(profileId, kind, refId)
     }
+    suspend fun clearFavorites(profileId: Long) = db.favorites().clear(profileId)
     suspend fun allFavorites(profileId: Long): List<FavoriteEntity> = db.favorites().all(profileId)
 
     suspend fun isFavorite(profileId: Long, kind: String, refId: String) = db.favorites().count(profileId, kind, refId) > 0

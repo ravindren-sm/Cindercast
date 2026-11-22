@@ -31,6 +31,7 @@ interface FavoriteDao {
     suspend fun list(profileId: Long, kind: String): List<FavoriteEntity>
     @Query("SELECT * FROM favorites WHERE profileId = :profileId ORDER BY addedAt DESC")
     suspend fun all(profileId: Long): List<FavoriteEntity>
+    @Query("DELETE FROM favorites WHERE profileId = :profileId") suspend fun clear(profileId: Long)
     @Query("SELECT COUNT(*) FROM favorites WHERE profileId = :profileId AND kind = :kind AND refId = :refId")
     suspend fun count(profileId: Long, kind: String, refId: String): Int
 }

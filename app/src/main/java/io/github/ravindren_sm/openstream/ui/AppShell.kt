@@ -23,6 +23,9 @@ import io.github.ravindren_sm.openstream.data.PrefsResumeStore
 import io.github.ravindren_sm.openstream.data.CatalogResult
 import io.github.ravindren_sm.openstream.data.PagedChannels
 import io.github.ravindren_sm.openstream.data.GuideLoader
+import io.github.ravindren_sm.openstream.ui.components.PosterLoader
+import io.github.ravindren_sm.openstream.ui.screens.SettingsModel
+import io.github.ravindren_sm.openstream.ui.screens.SettingsScreen
 import io.github.ravindren_sm.openstream.data.NextEpisodeFinder
 import io.github.ravindren_sm.openstream.provider.PortalText
 import io.github.ravindren_sm.openstream.ui.screens.FAVORITES_GROUP
@@ -235,6 +238,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     }
     // A picker for the versions of a title opened from Search, and which versions the open page has.
     var pickerOpen by remember { mutableStateOf(false) }
+    var autoPlayNext by remember { mutableStateOf(searchPrefs.getBoolean("autoplay_next", true)) }
     var detailVersions: List<VodItem> by remember { mutableStateOf(emptyList()) }
 
     BackHandler {
@@ -287,7 +291,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                     ?.let { PlayTarget(it, it.name, ResumeKeys.movie(it.id)) }
             }
             VodPlayerScreen(target = target, playback = vodPlayback, resume = resumeStore, memory = memory, portalUrl = portalUrl, history = recorder,
-                findNext = nextFinder::find, onPlayNext = { playOverride = it })
+                findNext = nextFinder::find, onPlayNext = { playOverride = it }, autoPlayNext = autoPlayNext)
         } else {
             TopNavBar(
                 activeTab = topTab,
@@ -381,6 +385,34 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                         }
                     },
                     onRemove = { f -> favorites.toggle(f.kind, f.refId, f.name, f.posterUri, f) },
+                )
+            } else if (stack.current.route == Route.SETTINGS) {
+                SettingsScreen(
+                    memory = memory,
+                    model = SettingsModel(
+                        portalStatus = when (val st = session.status) {
+                            is SessionStatus.Ready -> "Connected" + (st.expiry?.let { " · account active until $it" } ?: "")
+                            SessionStatus.Connecting -> "Connecting…"
+                            SessionStatus.Degraded -> "Connection check failed; retrying"
+                            is SessionStatus.Failed -> st.message
+                            SessionStatus.Idle -> "Not connected"
+                        },
+                        index = indexer.status,
+                        defaultFilters = searchState.defaultFilters?.summary(),
+                        autoPlayNext = autoPlayNext,
+                        posterCacheMb = PosterLoader.cacheBytes() / (1024 * 1024),
+                        version = runCatching { appContext.packageManager.getPackageInfo(appContext.packageName, 0).versionName }.getOrNull().orEmpty(),
+                        onChangePortal = { stack = NavStack.start(Route.SETUP) },
+                        onBuildIndex = { indexer.enable(); indexTick++ },
+                        onPauseIndex = { indexer.pause(); tileScopeForSearch.launch(Dispatchers.IO) { delay(300); indexer.refreshStatus() } },
+                        onClearIndex = { tileScopeForSearch.launch(Dispatchers.IO) { indexer.clear() } },
+                        onClearDefaultFilters = { searchPrefs.edit().remove("default_filters").apply(); searchState.defaultFilters = null },
+                        onClearRecentSearches = { tileScopeForSearch.launch(Dispatchers.IO) { repo.clearRecentSearches(profileId) } },
+                        onClearHistory = { tileScopeForSearch.launch(Dispatchers.IO) { repo.clearHistory(profileId); loadTiles() } },
+                        onClearFavorites = { tileScopeForSearch.launch(Dispatchers.IO) { repo.clearFavorites(profileId); favorites.reload() } },
+                        onToggleAutoPlay = { autoPlayNext = !autoPlayNext; searchPrefs.edit().putBoolean("autoplay_next", autoPlayNext).apply() },
+                        onClearPosterCache = { PosterLoader.clearCache() },
+                    ),
                 )
             } else if (stack.current.route == Route.TV_GUIDE) {
                 GuideScreen(

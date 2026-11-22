@@ -48,6 +48,12 @@ object PosterLoader {
 
     fun cached(url: String): ImageBitmap? = cache.get(url)
 
+    /** Drops every cached poster (Settings: clear cache). Posters are fetched again when next shown. */
+    fun clearCache() = cache.evictAll()
+
+    /** Bytes held by the cache now (RGB_565 pixels). */
+    fun cacheBytes(): Int = cache.size()
+
     /** Fetches and decodes [url] at about [targetWidthPx] wide; null on any failure. */
     suspend fun load(url: String, targetWidthPx: Int): ImageBitmap? {
         cache.get(url)?.let { return it }
