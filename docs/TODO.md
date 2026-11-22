@@ -4,10 +4,16 @@ One list for everything that is known and not done. The detail behind each item 
 (what was measured) and `docs/FEATURE_COVERAGE.md` (what the AI Studio spec still needs). Update this file when an
 item lands or a new one is found. Order within a group is rough priority.
 
-## Family safety (decided 2026-11-21, being built now)
+## Priority (owner, 2026-11-21)
+The owner is focused on the UI and interaction experience for adults. The children are too young to use the app
+without supervision, so profile enforcement is not needed before the first release. Build order follows from that:
+adult Home rows, focus and navigation polish, Search, Favorites, then the rest of the spec. The kid-safe rule for real
+runs on the family TV still stands (see Environment notes).
+
+## Family safety (deferred: not needed before release)
 - Profiles with a Kids flag, one household PIN, rating policy, adult categories hidden, Kids profile without Live TV.
-  Design in `docs/HOME_AND_PROFILES.md`.
-- Home screen per profile (adult, kids, first run), built after the profile layer.
+  The data layer is built and tested (slice 1); the picker, enforcement and Settings slices wait. Design in
+  `docs/HOME_AND_PROFILES.md`.
 - Real-portal check of the age labels the catalog really carries, so the rating policy covers every value seen.
 
 ## Observability and memory (found 2026-11-21: the app records no memory at all)

@@ -3,6 +3,11 @@
 Decided with the owner on 2026-11-21 after reading the AI Studio prototype's Home source and checking each row against
 the real portal. Children live in the household, so this comes before more features.
 
+## Status (2026-11-21)
+Slice 1 (data layer) and the Continue watching part of slices 4 and 5 are built. The owner has deprioritised the rest of
+the profile and Kids work: the children will not use the app unsupervised before release. Adult Home, favorites and
+navigation come first; slices 2, 3 and 6 are parked.
+
 ## Decisions
 - **Home layout:** the AI Studio rows and order for adults; a simpler big-tile Home for Kids profiles; a "doors and an
   invitation" Home on first run. No featured banner (heavy on this stick, and the portal has no backdrop images).
