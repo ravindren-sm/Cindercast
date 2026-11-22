@@ -28,7 +28,7 @@ Milestone column: where the work is planned (M3 live, M4 VOD, M5 everything else
 
 | # | Route | Status | What is built / what is missing | Milestone |
 |---|---|---|---|---|
-| 1 | Home | Not started | Placeholder. Needs Continue Watching, Recently Watched, Favorite Channels, Recently Added (movies, shows), Live Now in News, clock. Resume positions are already stored, so Continue Watching can read them. | M5 |
+| 1 | Home | Partial | Done: Continue watching row (progress, time left, resume from the tile, one tile per show), doors, first-run state. Missing: Recently Watched, Favorite Channels, new-in-your-categories rows, Live row, clock, Kids variant. | M5 |
 | 2 | Live TV browser | Partial | Done: genre rail, channel list, 14-per-page focus-triggered paging, real data. Missing: 3-column layout with preview and programme panel, sort (number or A-Z), channel logos, HD/4K badges, parental lock badge, programme title, skeleton rows, digit tuning inside the browser. | M3 |
 | 3 | Live player | Partial | Done: full screen, overlay, buffering, errors with retry, channel up/down, digit entry, Back to the watched channel, Language and Subtitles drawer (Menu key). Missing: stream readout on screen (we only log it), info banner with programme and actions, mini channel list (Left). | M3 |
 | 4 | TV Guide (EPG) | Not started | Waiting for an EPG probe (the portal may not supply guide data; the prototype already plans a "No information" cell). | M5 |
@@ -36,7 +36,7 @@ Milestone column: where the work is planned (M3 live, M4 VOD, M5 everything else
 | 6 | Movie detail | Partial | Done: poster, title, year, age, genres, synopsis, director, cast, rating, Play with initial focus, resume on play. Missing: hero backdrop, original title, runtime, Rotten Tomatoes and audience badges, explicit Resume button, Favorites button, PIN gate. | M4 / M5 |
 | 7 | Shows browser | Partial | Same as Movies (same screen, show categories). Same gaps. | M4 / M5 |
 | 8 | Show detail | Partial | Done: poster, title, year, age, rating (IMDb else Kinopoisk), genres, synopsis, Play (first episode of the season), season chips, paged episode list with real season and episode names, version chooser when an episode has several files (language and quality), per-episode resume with a "Resume m:ss" label, Back to the episode just watched. Missing: explicit Resume button on the show, Favorites, Rotten Tomatoes badges, next-episode prompt. | M4 |
-| 9 | VOD player | Partial | Done: bar with position and length, pause, 10 s seek, saved position and resume, Language and Subtitles drawer (Menu key) with the portal's external subtitle files. Missing: accelerating seek (30 s, 60 s when held), Continue Watching feed, next-episode prompt. | M4 |
+| 9 | VOD player | Partial | Done: bar with position and length, pause, 10 s seek, saved position and resume, Language and Subtitles drawer (Menu key) with the portal's external subtitle files. Continue Watching feed done. Missing: accelerating seek (30 s, 60 s when held), next-episode prompt. | M4 |
 | 10 | Search | Not started | D-pad keyboard and grouped results (live, movies, shows). Needs a check of the portal's server-side search. | M5 |
 | 11 | Favorites | Not started | Local store for channels, movies and shows, plus the screen and the add/remove buttons. | M5 |
 | 12 | Settings | Not started | Account, Connection (masked URL and MAC, setup wizard, sync), Playback (buffer presets, preferred audio, surface), Parental Lock, Appearance (theme, channel numbers, clock, ratings toggle and cache reset), About. | M5 |

@@ -99,7 +99,10 @@ class ShowDetailState(val show: VodItem, private val catalog: VodCatalog) {
 
     fun targetFor(file: VodItem, episode: VodItem): PlayTarget {
         val season = seasons[selectedSeason]
-        return PlayTarget(file, "${show.name}: ${episode.name}", ResumeKeys.episode(show.id, season.id, episode.id))
+        return PlayTarget(
+            file, "${show.name}: ${episode.name}", ResumeKeys.episode(show.id, season.id, episode.id),
+            kind = "EPISODE", titleId = show.id, subtitle = "${season.name} · ${episode.name}", posterUri = show.posterUri, historyTitle = show.name,
+        )
     }
 
     fun resumeKeyFor(episode: VodItem): String? =

@@ -101,7 +101,13 @@ class VodCatalog(private val session: PortalSession) {
 }
 
 /** What the player should play: the file, how to title it, and the key its resume position is stored under. */
-class PlayTarget(val file: VodItem, val title: String, val resumeKey: String) {
+class PlayTarget(
+    val file: VodItem, val title: String, val resumeKey: String,
+    /** What Home needs to list and reopen it: MOVIE or EPISODE, the movie's or the show's id, the episode line, the poster. */
+    val kind: String = "MOVIE", val titleId: String = file.id, val subtitle: String? = null, val posterUri: String? = file.posterUri,
+    /** The name Home shows (an episode's show name; [title] is the longer line the player shows). */
+    val historyTitle: String = title,
+) {
     override fun toString() = "PlayTarget(title=$title)"
 }
 

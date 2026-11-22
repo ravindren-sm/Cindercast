@@ -53,6 +53,8 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.Text
+import io.github.ravindren_sm.openstream.data.HistoryRecorder
+import io.github.ravindren_sm.openstream.data.NoHistory
 import io.github.ravindren_sm.openstream.data.PlayTarget
 import io.github.ravindren_sm.openstream.data.PlaybackRecovery
 import io.github.ravindren_sm.openstream.data.PosterUrl
@@ -97,6 +99,7 @@ fun VodPlayerScreen(
     resume: ResumeStore,
     memory: FocusMemory,
     portalUrl: String,
+    history: HistoryRecorder = NoHistory,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -124,6 +127,7 @@ fun VodPlayerScreen(
         if (id == null || phase !is VodPhase.Playing) return
         val pos = player.currentPosition
         val dur = knownDuration()
+        if (target != null && pos > 0) history.record(target, pos, dur)   // Home's Continue watching
         when {
             ResumePolicy.shouldSave(pos, dur) -> resume.put(id, pos)
             dur > 0 && pos > dur - ResumePolicy.NEAR_END_MILLIS -> resume.clear(id)
@@ -139,7 +143,10 @@ fun VodPlayerScreen(
                     val start = ResumePolicy.startPosition(id?.let(resume::get), knownDuration())
                     if (start > 0) { player.seekTo(start); notice = "Resumed at ${TimeText.format(start)}" }
                 }
-                if (state == Player.STATE_ENDED && id != null) resume.clear(id)
+                if (state == Player.STATE_ENDED && id != null) {
+                    resume.clear(id)
+                    if (target != null) history.record(target, knownDuration(), knownDuration())   // finished: leaves Continue watching
+                }
             }
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) { paused = !playWhenReady }
             override fun onTracksChanged(t: Tracks) { tracks = t }

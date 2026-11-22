@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
@@ -18,6 +19,20 @@ import io.github.ravindren_sm.openstream.data.LivePlayback
 import io.github.ravindren_sm.openstream.data.PlayTarget
 import io.github.ravindren_sm.openstream.data.PortalSession
 import io.github.ravindren_sm.openstream.data.PrefsResumeStore
+import io.github.ravindren_sm.openstream.profiles.ContinueItems
+import io.github.ravindren_sm.openstream.profiles.ContinueTile
+import io.github.ravindren_sm.openstream.profiles.ProfileRepository
+import io.github.ravindren_sm.openstream.profiles.ProfileResumeStore
+import io.github.ravindren_sm.openstream.profiles.RoomHistoryRecorder
+import io.github.ravindren_sm.openstream.profiles.db.OpenStreamDb
+import io.github.ravindren_sm.openstream.provider.VodItem
+import io.github.ravindren_sm.openstream.ui.screens.HomeScreen
+import io.github.ravindren_sm.openstream.ui.screens.doorFocusId
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import io.github.ravindren_sm.openstream.data.ResumeKeys
 import io.github.ravindren_sm.openstream.data.SessionStatus
 import io.github.ravindren_sm.openstream.data.VodCatalog
@@ -76,7 +91,17 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     // The show page being viewed (seasons, loaded episodes, scroll), kept while an episode plays.
     var showDetail: ShowDetailState? by remember(portalEpoch) { mutableStateOf(null) }
     val appContext = LocalContext.current
-    val resumeStore = remember { PrefsResumeStore(appContext) }
+    // The person watching. Until the profile picker exists there is one default profile ("Family"), made on first
+    // use; history and resume positions belong to it.
+    val repo = remember { ProfileRepository(OpenStreamDb.get(appContext)) }
+    var profileId by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(Unit) { profileId = withContext(Dispatchers.IO) { repo.ensureDefaultProfile().id } }
+    val resumeStore = remember { ProfileResumeStore(PrefsResumeStore(appContext)) { profileId } }
+    val recorder = remember { RoomHistoryRecorder(repo, { profileId }, CoroutineScope(SupervisorJob() + Dispatchers.IO)) }
+    // Continue watching, re-read each time Home is shown (null until the first read finishes).
+    var continueTiles: List<ContinueTile>? by remember { mutableStateOf(null) }
+    // The title chosen from Continue watching, kept while it plays.
+    var historyTarget: PlayTarget? by remember { mutableStateOf(null) }
     val connected = session.status.let { it is SessionStatus.Ready || it is SessionStatus.Degraded }
     // A portal already saved: hand it to the session (it connects while the app is in the foreground).
     LaunchedEffect(Unit) { (loaded as? SettingsStore.Loaded.Found)?.let { session.configure(it.settings) } }
@@ -110,14 +135,16 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 },
             )
         } else if (stack.current.route == Route.VOD_PLAYER) {
-            val target: PlayTarget? = if (stack.current.params["play"] == "episode") {
+            val target: PlayTarget? = if (stack.current.params["play"] == "history") {
+                historyTarget
+            } else if (stack.current.params["play"] == "episode") {
                 showDetail?.playTarget
             } else {
                 val browse = if (stack.current.params["kind"] == VodKind.SHOWS.name) showsState else moviesState
                 browse.titles.items.getOrNull(stack.current.params["item"]?.toIntOrNull() ?: -1)
                     ?.let { PlayTarget(it, it.name, ResumeKeys.movie(it.id)) }
             }
-            VodPlayerScreen(target = target, playback = vodPlayback, resume = resumeStore, memory = memory, portalUrl = portalUrl)
+            VodPlayerScreen(target = target, playback = vodPlayback, resume = resumeStore, memory = memory, portalUrl = portalUrl, history = recorder)
         } else {
             TopNavBar(
                 activeTab = topTab,
@@ -125,7 +152,21 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 onSelectTab = { tab -> stack = stack.resetToTab(tab) },
             )
             SessionStatusLine(session.status)
-            if (stack.current.route == Route.MOVIES || stack.current.route == Route.SHOWS) {
+            if (stack.current.route == Route.HOME) {
+                HomeScreen(
+                    tiles = continueTiles, portalUrl = portalUrl, memory = memory,
+                    onResume = { tile ->
+                        // Rebuild the play target from what was stored: the command plays it, the resume key finds the position.
+                        val file = VodItem(tile.resumeKey, tile.title, false, false, false, tile.playCmd, emptyList())
+                        historyTarget = PlayTarget(
+                            file, if (tile.subtitle != null) "${tile.title}: ${tile.subtitle}" else tile.title, tile.resumeKey,
+                            kind = tile.kind, titleId = tile.titleId, subtitle = tile.subtitle, posterUri = tile.posterUri, historyTitle = tile.title,
+                        )
+                        stack = stack.navigate(Route.VOD_PLAYER, mapOf("play" to "history"), currentFocusId = memory.focusedId)
+                    },
+                    onDoor = { route -> stack = stack.resetToTab(route) },
+                )
+            } else if (stack.current.route == Route.MOVIES || stack.current.route == Route.SHOWS) {
                 val browse = if (stack.current.route == Route.SHOWS) showsState else moviesState
                 VodBrowseScreen(
                     state = browse, connected = connected, portalUrl = portalUrl, memory = memory,
@@ -177,9 +218,20 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         }
     }
 
-    // After each stack change, once the new screen is on screen, put focus where it belongs.
-    LaunchedEffect(stack) {
+    // Read the history whenever Home is (re)entered; a short wait lets the player's last save land first.
+    val onHome = stack.current.route == Route.HOME
+    LaunchedEffect(onHome, profileId) {
+        if (!onHome || profileId <= 0L) return@LaunchedEffect
+        delay(300)
+        continueTiles = withContext(Dispatchers.IO) { ContinueItems.from(repo.continueWatching(profileId, 30)) }
+    }
+
+    // After each stack change, once the new screen is on screen, put focus where it belongs. On Home that waits for
+    // the history, so the first Continue watching tile (not a door) gets it.
+    val homeReady = !onHome || continueTiles != null
+    LaunchedEffect(stack, homeReady) {
+        if (!homeReady) return@LaunchedEffect
         androidx.compose.runtime.withFrameNanos { }   // let the new screen compose and attach
-        memory.tryFocusFirst(stack.restoreFocusId, initialFocusId(stack.current.route), topTab?.let(::tabFocusId))
+        memory.tryFocusFirst(stack.restoreFocusId, initialFocusId(stack.current.route), if (onHome) doorFocusId(0) else null, topTab?.let(::tabFocusId))
     }
 }

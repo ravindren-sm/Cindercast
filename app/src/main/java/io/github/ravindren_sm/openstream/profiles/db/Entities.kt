@@ -68,6 +68,8 @@ data class HistoryEntity(
     val durationMs: Long,
     val completed: Boolean,
     val updatedAt: Long,
+    /** The portal command that plays this title again (a movie's, or an episode's chosen file). Never printed. */
+    val playCmd: String? = null,
 )
 
 /** A category a profile pinned, which Home turns into a "new in ..." row. [kind] is MOVIES or SHOWS. */

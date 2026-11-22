@@ -46,6 +46,8 @@ class ProfileRepository(private val db: OpenStreamDb, private val nowMillis: () 
     // ---- profiles ----
 
     suspend fun profiles(): List<ProfileInfo> = db.profiles().all().map { it.info() }
+    /** The first profile, made on first use so history has an owner before the picker exists. */
+    suspend fun ensureDefaultProfile(): ProfileInfo = profiles().firstOrNull() ?: create("Family", 0, isKids = false)
     suspend fun profile(id: Long): ProfileInfo? = db.profiles().byId(id)?.info()
     suspend fun count(): Int = db.profiles().count()
 
@@ -119,14 +121,14 @@ class ProfileRepository(private val db: OpenStreamDb, private val nowMillis: () 
      */
     suspend fun recordProgress(
         profileId: Long, resumeKey: String, kind: String, titleId: String, title: String, subtitle: String?,
-        posterUri: String?, positionMs: Long, durationMs: Long,
+        posterUri: String?, positionMs: Long, durationMs: Long, playCmd: String? = null,
     ) {
         val existing = db.history().get(profileId, resumeKey)
         if (existing == null && positionMs < ResumePolicy.MIN_MILLIS) return
         db.history().put(
             HistoryEntity(
                 profileId, resumeKey, kind, titleId, title, subtitle, posterUri, positionMs, durationMs,
-                completed = HistoryRules.isCompleted(positionMs, durationMs), updatedAt = nowMillis(),
+                completed = HistoryRules.isCompleted(positionMs, durationMs), updatedAt = nowMillis(), playCmd = playCmd,
             ),
         )
     }

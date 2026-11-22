@@ -35,8 +35,8 @@ item lands or a new one is found. Order within a group is rough priority.
   playlists keep enough history; check how much the real channels keep.
 - Accelerating seek when a key is held (30 s, 60 s), and a way to jump far in a 2-hour film (for example a position
   scrubber), since 10 s per press is slow.
-- Find a half-watched title again: Continue Watching on Home (part of the Home build), and mark a title watched or
-  unwatched by hand.
+- Continue Watching on Home is built (2026-11-21). Still to do: mark a title watched or unwatched by hand, remove a
+  tile, and land focus on the tile (not the tab) after Back from the player.
 - Next-episode prompt at the end of an episode.
 
 ## Reliability
