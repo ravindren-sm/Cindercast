@@ -159,6 +159,9 @@ class StalkerResult(val outcome: ProbeOutcome, internal val js: JsonElement?, va
     }
 }
 
+/** A rating value (0 to 10) and where it came from ("IMDb" or "Kinopoisk"). */
+data class ShownRating(val value: Double, val source: String)
+
 /**
  * A VOD entry (movie, show, season or episode). [cmd] is needed for create_link but is never
  * printed: [toString] omits it.
@@ -190,6 +193,13 @@ class VodItem(
     /** Poster address as sent: absolute, or a path on the portal host. Resolved by the app. */
     val posterUri: String? = null,
 ) {
+    /**
+     * The rating to show: the portal's IMDb value if it sent one, else its Kinopoisk value, labelled as that and
+     * never passed off as IMDb. On the real portal IMDb is almost always 0 and Kinopoisk is filled for about half.
+     */
+    val shownRating: ShownRating?
+        get() = imdbRating?.let { ShownRating(it, "IMDb") } ?: kinopoiskRating?.let { ShownRating(it, "Kinopoisk") }
+
     override fun toString() = "VodItem(id=$id, name=$name, series=$isSeries, season=$isSeason, episode=$isEpisode, file=$isFile, inlineFiles=${fileCmds.size})"
 
     /** The cmd to use for create_link: the item's own, else the first inline file's. */

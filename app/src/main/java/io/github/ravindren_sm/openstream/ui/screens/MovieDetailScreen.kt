@@ -50,7 +50,7 @@ fun MovieDetailScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.S2)) {
                 item.year?.let { Text(it, style = Tokens.BodyLarge, color = Tokens.TextSecondary) }
                 item.age?.let { Text(PortalText.decodeEntities(it), style = Tokens.BodyLarge, color = Tokens.TextSecondary) }
-                item.imdbRating?.let { Text("IMDb %.1f".format(it), style = Tokens.BodyLarge, color = Tokens.StatusWarning) }
+                item.shownRating?.let { Text("${it.source} %.1f".format(it.value), style = Tokens.BodyLarge, color = Tokens.StatusWarning) }
                 item.genres?.let { Text(PortalText.decodeEntities(it), style = Tokens.BodyLarge, color = Tokens.TextSecondary, maxLines = 1) }
             }
             item.description?.let { Text(PortalText.decodeEntities(it), style = Tokens.Body, color = Tokens.TextPrimary, maxLines = 6) }

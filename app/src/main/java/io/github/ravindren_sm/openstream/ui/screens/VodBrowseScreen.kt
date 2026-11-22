@@ -40,6 +40,7 @@ import io.github.ravindren_sm.openstream.data.VodCatalog
 import io.github.ravindren_sm.openstream.data.VodCategory
 import io.github.ravindren_sm.openstream.data.VodKind
 import io.github.ravindren_sm.openstream.provider.PortalText
+import io.github.ravindren_sm.openstream.provider.ShownRating
 import io.github.ravindren_sm.openstream.provider.VodItem
 import io.github.ravindren_sm.openstream.ui.components.FocusVariant
 import io.github.ravindren_sm.openstream.ui.components.OsFocusable
@@ -197,7 +198,7 @@ private fun TitleCard(index: Int, item: VodItem, portalUrl: String, memory: Focu
         Column {
             Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f)) {
                 Poster(PosterUrl.resolve(item.posterUri, portalUrl), Modifier.fillMaxSize(), targetWidthPx = 300)
-                item.imdbRating?.let { RatingBadge(it, Modifier.align(Alignment.TopEnd).padding(Spacing.S1)) }
+                item.shownRating?.let { RatingBadge(it, Modifier.align(Alignment.TopEnd).padding(Spacing.S1)) }
             }
             Text(
                 PortalText.decodeEntities(item.name), style = Tokens.Body, color = Tokens.TextPrimary, maxLines = 2,
@@ -207,11 +208,11 @@ private fun TitleCard(index: Int, item: VodItem, portalUrl: String, memory: Focu
     }
 }
 
-/** The portal's IMDb rating on a card. Shown only when the portal sent a real value. */
+/** A rating on a card: a star for IMDb, "KP" for Kinopoisk. Shown only when the portal sent a real value. */
 @Composable
-fun RatingBadge(rating: Double, modifier: Modifier = Modifier) {
+fun RatingBadge(rating: ShownRating, modifier: Modifier = Modifier) {
     Text(
-        "★ %.1f".format(rating), style = Tokens.Body, color = Tokens.StatusWarning, maxLines = 1,
+        (if (rating.source == "IMDb") "★ %.1f" else "KP %.1f").format(rating.value), style = Tokens.Body, color = Tokens.StatusWarning, maxLines = 1,
         modifier = modifier
             .background(Tokens.BgCanvas.copy(alpha = 0.8f), RoundedCornerShape(Radii.Sm))
             .padding(horizontal = Spacing.S1, vertical = 2.dp),

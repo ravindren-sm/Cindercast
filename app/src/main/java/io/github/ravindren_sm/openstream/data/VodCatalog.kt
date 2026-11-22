@@ -13,7 +13,7 @@ enum class VodKind { MOVIES, SHOWS }
 /** A catalog category. [title] is already cleaned of HTML entities. */
 data class VodCategory(val id: String, val title: String) {
     companion object {
-        private val SHOW_WORDS = Regex("(?i)\\b(series|shows?|seasons?)\\b")
+        private val SHOW_WORDS = Regex("(?i)\\b(series|shows?|seasons?|dramas?|serials?|soaps?|episodes?|sitcoms?|telenovelas?)\\b")
 
         /**
          * Which tab a category belongs to, from its title ("HULU | ENGLISH SERIES" is shows). The portal gives no

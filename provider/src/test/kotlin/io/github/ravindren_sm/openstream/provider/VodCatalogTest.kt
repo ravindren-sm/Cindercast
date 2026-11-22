@@ -33,6 +33,14 @@ class VodCatalogTest {
         assertFalse(item.toString().contains("/m/9"), "cmd must stay out of toString")
     }
 
+    @Test fun `the shown rating is IMDb when there is one, else Kinopoisk labelled as such, else none`() {
+        fun item(body: String) = VodItem.listFrom(js("""{"data":[{"id":"1","name":"A",$body}]}"""))[0]
+        assertEquals(ShownRating(7.5, "IMDb"), item(""""rating_imdb":"7.5","rating_kinopoisk":"6.1"""").shownRating)
+        assertEquals(ShownRating(6.1, "Kinopoisk"), item(""""rating_imdb":"0","rating_kinopoisk":"6.1"""").shownRating)
+        assertNull(item(""""rating_imdb":"0","rating_kinopoisk":"0"""").shownRating)
+        assertNull(item(""""name2":"x"""").shownRating)
+    }
+
     @Test fun `ratings outside 0 to 10 or not numbers are hidden`() {
         assertEquals(8.1, PortalText.rating("8.1")); assertEquals(10.0, PortalText.rating(" 10 "))
         listOf(null, "", "0", "0.0", "N/A", "11", "-1").forEach { assertNull(PortalText.rating(it), it.toString()) }

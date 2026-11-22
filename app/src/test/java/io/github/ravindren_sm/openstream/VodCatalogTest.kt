@@ -103,6 +103,11 @@ class VodCatalogTest {
         assertEquals(VodKind.SHOWS, VodCategory.kindOf("Hindi TV Shows"))
         assertEquals(VodKind.SHOWS, VodCategory.kindOf("Season Pass"))
         assertEquals(VodKind.MOVIES, VodCategory.kindOf("ENGLISH MOVIES 4K"))
+        assertEquals(VodKind.SHOWS, VodCategory.kindOf("HINDI DUB | K-DRAMAS"))   // found on the real portal
+        assertEquals(VodKind.SHOWS, VodCategory.kindOf("ENGLISH SERIALS"))
+        assertEquals(VodKind.MOVIES, VodCategory.kindOf("ANIME | MOVIES"))
+        assertEquals(VodKind.MOVIES, VodCategory.kindOf("ENGLISH DOCU | MOVIES"))
+        assertEquals(VodKind.MOVIES, VodCategory.kindOf("DOCUDRAMA MOVIES"))      // "docudrama" is not "drama"
         assertEquals(VodKind.MOVIES, VodCategory.kindOf("KIDS"))
         assertEquals(VodKind.MOVIES, VodCategory.kindOf("SHOWTIME MOVIES"))     // "showtime" is not "show"
     }
