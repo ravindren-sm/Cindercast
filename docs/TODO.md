@@ -53,8 +53,8 @@ transitions, Settings.
 ## Release readiness
 - Release builds cannot reach an HTTP-only provider (cleartext is allowed in debug only). Needs a release
   network-security decision.
-- Public repo: publish the `native-app` branch once GitHub login works (`gh auth login`, then
-  `git push -u origin main:native-app`). History was scrubbed first; see `docs/MILESTONES.md`.
+- Public repo: the scrubbed history is on branch `native-app` of the OpenStream repo (pushed 2026-11-21; `main` there is
+  untouched). Decide when to open a PR or make it the default branch; push later commits with `git push`.
 - Rotten Tomatoes and real IMDb ratings need an outside service and a user-supplied key; the portal's own rating
   (IMDb when present, otherwise Kinopoisk, labelled) is what is shown today.
 - Docs review before anything is public beyond the scrubbed branch.
