@@ -27,6 +27,18 @@ item lands or a new one is found. Order within a group is rough priority.
 - Crash and ANR capture on the device (local only), shown in Settings, so a family member can report a problem
   without adb. No remote telemetry: nothing leaves the device unless the owner decides otherwise later.
 
+## Playback controls (asked by the owner 2026-11-21: movies are rarely finished in one sitting)
+- Verified on the Fire TV against the fake portal: pause (Select or play/pause key), Left and Right skip 10 s, the
+  remote's rewind and fast-forward keys skip 30 s (also while paused), resume on the next play. Pause and the 60 s
+  forward skip were also verified on the real portal; rewind and the media keys only on the fake one.
+- Live TV has no pause or rewind. Add a time-shift window for live (pause, rewind a few minutes) if the live HLS
+  playlists keep enough history; check how much the real channels keep.
+- Accelerating seek when a key is held (30 s, 60 s), and a way to jump far in a 2-hour film (for example a position
+  scrubber), since 10 s per press is slow.
+- Find a half-watched title again: Continue Watching on Home (part of the Home build), and mark a title watched or
+  unwatched by hand.
+- Next-episode prompt at the end of an episode.
+
 ## Reliability
 - 30-minute soak on a live channel (the VOD soak passed; live was skipped because content cannot be vetted).
 - Whether the video decoder glitch seen once at about 1 min 50 s recurs, and on which streams.
