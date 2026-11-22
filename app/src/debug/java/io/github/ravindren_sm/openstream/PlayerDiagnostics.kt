@@ -85,6 +85,18 @@ class PlayerDiagnostics(
         metrics.onState(state)?.let(sink)
     }
 
+    private var lastWindowNote = ""
+
+    /** The stream's playable window: for live HLS its length shows how much history can be rewound. Numbers only. */
+    override fun onTimelineChanged(eventTime: AnalyticsListener.EventTime, reason: Int) {
+        val timeline = eventTime.timeline
+        if (timeline.isEmpty) return
+        val w = androidx.media3.common.Timeline.Window()
+        timeline.getWindow(eventTime.windowIndex.coerceIn(0, timeline.windowCount - 1), w)
+        val note = "window: live=${w.isLive()} dynamic=${w.isDynamic} seekable=${w.isSeekable} lengthSec=${if (w.durationMs == androidx.media3.common.C.TIME_UNSET) -1 else w.durationMs / 1000 / 10 * 10}"
+        if (note != lastWindowNote) { lastWindowNote = note; sink(note) }
+    }
+
     override fun onIsPlayingChanged(eventTime: AnalyticsListener.EventTime, isPlaying: Boolean) {
         sink("playing: $isPlaying")
     }

@@ -37,8 +37,8 @@ runs on the family TV still stands (see Environment notes).
 - Verified on the Fire TV against the fake portal: pause (Select or play/pause key), Left and Right skip 10 s, the
   remote's rewind and fast-forward keys skip 30 s (also while paused), resume on the next play. Pause and the 60 s
   forward skip were also verified on the real portal; rewind and the media keys only on the fake one.
-- Live TV has no pause or rewind. Add a time-shift window for live (pause, rewind a few minutes) if the live HLS
-  playlists keep enough history; check how much the real channels keep.
+- Live TV pause and rewind are built (2026-11-21). Measure how much history the real channels keep (the debug log prints the
+  window length) and decide whether to show a rewind limit in the label.
 - Accelerating seek is done (2026-11-21, steps grow while a key is held). A visible position scrubber is not.
 - Continue Watching on Home is built (2026-11-21). Mark watched, remove and focus after Back are done too.
 - Next-episode prompt: done (2026-11-21).

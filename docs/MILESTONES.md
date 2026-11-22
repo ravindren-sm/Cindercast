@@ -390,3 +390,8 @@ Method: a debug-only activity (`VodShapeProbeActivity`), one request for the fir
 - A bug found on the TV and fixed: the lookup ran in an effect that every position update restarted, so its answer was thrown away; the condition is now a plain flag.
 - Tests: `NextEpisodeTest` (next in season, across seasons skipping empty ones, end of show, unknown ids, key parsing) and the seek steps. Checked on the Fire TV against the fake portal: the card, then the automatic hand-over to the next episode.
 
+## Live TV pause and rewind (2026-11-21; fake portal for the app; the real window not yet measured)
+- Select or the play/pause key pauses a live channel; Left and Right skip within what the stream keeps (10 s, growing while held, 30 s on the rewind and fast-forward keys); a skip that passes the live edge rejoins live. The screen shows "Paused" and, for a real live stream, "Live" or "-m:ss behind live". A stream that keeps no history says "This channel cannot be rewound". Up and Down still change channel.
+- A debug log line records the stream's window (live, seekable, length in seconds) so the real channels' rewind depth can be read once a real channel is played.
+- Checked on the Fire TV against the fake portal (a progressive file, not live): pause and the Paused label. The real portal's channels are not yet measured; that needs a (kid-safe) channel played once.
+

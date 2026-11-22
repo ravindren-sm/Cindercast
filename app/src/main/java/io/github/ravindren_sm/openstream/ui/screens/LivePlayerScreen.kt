@@ -28,6 +28,8 @@ import io.github.ravindren_sm.openstream.ui.components.audioChoices
 import io.github.ravindren_sm.openstream.ui.components.subtitleChoices
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
+import io.github.ravindren_sm.openstream.data.LiveShift
+import io.github.ravindren_sm.openstream.data.SeekRamp
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
@@ -137,10 +139,28 @@ fun LivePlayerScreen(
     var attempt by remember { mutableIntStateOf(0) }
     var overlayTick by remember { mutableIntStateOf(0) }
     var overlayVisible by remember { mutableStateOf(true) }
+    var paused by remember { mutableStateOf(false) }
+    // How far behind the live edge playback is (null when the stream is not live or the value is not known).
+    var behindLive: Long? by remember { mutableStateOf(null) }
+    LaunchedEffect(player) {
+        while (true) {
+            val offset = player.currentLiveOffset
+            behindLive = if (player.isCurrentMediaItemLive && offset != androidx.media3.common.C.TIME_UNSET) offset else null
+            delay(500)
+        }
+    }
+
+    /** Pause, rewind and skip within what the stream keeps. A live stream that keeps no history cannot be moved. */
+    fun shift(delta: Long) {
+        if (!player.isCurrentMediaItemSeekable) { notice = "This channel cannot be rewound"; return }
+        if (delta > 0 && LiveShift.reachesLive(behindLive, delta)) { player.seekToDefaultPosition(); return }
+        player.seekTo((player.currentPosition + delta).coerceAtLeast(0))
+    }
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) { buffering = state == Player.STATE_BUFFERING }
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) { paused = !playWhenReady }
             override fun onTracksChanged(t: Tracks) { tracks = t }
             override fun onPlayerError(error: PlaybackException) {
                 if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
@@ -264,6 +284,13 @@ fun LivePlayerScreen(
                     e.key == Key.DirectionUp || e.key == Key.ChannelUp -> { zap(forward = true); true }
                     e.key == Key.DirectionDown || e.key == Key.ChannelDown -> { zap(forward = false); true }
                     typed.isNotEmpty() && (e.key == Key.Enter || e.key == Key.NumPadEnter || e.key == Key.DirectionCenter) -> { commitTyped(); true }
+                    e.key == Key.DirectionLeft -> { shift(-SeekRamp.stepMillis(e.nativeKeyEvent.repeatCount)); true }
+                    e.key == Key.DirectionRight -> { shift(SeekRamp.stepMillis(e.nativeKeyEvent.repeatCount)); true }
+                    e.key == Key.MediaRewind -> { shift(-30_000); true }
+                    e.key == Key.MediaFastForward -> { shift(30_000); true }
+                    e.key == Key.MediaPlayPause || e.key == Key.Enter || e.key == Key.NumPadEnter || e.key == Key.DirectionCenter -> { player.playWhenReady = !player.playWhenReady; true }
+                    e.key == Key.MediaPlay -> { player.playWhenReady = true; true }
+                    e.key == Key.MediaPause -> { player.playWhenReady = false; true }
                     else -> false   // Back and everything else still reach the shell
                 }
             },
@@ -298,6 +325,17 @@ fun LivePlayerScreen(
             Text(
                 "Menu: audio & subtitles", style = Tokens.Body, color = Tokens.TextSecondary,
                 modifier = Modifier.align(Alignment.TopStart).padding(Spacing.SafeHorizontal, Spacing.SafeVertical + 76.dp),
+            )
+        }
+
+        // Where playback is relative to live (shown while paused, or for a moment after any key).
+        if ((overlayVisible || paused) && channel != null && !tracksOpen && phase is Phase.Playing) {
+            val label = LiveShift.label(behindLive)
+            Text(
+                (if (paused) "Paused" else "") + (if (paused && label.isNotEmpty()) " · " else "") + label,
+                style = Tokens.BodyLarge, color = if (paused || label.startsWith("-")) Tokens.StatusWarning else Tokens.StatusSuccess,
+                modifier = Modifier.align(Alignment.BottomStart).padding(Spacing.SafeHorizontal, Spacing.SafeVertical + 40.dp)
+                    .background(Tokens.BgCanvas.copy(alpha = 0.7f)).padding(Spacing.S2),
             )
         }
 

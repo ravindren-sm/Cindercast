@@ -49,3 +49,18 @@ class NextEpisodeTest {
         assertEquals(steps.sorted(), steps)
     }
 }
+
+class LiveShiftTest {
+    @org.junit.Test fun labelsSayLiveOrHowFarBehind() {
+        org.junit.Assert.assertEquals("", LiveShift.label(null))
+        org.junit.Assert.assertEquals("Live", LiveShift.label(1_500))
+        org.junit.Assert.assertEquals("-2:05 behind live", LiveShift.label(125_000))
+        org.junit.Assert.assertEquals("-1:00:00 behind live", LiveShift.label(3_600_000))
+    }
+
+    @org.junit.Test fun aSkipThatPassesTheEdgeRejoinsLive() {
+        org.junit.Assert.assertEquals(true, LiveShift.reachesLive(20_000, 30_000))
+        org.junit.Assert.assertEquals(false, LiveShift.reachesLive(120_000, 30_000))
+        org.junit.Assert.assertEquals(false, LiveShift.reachesLive(null, 30_000))
+    }
+}
