@@ -67,24 +67,40 @@ def vod_total(cat):
     return 40 if cat == "*" else 20 + int(cat) % 10 * 3
 
 
-def vod_page(cat, page, host):
-    total = vod_total(cat)
-    first = (page - 1) * PAGE + 1
-    last = min(page * PAGE, total)
+def vod_item(cat, n, host):
     is_series = cat in ("20", "21", "22")
-    data = []
-    for n in range(first, last + 1):
-        rating = "0" if n % 4 == 0 else f"{5 + n % 5}.{n % 10}"        # every 4th has no rating: the badge must hide
-        name = f"Tom &amp; Jerry {n}" if n % 7 == 0 else f"{'Show' if is_series else 'Movie'} {n} (c{cat})"
-        data.append({
+    rating = "0" if n % 4 == 0 else f"{5 + n % 5}.{n % 10}"        # every 4th has no rating: the badge must hide
+    name = f"Tom &amp; Jerry {n}" if n % 7 == 0 else f"{'Show' if is_series else 'Movie'} {n} (c{cat})"
+    return {
             "id": f"{cat}-{n}", "name": name, "year": str(1990 + n % 35), "rating_imdb": rating, "rating_kinopoisk": "0",
             "rating_mpaa": "PG-13" if n % 2 else "R", "genres_str": "Drama, Thriller",
             "description": "An invented story used only to test the layout of the detail page. " * 4,
             "actors": "Actor One, Actor Two, Actor Three", "director": "Director Name",
             "screenshot_uri": f"http://{host}/poster/{n}.png", "cmd": f"/media/{cat}-{n}.mpg",
             "is_series": "1" if is_series else "0", "is_movie": "1",
-        })
+        }
+
+
+def vod_page(cat, page, host):
+    total = vod_total(cat)
+    first = (page - 1) * PAGE + 1
+    last = min(page * PAGE, total)
+    data = [vod_item(cat, n, host) for n in range(first, last + 1)]
     return {"total_items": str(total), "max_page_items": PAGE, "data": data}
+
+
+def vod_search(text, page, host):
+    """Titles of every category whose (entity-decoded) name contains the text, paged like the real lists."""
+    import html
+    needle = text.lower()
+    hits = []
+    for c in VOD_CATEGORIES[1:]:
+        for n in range(1, vod_total(c["id"]) + 1):
+            item = vod_item(c["id"], n, host)
+            if needle in html.unescape(item["name"]).lower():
+                hits.append(item)
+    chunk = hits[(page - 1) * PAGE: page * PAGE]
+    return {"total_items": str(len(hits)), "max_page_items": PAGE, "data": chunk}
 
 
 def vod_children(show, season, episode, page):
@@ -217,7 +233,7 @@ class H(BaseHTTPRequestHandler):
         t, a = q.get("type", ""), q.get("action", "")
         line = f"{t}/{a}"
         if a == "get_ordered_list":
-            line += f" genre={q.get('genre')} category={q.get('category')} show={q.get('movie_id')} season={q.get('season_id')} episode={q.get('episode_id')} p={q.get('p')}"
+            line += f" genre={q.get('genre')} category={q.get('category')} show={q.get('movie_id')} season={q.get('season_id')} episode={q.get('episode_id')} p={q.get('p')} search={'yes' if q.get('search') else 'no'}"
         log(line)
         js = None
         if (t, a) == ("stb", "handshake"):
@@ -228,6 +244,8 @@ class H(BaseHTTPRequestHandler):
             js = {"data": {"msgs": 0}}
         elif (t, a) == ("itv", "get_genres"):
             js = GENRES
+        elif (t, a) == ("itv", "get_all_channels"):
+            js = {"data": channels_page("*", 1)["data"] + [c for p in range(2, 10) for c in channels_page("*", p)["data"]]}
         elif (t, a) == ("itv", "create_link"):
             host = self.headers.get("Host", f"localhost:{ARGS.port}")
             js = {"cmd": f"ffmpeg http://{host}/stream/test.mp4?token=faketoken", "error": ""}
@@ -237,6 +255,8 @@ class H(BaseHTTPRequestHandler):
             host = self.headers.get("Host", f"localhost:{ARGS.port}")
             if q.get("movie_id", "0") != "0":
                 js = vod_children(q["movie_id"], q.get("season_id", "0"), q.get("episode_id", "0"), int(q.get("p", "1") or "1"))
+            elif q.get("search"):
+                js = vod_search(q["search"], int(q.get("p", "1") or "1"), host)
             else:
                 js = vod_page(q.get("category", "*"), int(q.get("p", "1") or "1"), host)
         elif (t, a) == ("vod", "create_link"):

@@ -23,6 +23,7 @@ import io.github.ravindren_sm.openstream.ui.theme.Tokens
 /** The focus ID a screen takes when it appears and nothing was remembered (per the prototype's focus table). */
 fun initialFocusId(route: Route): String = when (route) {
     Route.HOME -> continueFocusId(0)
+    Route.SEARCH -> SEARCH_INPUT_ID
     Route.LIVE_TV -> genreFocusId(0)
     Route.LIVE_PLAYER, Route.VOD_PLAYER -> PLAYER_SURFACE_ID
     Route.MOVIES, Route.SHOWS -> categoryFocusId(0)

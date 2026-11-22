@@ -330,3 +330,11 @@ Design in `docs/HOME_AND_PROFILES.md`. Built: Room 2.7.1 with KSP (the owner cho
 - Fixes found on the TV: the last card of a row had its focus ring clipped (rows now keep a little end padding); after a removal focus moves to the next tile in the row instead of dropping to the tab bar.
 - Tests: `FavoriteItemsTest` (movie and show round trip, channel number order, a fixed channel list). Checked on the Fire TV with a side-by-side install: hearts in Live TV, Home row, the Favorites tab, zapping between favorites, movie detail from a favorite, removal and focus. The real portal was not contacted.
 
+## Search (2026-11-21; fake portal, no provider contact)
+- Search tab: a text box (the system keyboard), results grouped as Channels, Movies and Shows. The search starts about 0.8 s after typing stops, or at once on the keyboard's Done; two letters minimum. Select opens a result like the other screens (movie page, show page, channel player), and Back returns to the same result with the results kept.
+- Titles use the portal's own `search` parameter on the VOD list (all categories, up to three pages), ranked so titles starting with the text come first, then titles containing it, then other matches the portal made on other fields. Channels are found by reading all channels once (`get_all_channels`, kept for the session) and filtering by name or exact number, at most 30; the channel results play as a list that Up and Down zap through.
+- The typed text is only in the request itself: the logged purpose line, the debug log and the fake portal's request log carry no query (checked in logcat after searching).
+- Home's Search door opens it; the options hint on Home no longer shows when there are no tiles.
+- Tests: `SearchRankingTest` (ordering, entities and spaces, channel name and number matching, the cap, empty results) and `SearchRequestsTest` in the provider module (encoded text, purpose without it, all-channels payload as a bare array or a data array). Fake portal: `search` on VOD lists and `get_all_channels`.
+- Not verified on the real portal: that its VOD `search` parameter filters as expected and what `get_all_channels` returns and costs (5,100 channels). Needs an approved, kid-safe query run. Until then channel search may report "Channels could not be searched" on that portal; movies and shows are unaffected.
+

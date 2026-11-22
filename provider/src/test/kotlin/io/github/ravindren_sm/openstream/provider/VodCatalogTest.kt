@@ -96,3 +96,24 @@ class SubtitleParserTest {
         assertFalse(VodLink("http://secret.invalid/s.m3u8", listOf(one)).toString().contains("secret.invalid"))
     }
 }
+
+/** Search requests and the all-channels payload. All data is fake. */
+class SearchRequestsTest {
+    private val ctx = StalkerRequests.Context("http://portal.invalid/stalker_portal/c/", "00:1A:79:00:00:01", token = "tok")
+
+    @Test fun `a VOD search sends the typed text encoded and keeps it out of the logged purpose`() {
+        val r = StalkerRequests.vodSearch(ctx, "tom & jerry", page = 2)
+        assertTrue(r.url.contains("search=tom+%26+jerry"), r.url)
+        assertTrue(r.url.contains("type=vod") && r.url.contains("category=*"), r.url)
+        assertTrue(r.url.contains("p=2"), r.url)
+        assertFalse(r.purpose.contains("jerry"), r.purpose)
+    }
+
+    @Test fun `all channels are read from a bare array or from a data array`() {
+        val bare = StalkerClient.parseJs("""{"js":[{"id":"1","number":"5","name":" News ","cmd":"ffmpeg x"},{"name":"no id"}]}""".toByteArray())
+        val wrapped = StalkerClient.parseJs("""{"js":{"data":[{"id":"2","number":"6","name":"Sport"}]}}""".toByteArray())
+        assertEquals(listOf("News"), LiveCatalogParser.allChannels(bare)?.map { it.name })
+        assertEquals(listOf("Sport"), LiveCatalogParser.allChannels(wrapped)?.map { it.name })
+        assertNull(LiveCatalogParser.allChannels(StalkerClient.parseJs("""{"js":"nope"}""".toByteArray())))
+    }
+}

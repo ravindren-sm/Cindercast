@@ -44,6 +44,10 @@ runs on the family TV still stands (see Environment notes).
 - Continue Watching on Home is built (2026-11-21). Mark watched, remove and focus after Back are done too.
 - Next-episode prompt at the end of an episode.
 
+## Search follow-ups
+- Check the real portal's VOD `search` parameter and `get_all_channels` with one approved, kid-safe query (one session, both StbEmu and TiviMate stopped). If `get_all_channels` is slow or huge, search channels by genre instead or cache on disk.
+- Recent searches, a result count per group, and a "more results" page beyond the first three.
+
 ## Reliability
 - 30-minute soak on a live channel (the VOD soak passed; live was skipped because content cannot be vetted).
 - Whether the video decoder glitch seen once at about 1 min 50 s recurs, and on which streams.

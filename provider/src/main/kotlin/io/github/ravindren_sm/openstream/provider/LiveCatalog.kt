@@ -51,6 +51,24 @@ object LiveCatalogParser {
             LiveGenre(id, o.str("title")?.trim()?.takeIf { it.isNotEmpty() } ?: "?")
         }.orEmpty()
 
+    /** One channel from a list entry; null without an id. */
+    private fun channel(e: JsonElement): LiveChannel? {
+        val c = e as? JsonObject ?: return null
+        val id = c.str("id")?.takeIf { it.isNotBlank() } ?: return null
+        return LiveChannel(
+            id = id,
+            number = c.str("number")?.trim().orEmpty(),
+            name = c.str("name")?.trim()?.takeIf { it.isNotEmpty() } ?: "?",
+            cmd = c.str("cmd")?.takeIf { it.isNotBlank() },
+        )
+    }
+
+    /** The "js" of get_all_channels: either a bare array or an object with a "data" array. Null for anything else. */
+    fun allChannels(js: JsonElement?): List<LiveChannel>? {
+        val array = (js as? JsonArray) ?: ((js as? JsonObject)?.get("data") as? JsonArray) ?: return null
+        return array.mapNotNull(::channel)
+    }
+
     /** A channel page from the "js" object of itv get_ordered_list; null if the payload is not an object. */
     fun channelPage(js: JsonElement?, page: Int): LiveChannelPage? {
         val o = js as? JsonObject ?: return null

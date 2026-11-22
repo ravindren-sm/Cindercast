@@ -80,6 +80,20 @@ object StalkerRequests {
         "episode_id" to "0", "category" to category, "fav" to "0", "sortby" to "added",
         "hd" to "0", "not_ended" to "0", "p" to page.toString())
 
+    /**
+     * One page of VOD titles whose name matches [query], across all categories (the portal's own `search` parameter).
+     * The query is what the viewer typed, so it is only in the request, never in the purpose text that gets logged.
+     */
+    fun vodSearch(ctx: Context, query: String, page: Int = 1) = build(ctx,
+        "Search: VOD titles matching the typed text, page $page",
+        "type" to "vod", "action" to "get_ordered_list", "movie_id" to "0", "season_id" to "0",
+        "episode_id" to "0", "category" to "*", "fav" to "0", "sortby" to "added",
+        "hd" to "0", "not_ended" to "0", "search" to query, "p" to page.toString())
+
+    /** Every live channel in one answer (the portal has no live search of its own; the app filters them). */
+    fun allChannels(ctx: Context) = build(ctx, "Search: all live channels, for filtering on the device",
+        "type" to "itv", "action" to "get_all_channels")
+
     /** Children of a VOD title: seasons (seasonId "0"), a season's episodes, or an episode's files. */
     fun vodChildren(ctx: Context, movieId: String, seasonId: String = "0", episodeId: String = "0", page: Int = 1) = build(ctx,
         "Step 4f: ${levelName(seasonId, episodeId)}, page $page",
@@ -379,6 +393,26 @@ class StalkerClient(
         val r = call(StalkerRequests.vodPage(ctx(), "vod", category, page)) { js ->
             parsed = VodCatalogParser.page(js, page)
             listOf("vod page $page: ${parsed?.items?.size ?: "?"} of ${parsed?.totalItems ?: "?"}")
+        }
+        return r to parsed
+    }
+
+    /** One page (1-based) of VOD titles matching [query]. Summary: counts only, never the text. */
+    fun vodSearch(query: String, page: Int): Pair<StalkerResult, VodPage?> {
+        var parsed: VodPage? = null
+        val r = call(StalkerRequests.vodSearch(ctx(), query, page)) { js ->
+            parsed = VodCatalogParser.page(js, page)
+            listOf("search page $page: ${parsed?.items?.size ?: "?"} of ${parsed?.totalItems ?: "?"}")
+        }
+        return r to parsed
+    }
+
+    /** All live channels, for on-device search. Null if the payload is unusable. Summary: the count only. */
+    fun allChannels(): Pair<StalkerResult, List<LiveChannel>?> {
+        var parsed: List<LiveChannel>? = null
+        val r = call(StalkerRequests.allChannels(ctx())) { js ->
+            parsed = LiveCatalogParser.allChannels(js)
+            listOf("all channels: ${parsed?.size ?: "?"}")
         }
         return r to parsed
     }

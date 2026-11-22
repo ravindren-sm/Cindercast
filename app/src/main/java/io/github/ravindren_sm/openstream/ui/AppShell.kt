@@ -20,7 +20,14 @@ import io.github.ravindren_sm.openstream.data.LivePlayback
 import io.github.ravindren_sm.openstream.data.PlayTarget
 import io.github.ravindren_sm.openstream.data.PortalSession
 import io.github.ravindren_sm.openstream.data.PrefsResumeStore
+import io.github.ravindren_sm.openstream.data.CatalogResult
 import io.github.ravindren_sm.openstream.data.PagedChannels
+import io.github.ravindren_sm.openstream.data.SearchCatalog
+import io.github.ravindren_sm.openstream.data.SearchRanking
+import io.github.ravindren_sm.openstream.ui.screens.SearchPhase
+import io.github.ravindren_sm.openstream.ui.screens.SearchScreen
+import io.github.ravindren_sm.openstream.ui.screens.SearchState
+import io.github.ravindren_sm.openstream.ui.screens.searchChannelFocusId
 import io.github.ravindren_sm.openstream.profiles.ContinueItems
 import io.github.ravindren_sm.openstream.profiles.FavoriteItems
 import io.github.ravindren_sm.openstream.profiles.FavoritesState
@@ -116,6 +123,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     // The favorite channels being played (a fixed list to zap through), and the favorite movie whose page is open.
     var favPlayer: PagedChannels? by remember { mutableStateOf(null) }
     var favItem: VodItem? by remember { mutableStateOf(null) }
+    var lastSubmitHandled by remember { mutableIntStateOf(0) }
     // Continue watching, re-read each time Home is shown (null until the first read finishes).
     var continueTiles: List<ContinueTile>? by remember { mutableStateOf(null) }
     var tilesFresh by remember { mutableStateOf(false) }   // Home's rows were re-read since it was entered
@@ -133,6 +141,24 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     val connected = session.status.let { it is SessionStatus.Ready || it is SessionStatus.Degraded }
     // A portal already saved: hand it to the session (it connects while the app is in the foreground).
     LaunchedEffect(Unit) { (loaded as? SettingsStore.Loaded.Found)?.let { session.configure(it.settings) } }
+
+    // Search: the box text and the last outcome live here so they survive opening a result and coming back.
+    val searchCatalog = remember(portalEpoch) { SearchCatalog(session) }
+    val searchState = remember(portalEpoch) { SearchState() }
+    LaunchedEffect(searchState.query, searchState.submitTick, connected) {
+        val q = searchState.query.trim()
+        if (q.length < SearchRanking.MIN_QUERY) { searchState.phase = SearchPhase.Idle; return@LaunchedEffect }
+        if (!connected) { searchState.phase = SearchPhase.Idle; return@LaunchedEffect }
+        // Wait for a pause in typing, unless Done was pressed (the tick changed with no text change is handled by the key).
+        delay(if (searchState.submitTick > 0 && searchState.submitTick != lastSubmitHandled) 0L else 800L)
+        lastSubmitHandled = searchState.submitTick
+        searchState.phase = SearchPhase.Loading
+        val result = withContext(Dispatchers.IO) { searchCatalog.search(q) }
+        searchState.phase = when (result) {
+            is CatalogResult.Ok -> SearchPhase.Done(result.value)
+            is CatalogResult.Failed -> SearchPhase.Failed(result.message)
+        }
+    }
 
     BackHandler {
         if (memory.justFinishedEditing()) return@BackHandler    // that Back closed a keyboard
@@ -161,7 +187,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 onChannelChanged = { i ->
                     // Back should land on the channel being watched, with its row on screen.
                     if (fromFavorites) {
-                        stack = stack.withPreviousFocus(if (from == "home") homeFavChannelFocusId(i) else favChannelFocusId(i))
+                        stack = stack.withPreviousFocus(when (from) { "home" -> homeFavChannelFocusId(i); "search" -> searchChannelFocusId(i); else -> favChannelFocusId(i) })
                     } else {
                         stack = stack.withPreviousFocus(channelFocusId(i))
                         liveState.channelListState.requestScrollToItem(maxOf(i - 3, 0))
@@ -271,6 +297,25 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                         }
                     },
                     onRemove = { f -> favorites.toggle(f.kind, f.refId, f.name, f.posterUri, f) },
+                )
+            } else if (stack.current.route == Route.SEARCH) {
+                SearchScreen(
+                    state = searchState, portalUrl = portalUrl, memory = memory, connected = connected,
+                    isFavoriteVod = favorites::isVod, isFavoriteChannel = favorites::isChannel,
+                    onOpenChannel = { i ->
+                        (searchState.phase as? SearchPhase.Done)?.let { done ->
+                            favPlayer = PagedChannels.fixed(done.results.channels)
+                            stack = stack.navigate(Route.LIVE_PLAYER, mapOf("item" to "$i", "src" to "fav", "from" to "search"), currentFocusId = memory.focusedId)
+                        }
+                    },
+                    onOpenMovie = { item ->
+                        favItem = item
+                        stack = stack.navigate(Route.MOVIE_DETAIL, mapOf("src" to "fav"), currentFocusId = memory.focusedId)
+                    },
+                    onOpenShow = { item ->
+                        if (showDetail?.show?.id != item.id) showDetail = ShowDetailState(item, vodCatalog)
+                        stack = stack.navigate(Route.SHOW_DETAIL, emptyMap(), currentFocusId = memory.focusedId)
+                    },
                 )
             } else if (stack.current.route == Route.LIVE_TV) {
                 LiveTvScreen(

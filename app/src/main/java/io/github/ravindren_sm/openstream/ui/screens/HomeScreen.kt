@@ -139,7 +139,7 @@ fun HomeScreen(
                     }
                 }
             }
-            if (!empty) Text("Press Menu on a title for options", style = Tokens.Body, color = Tokens.TextSecondary)
+            if (!continueTiles.isNullOrEmpty() || recentTiles.isNotEmpty()) Text("Press Menu on a title for options", style = Tokens.Body, color = Tokens.TextSecondary)
         }
         menuTile?.let { tile -> TileMenu(tile, memory, onChoose = ::close) }
     }
