@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ProfileEntity::class, HouseholdEntity::class, FavoriteEntity::class, HistoryEntity::class,
         PinnedCategoryEntity::class, KidsAllowedCategoryEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class OpenStreamDb : RoomDatabase() {
@@ -36,9 +36,18 @@ abstract class OpenStreamDb : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE history ADD COLUMN playCmd TEXT") }
         }
 
+        /** Version 3: a favorite keeps the command and the catalog details it needs to be opened again. */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                for (column in listOf("playCmd TEXT", "number TEXT", "year TEXT", "description TEXT", "actors TEXT", "director TEXT", "genres TEXT", "age TEXT", "imdbRating REAL", "kinopoiskRating REAL")) {
+                    db.execSQL("ALTER TABLE favorites ADD COLUMN $column")
+                }
+            }
+        }
+
         fun get(context: Context): OpenStreamDb = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, OpenStreamDb::class.java, "openstream.db")
-                .addMigrations(MIGRATION_1_2).build().also { instance = it }
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
         }
 
         /** An in-memory database for tests. */

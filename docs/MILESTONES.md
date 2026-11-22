@@ -322,3 +322,11 @@ Design in `docs/HOME_AND_PROFILES.md`. Built: Room 2.7.1 with KSP (the owner cho
 - Tests: two more `ContinueItemsTest` cases (watched label and full bar; no repeat across the two rows). Checked on the Fire TV with a side-by-side install: tile, menu, mark watched (moves to Recently watched), mark not watched (moves back), Back from the player onto the tile, remove (welcome state). Side app uninstalled, fake portal stopped, scratch files deleted. The real portal was not contacted.
 - Not done: Favorite channels, "new in your categories" and Live rows (need favorites and a category chooser first).
 
+## Favorites (2026-11-21; fake portal and a local test video, no provider contact)
+- Channels, movies and shows can be favorites, kept per profile in Room (schema 3 adds the command and catalog details, so a favorite opens again without browsing to it; migration 2 to 3).
+- Marking: Menu key on a channel in Live TV; an "Add to favorites" button beside Play on movie and show pages. A heart shows on the channel row and on the title card. Menu on a tile in the Favorites tab removes it.
+- Favorites tab: Channels (in channel-number order), Movies, Shows. Selecting a channel plays the favorites as a list, so Up and Down zap between them and Back lands on the channel last watched. A movie opens its full detail page from the stored details; a show opens its seasons.
+- Home: a "Favorite channels" row between the watching rows and the doors.
+- Fixes found on the TV: the last card of a row had its focus ring clipped (rows now keep a little end padding); after a removal focus moves to the next tile in the row instead of dropping to the tab bar.
+- Tests: `FavoriteItemsTest` (movie and show round trip, channel number order, a fixed channel list). Checked on the Fire TV with a side-by-side install: hearts in Live TV, Home row, the Favorites tab, zapping between favorites, movie detail from a favorite, removal and focus. The real portal was not contacted.
+

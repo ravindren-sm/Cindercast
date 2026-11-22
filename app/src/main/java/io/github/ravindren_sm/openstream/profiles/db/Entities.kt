@@ -46,6 +46,19 @@ data class FavoriteEntity(
     val name: String,
     val posterUri: String?,
     val addedAt: Long,
+    // What the favorite needs to be opened again without asking the portal for the catalog entry. Labels and
+    // commands only; the command is never printed.
+    val playCmd: String? = null,
+    /** A channel's number as the portal sends it. */
+    val number: String? = null,
+    val year: String? = null,
+    val description: String? = null,
+    val actors: String? = null,
+    val director: String? = null,
+    val genres: String? = null,
+    val age: String? = null,
+    val imdbRating: Double? = null,
+    val kinopoiskRating: Double? = null,
 )
 
 /** What a profile has watched: one row per resume key (a movie, or one episode), newest first on Home. */

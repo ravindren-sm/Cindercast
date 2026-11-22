@@ -43,6 +43,7 @@ import io.github.ravindren_sm.openstream.provider.PortalText
 import io.github.ravindren_sm.openstream.provider.ShownRating
 import io.github.ravindren_sm.openstream.provider.VodItem
 import io.github.ravindren_sm.openstream.ui.components.FocusVariant
+import io.github.ravindren_sm.openstream.ui.components.HEART
 import io.github.ravindren_sm.openstream.ui.components.OsFocusable
 import io.github.ravindren_sm.openstream.ui.components.Poster
 import io.github.ravindren_sm.openstream.ui.focus.FocusMemory
@@ -103,6 +104,7 @@ fun VodBrowseScreen(
     portalUrl: String,
     memory: FocusMemory,
     onOpen: (index: Int, item: VodItem) -> Unit,
+    isFavorite: (VodItem) -> Boolean = { false },
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -142,13 +144,13 @@ fun VodBrowseScreen(
         }
 
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            if (state.categoriesLoaded && state.categories.isNotEmpty()) TitleGrid(state, portalUrl, memory, onOpen)
+            if (state.categoriesLoaded && state.categories.isNotEmpty()) TitleGrid(state, portalUrl, memory, onOpen, isFavorite)
         }
     }
 }
 
 @Composable
-private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMemory, onOpen: (Int, VodItem) -> Unit) {
+private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMemory, onOpen: (Int, VodItem) -> Unit, isFavorite: (VodItem) -> Boolean) {
     val paged = state.titles
     val gridState = state.gridState
     val scope = rememberCoroutineScope()
@@ -177,7 +179,7 @@ private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMem
                 horizontalArrangement = Arrangement.spacedBy(Spacing.S2), verticalArrangement = Arrangement.spacedBy(Spacing.S2),
             ) {
                 itemsIndexed(paged.items, key = { _, t -> t.id }) { index, item ->
-                    TitleCard(index, item, portalUrl, memory, onOpen)
+                    TitleCard(index, item, portalUrl, memory, onOpen, isFavorite(item))
                 }
                 if (paged.error != null) {
                     item(key = "retry", span = { androidx.compose.foundation.lazy.grid.GridItemSpan(COLUMNS) }) {
@@ -190,7 +192,7 @@ private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMem
 }
 
 @Composable
-private fun TitleCard(index: Int, item: VodItem, portalUrl: String, memory: FocusMemory, onOpen: (Int, VodItem) -> Unit) {
+private fun TitleCard(index: Int, item: VodItem, portalUrl: String, memory: FocusMemory, onOpen: (Int, VodItem) -> Unit, favorite: Boolean) {
     OsFocusable(
         id = titleFocusId(index), memory = memory, variant = FocusVariant.CARD,
         modifier = Modifier.fillMaxWidth(), onSelect = { onOpen(index, item) },
@@ -199,6 +201,7 @@ private fun TitleCard(index: Int, item: VodItem, portalUrl: String, memory: Focu
             Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f)) {
                 Poster(PosterUrl.resolve(item.posterUri, portalUrl), Modifier.fillMaxSize(), targetWidthPx = 300)
                 item.shownRating?.let { RatingBadge(it, Modifier.align(Alignment.TopEnd).padding(Spacing.S1)) }
+                if (favorite) Text("$HEART", style = Tokens.BodyLarge, color = Tokens.StatusError, modifier = Modifier.align(Alignment.TopStart).padding(Spacing.S1))
             }
             Text(
                 PortalText.decodeEntities(item.name), style = Tokens.Body, color = Tokens.TextPrimary, maxLines = 2,

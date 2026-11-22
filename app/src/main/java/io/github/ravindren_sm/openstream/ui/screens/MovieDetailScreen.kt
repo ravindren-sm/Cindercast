@@ -15,6 +15,7 @@ import io.github.ravindren_sm.openstream.data.PosterUrl
 import io.github.ravindren_sm.openstream.provider.PortalText
 import io.github.ravindren_sm.openstream.provider.VodItem
 import io.github.ravindren_sm.openstream.ui.components.FocusVariant
+import io.github.ravindren_sm.openstream.ui.components.HEART
 import io.github.ravindren_sm.openstream.ui.components.OsFocusable
 import io.github.ravindren_sm.openstream.ui.components.Poster
 import io.github.ravindren_sm.openstream.ui.focus.FocusMemory
@@ -22,6 +23,7 @@ import io.github.ravindren_sm.openstream.ui.theme.Spacing
 import io.github.ravindren_sm.openstream.ui.theme.Tokens
 
 const val DETAIL_PLAY_ID = "detail-play"
+const val DETAIL_FAVORITE_ID = "detail-fav"
 
 /**
  * A movie's page: poster, title line (year, age rating, the portal's IMDb rating), description, cast and a Play
@@ -33,6 +35,8 @@ fun MovieDetailScreen(
     portalUrl: String,
     memory: FocusMemory,
     onPlay: () -> Unit,
+    favorite: Boolean = false,
+    onToggleFavorite: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (item == null) {
@@ -56,9 +60,15 @@ fun MovieDetailScreen(
             item.description?.let { Text(PortalText.decodeEntities(it), style = Tokens.Body, color = Tokens.TextPrimary, maxLines = 6) }
             item.director?.let { Text("Director: ${PortalText.decodeEntities(it)}", style = Tokens.Body, color = Tokens.TextSecondary, maxLines = 2) }
             item.actors?.let { Text("Cast: ${PortalText.decodeEntities(it)}", style = Tokens.Body, color = Tokens.TextSecondary, maxLines = 3) }
-            OsFocusable(id = DETAIL_PLAY_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = onPlay) { _ ->
-                Text("Play", style = Tokens.TitleMedium, color = Tokens.TextPrimary,
-                    modifier = Modifier.padding(horizontal = Spacing.S4, vertical = Spacing.S2))
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.S3)) {
+                OsFocusable(id = DETAIL_PLAY_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = onPlay) { _ ->
+                    Text("Play", style = Tokens.TitleMedium, color = Tokens.TextPrimary,
+                        modifier = Modifier.padding(horizontal = Spacing.S4, vertical = Spacing.S2))
+                }
+                OsFocusable(id = DETAIL_FAVORITE_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = onToggleFavorite) { _ ->
+                    Text(if (favorite) "$HEART  In favorites" else "Add to favorites", style = Tokens.TitleMedium, color = if (favorite) Tokens.StatusError else Tokens.TextPrimary,
+                        modifier = Modifier.padding(horizontal = Spacing.S4, vertical = Spacing.S2))
+                }
             }
         }
     }

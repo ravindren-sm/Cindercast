@@ -67,6 +67,8 @@ enum class TileAction { REMOVE, TOGGLE_WATCHED }
 fun HomeScreen(
     continueTiles: List<ContinueTile>?,
     recentTiles: List<ContinueTile>,
+    favoriteChannels: List<io.github.ravindren_sm.openstream.profiles.db.FavoriteEntity>,
+    onOpenFavoriteChannel: (Int) -> Unit,
     portalUrl: String,
     memory: FocusMemory,
     onResume: (ContinueTile) -> Unit,
@@ -77,7 +79,7 @@ fun HomeScreen(
     var menuTile: ContinueTile? by remember { mutableStateOf(null) }
     var menuFocusIdBefore by remember { mutableStateOf<String?>(null) }
     var refocus by remember { mutableStateOf<List<String>?>(null) }
-    val empty = continueTiles.isNullOrEmpty() && recentTiles.isEmpty()
+    val empty = continueTiles.isNullOrEmpty() && recentTiles.isEmpty() && favoriteChannels.isEmpty()
 
     // After the menu closes, put focus back where the viewer was (the tile may be gone: fall back to a door).
     LaunchedEffect(refocus) {
@@ -119,6 +121,14 @@ fun HomeScreen(
                 Text("Recently watched", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
                 TileRow(recentTiles, ::recentFocusId, 170.dp, portalUrl, memory, onResume, ::open)
             }
+            if (favoriteChannels.isNotEmpty()) {
+                Text("Favorite channels", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = PaddingValues(end = Spacing.S1, top = Spacing.S1, bottom = Spacing.S1)) {
+                    itemsIndexed(favoriteChannels, key = { _, f -> f.refId }) { i, f ->
+                        ChannelCard(homeFavChannelFocusId(i), f.number.orEmpty(), f.name, memory, { onOpenFavoriteChannel(i) })
+                    }
+                }
+            }
             Text("Browse", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), modifier = Modifier.fillMaxWidth()) {
                 DOORS.forEachIndexed { i, (route, label) ->
@@ -140,7 +150,7 @@ private fun TileRow(
     tiles: List<ContinueTile>, idOf: (Int) -> String, width: androidx.compose.ui.unit.Dp, portalUrl: String, memory: FocusMemory,
     onSelect: (ContinueTile) -> Unit, onMenu: (ContinueTile, String) -> Unit,
 ) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = PaddingValues(vertical = Spacing.S1)) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = PaddingValues(end = Spacing.S1, top = Spacing.S1, bottom = Spacing.S1)) {
         itemsIndexed(tiles, key = { _, t -> t.resumeKey }) { i, tile ->
             val id = idOf(i)
             OsFocusable(

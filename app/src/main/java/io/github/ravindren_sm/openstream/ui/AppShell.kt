@@ -20,7 +20,15 @@ import io.github.ravindren_sm.openstream.data.LivePlayback
 import io.github.ravindren_sm.openstream.data.PlayTarget
 import io.github.ravindren_sm.openstream.data.PortalSession
 import io.github.ravindren_sm.openstream.data.PrefsResumeStore
+import io.github.ravindren_sm.openstream.data.PagedChannels
 import io.github.ravindren_sm.openstream.profiles.ContinueItems
+import io.github.ravindren_sm.openstream.profiles.FavoriteItems
+import io.github.ravindren_sm.openstream.profiles.FavoritesState
+import io.github.ravindren_sm.openstream.profiles.Kinds
+import io.github.ravindren_sm.openstream.ui.screens.FAVORITES_INITIAL_IDS
+import io.github.ravindren_sm.openstream.ui.screens.FavoritesScreen
+import io.github.ravindren_sm.openstream.ui.screens.favChannelFocusId
+import io.github.ravindren_sm.openstream.ui.screens.homeFavChannelFocusId
 import io.github.ravindren_sm.openstream.profiles.ContinueTile
 import io.github.ravindren_sm.openstream.profiles.ProfileRepository
 import io.github.ravindren_sm.openstream.profiles.ProfileResumeStore
@@ -102,6 +110,12 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     LaunchedEffect(Unit) { profileId = withContext(Dispatchers.IO) { repo.ensureDefaultProfile().id } }
     val resumeStore = remember { ProfileResumeStore(PrefsResumeStore(appContext)) { profileId } }
     val recorder = remember { RoomHistoryRecorder(repo, { profileId }, CoroutineScope(SupervisorJob() + Dispatchers.IO)) }
+    // Favorites (channels, movies, shows) of the current profile, shared by every screen that shows a heart.
+    val favorites = remember { FavoritesState(repo, { profileId }, CoroutineScope(SupervisorJob() + Dispatchers.IO)) }
+    LaunchedEffect(profileId) { if (profileId > 0L) withContext(Dispatchers.IO) { favorites.reload() } }
+    // The favorite channels being played (a fixed list to zap through), and the favorite movie whose page is open.
+    var favPlayer: PagedChannels? by remember { mutableStateOf(null) }
+    var favItem: VodItem? by remember { mutableStateOf(null) }
     // Continue watching, re-read each time Home is shown (null until the first read finishes).
     var continueTiles: List<ContinueTile>? by remember { mutableStateOf(null) }
     var tilesFresh by remember { mutableStateOf(false) }   // Home's rows were re-read since it was entered
@@ -140,12 +154,18 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         } else if (stack.current.route == Route.LIVE_PLAYER) {
             // Full screen: no tab bar or status line over the video (a focused tab would leave on Select).
             val index = stack.current.params["item"]?.toIntOrNull() ?: -1
+            val fromFavorites = stack.current.params["src"] == "fav"
+            val from = stack.current.params["from"]
             LivePlayerScreen(
-                channels = liveState.channels, startIndex = index, playback = livePlayback, memory = memory,
+                channels = (if (fromFavorites) favPlayer else null) ?: liveState.channels, startIndex = index, playback = livePlayback, memory = memory,
                 onChannelChanged = { i ->
                     // Back should land on the channel being watched, with its row on screen.
-                    stack = stack.withPreviousFocus(channelFocusId(i))
-                    liveState.channelListState.requestScrollToItem(maxOf(i - 3, 0))
+                    if (fromFavorites) {
+                        stack = stack.withPreviousFocus(if (from == "home") homeFavChannelFocusId(i) else favChannelFocusId(i))
+                    } else {
+                        stack = stack.withPreviousFocus(channelFocusId(i))
+                        liveState.channelListState.requestScrollToItem(maxOf(i - 3, 0))
+                    }
                 },
             )
         } else if (stack.current.route == Route.VOD_PLAYER) {
@@ -153,6 +173,8 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 historyTarget
             } else if (stack.current.params["play"] == "episode") {
                 showDetail?.playTarget
+            } else if (stack.current.params["src"] == "fav") {
+                favItem?.let { PlayTarget(it, it.name, ResumeKeys.movie(it.id)) }
             } else {
                 val browse = if (stack.current.params["kind"] == VodKind.SHOWS.name) showsState else moviesState
                 browse.titles.items.getOrNull(stack.current.params["item"]?.toIntOrNull() ?: -1)
@@ -169,6 +191,11 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
             if (stack.current.route == Route.HOME) {
                 HomeScreen(
                     continueTiles = continueTiles, recentTiles = recentTiles, portalUrl = portalUrl, memory = memory,
+                    favoriteChannels = favorites.channels(),
+                    onOpenFavoriteChannel = { i ->
+                        favPlayer = PagedChannels.fixed(favorites.channels().map(FavoriteItems::toChannel))
+                        stack = stack.navigate(Route.LIVE_PLAYER, mapOf("item" to "$i", "src" to "fav", "from" to "home"), currentFocusId = memory.focusedId)
+                    },
                     onTileAction = { tile, action ->
                         tileScope.launch {
                             withContext(Dispatchers.IO) {
@@ -194,7 +221,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
             } else if (stack.current.route == Route.MOVIES || stack.current.route == Route.SHOWS) {
                 val browse = if (stack.current.route == Route.SHOWS) showsState else moviesState
                 VodBrowseScreen(
-                    state = browse, connected = connected, portalUrl = portalUrl, memory = memory,
+                    state = browse, connected = connected, portalUrl = portalUrl, memory = memory, isFavorite = favorites::isVod,
                     onOpen = { index, item ->
                         // The portal keeps shows among the movies: the title's own flag decides which page opens.
                         val route = if (item.isSeries) Route.SHOW_DETAIL else Route.MOVIE_DETAIL
@@ -205,8 +232,11 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
             } else if (stack.current.route == Route.MOVIE_DETAIL) {
                 val browse = if (stack.current.params["kind"] == VodKind.SHOWS.name) showsState else moviesState
                 val index = stack.current.params["item"]?.toIntOrNull() ?: -1
+                val movie = if (stack.current.params["src"] == "fav") favItem else browse.titles.items.getOrNull(index)
                 MovieDetailScreen(
-                    item = browse.titles.items.getOrNull(index), portalUrl = portalUrl, memory = memory,
+                    item = movie, portalUrl = portalUrl, memory = memory,
+                    favorite = movie?.let(favorites::isVod) ?: false,
+                    onToggleFavorite = { movie?.let(favorites::toggleVod) },
                     onPlay = { stack = stack.navigate(Route.VOD_PLAYER, stack.current.params, currentFocusId = memory.focusedId) },
                 )
             } else if (stack.current.route == Route.SHOW_DETAIL) {
@@ -216,17 +246,38 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 } else {
                     ShowDetailScreen(
                         state = detail, connected = connected, portalUrl = portalUrl, resume = resumeStore, memory = memory,
+                        favorite = favorites.isVod(detail.show), onToggleFavorite = { favorites.toggleVod(detail.show) },
                         onPlay = { target, returnFocusId ->
                             detail.playTarget = target
                             stack = stack.navigate(Route.VOD_PLAYER, mapOf("play" to "episode"), currentFocusId = returnFocusId)
                         },
                     )
                 }
+            } else if (stack.current.route == Route.FAVORITES) {
+                FavoritesScreen(
+                    favorites = favorites, portalUrl = portalUrl, memory = memory,
+                    onOpenChannel = { i ->
+                        favPlayer = PagedChannels.fixed(favorites.channels().map(FavoriteItems::toChannel))
+                        stack = stack.navigate(Route.LIVE_PLAYER, mapOf("item" to "$i", "src" to "fav", "from" to "tab"), currentFocusId = memory.focusedId)
+                    },
+                    onOpenTitle = { f ->
+                        val item = FavoriteItems.toVod(f)
+                        if (f.kind == Kinds.SHOW) {
+                            if (showDetail?.show?.id != item.id) showDetail = ShowDetailState(item, vodCatalog)
+                            stack = stack.navigate(Route.SHOW_DETAIL, emptyMap(), currentFocusId = memory.focusedId)
+                        } else {
+                            favItem = item
+                            stack = stack.navigate(Route.MOVIE_DETAIL, mapOf("src" to "fav"), currentFocusId = memory.focusedId)
+                        }
+                    },
+                    onRemove = { f -> favorites.toggle(f.kind, f.refId, f.name, f.posterUri, f) },
+                )
             } else if (stack.current.route == Route.LIVE_TV) {
                 LiveTvScreen(
                     state = liveState,
                     connected = connected,
                     memory = memory,
+                    isFavorite = favorites::isChannel, onToggleFavorite = favorites::toggleChannel,
                     onOpenChannel = { index, _ ->
                         stack = stack.navigate(Route.LIVE_PLAYER, mapOf("item" to "$index"), currentFocusId = memory.focusedId)
                     },
@@ -259,6 +310,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     LaunchedEffect(stack, homeReady) {
         if (!homeReady) return@LaunchedEffect
         androidx.compose.runtime.withFrameNanos { }   // let the new screen compose and attach
-        memory.tryFocusFirst(stack.restoreFocusId, initialFocusId(stack.current.route), if (onHome) recentFocusId(0) else null, if (onHome) doorFocusId(0) else null, topTab?.let(::tabFocusId))
+        memory.tryFocusFirst(stack.restoreFocusId, initialFocusId(stack.current.route), if (onHome) recentFocusId(0) else null, if (onHome) homeFavChannelFocusId(0) else null, if (onHome) doorFocusId(0) else null,
+            *(if (stack.current.route == Route.FAVORITES) FAVORITES_INITIAL_IDS else emptyArray()), topTab?.let(::tabFocusId))
     }
 }

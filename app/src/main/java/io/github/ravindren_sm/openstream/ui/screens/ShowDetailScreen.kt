@@ -43,6 +43,7 @@ import io.github.ravindren_sm.openstream.data.VodCatalog
 import io.github.ravindren_sm.openstream.provider.PortalText
 import io.github.ravindren_sm.openstream.provider.VodItem
 import io.github.ravindren_sm.openstream.ui.components.FocusVariant
+import io.github.ravindren_sm.openstream.ui.components.HEART
 import io.github.ravindren_sm.openstream.ui.components.OsFocusable
 import io.github.ravindren_sm.openstream.ui.components.Poster
 import io.github.ravindren_sm.openstream.ui.focus.FocusMemory
@@ -110,6 +111,7 @@ class ShowDetailState(val show: VodItem, private val catalog: VodCatalog) {
 }
 
 const val SHOW_PLAY_ID = "show-play"
+const val SHOW_FAVORITE_ID = "show-fav"
 fun seasonFocusId(index: Int) = "season-$index"
 fun episodeFocusId(index: Int) = "episode-$index"
 private fun fileFocusId(index: Int) = "file-$index"
@@ -131,6 +133,8 @@ fun ShowDetailScreen(
     resume: ResumeStore,
     memory: FocusMemory,
     onPlay: (target: PlayTarget, returnFocusId: String) -> Unit,
+    favorite: Boolean = false,
+    onToggleFavorite: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -188,6 +192,10 @@ fun ShowDetailScreen(
                         state.episodes.items.firstOrNull()?.let { playEpisode(0, it) } ?: run { notice = "Episodes are still loading." }
                     }) { _ ->
                         Text("Play", style = Tokens.TitleMedium, color = Tokens.TextPrimary,
+                            modifier = Modifier.padding(horizontal = Spacing.S4, vertical = Spacing.S1))
+                    }
+                    OsFocusable(id = SHOW_FAVORITE_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = onToggleFavorite) { _ ->
+                        Text(if (favorite) "$HEART  In favorites" else "Add to favorites", style = Tokens.TitleMedium, color = if (favorite) Tokens.StatusError else Tokens.TextPrimary,
                             modifier = Modifier.padding(horizontal = Spacing.S4, vertical = Spacing.S1))
                     }
                     notice?.let { Text(it, style = Tokens.Body, color = if (busy) Tokens.TextSecondary else Tokens.StatusError) }

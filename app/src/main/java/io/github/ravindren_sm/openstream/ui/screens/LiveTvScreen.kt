@@ -31,7 +31,9 @@ import io.github.ravindren_sm.openstream.data.PagedChannels
 import io.github.ravindren_sm.openstream.provider.LiveChannel
 import io.github.ravindren_sm.openstream.provider.LiveGenre
 import io.github.ravindren_sm.openstream.ui.components.FocusVariant
+import io.github.ravindren_sm.openstream.ui.components.HEART
 import io.github.ravindren_sm.openstream.ui.components.OsFocusable
+import io.github.ravindren_sm.openstream.ui.components.onMenuKey
 import io.github.ravindren_sm.openstream.ui.focus.FocusMemory
 import io.github.ravindren_sm.openstream.ui.theme.Spacing
 import io.github.ravindren_sm.openstream.ui.theme.Tokens
@@ -94,6 +96,8 @@ fun LiveTvScreen(
     connected: Boolean,
     memory: FocusMemory,
     onOpenChannel: (index: Int, channel: LiveChannel) -> Unit,
+    isFavorite: (LiveChannel) -> Boolean = { false },
+    onToggleFavorite: (LiveChannel) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -139,13 +143,16 @@ fun LiveTvScreen(
 
         // ---- channel list ----
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            if (state.genresLoaded) ChannelList(state, memory, onOpenChannel)
+            if (state.genresLoaded) ChannelList(state, memory, onOpenChannel, isFavorite, onToggleFavorite)
         }
     }
 }
 
 @Composable
-private fun ChannelList(state: LiveBrowseState, memory: FocusMemory, onOpenChannel: (Int, LiveChannel) -> Unit) {
+private fun ChannelList(
+    state: LiveBrowseState, memory: FocusMemory, onOpenChannel: (Int, LiveChannel) -> Unit,
+    isFavorite: (LiveChannel) -> Boolean, onToggleFavorite: (LiveChannel) -> Unit,
+) {
     val paged = state.channels
     val listState = state.channelListState
     val scope = rememberCoroutineScope()
@@ -177,12 +184,13 @@ private fun ChannelList(state: LiveBrowseState, memory: FocusMemory, onOpenChann
                 itemsIndexed(paged.items, key = { _, c -> c.id }) { index, channel ->
                     OsFocusable(
                         id = channelFocusId(index), memory = memory, variant = FocusVariant.ROW,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().onMenuKey { onToggleFavorite(channel) },
                         onSelect = { onOpenChannel(index, channel) },
                     ) { _ ->
                         Row(Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1 + 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(channel.number, style = Tokens.Mono, color = Tokens.TextSecondary, maxLines = 1, modifier = Modifier.width(96.dp))
-                            Text(channel.name, style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 1)
+                            Text(channel.name, style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                            if (isFavorite(channel)) Text("  $HEART", style = Tokens.BodyLarge, color = Tokens.StatusError)
                         }
                     }
                 }

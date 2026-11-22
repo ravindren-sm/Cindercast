@@ -72,6 +72,13 @@ class PagedChannels(private val fetchPage: (Int) -> CatalogResult<LiveChannelPag
 
     private var nextPage = 1
 
+    companion object {
+        /** A list that is already complete (the favorite channels): one page, nothing more to fetch. */
+        fun fixed(channels: List<LiveChannel>) = PagedChannels { page ->
+            if (page == 1) CatalogResult.Ok(LiveChannelPage(1, channels, channels.size, maxOf(channels.size, 1))) else CatalogResult.Failed("")
+        }.also { it.loadNext() }
+    }
+
     /** Loads one more page. Blocking. Does nothing if a load is running or paging is finished. */
     fun loadNext() {
         synchronized(this) {

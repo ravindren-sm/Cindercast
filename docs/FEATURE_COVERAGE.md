@@ -28,17 +28,17 @@ Milestone column: where the work is planned (M3 live, M4 VOD, M5 everything else
 
 | # | Route | Status | What is built / what is missing | Milestone |
 |---|---|---|---|---|
-| 1 | Home | Partial | Done: Continue watching row (progress, time left, resume from the tile, one tile per show), doors, first-run state. Recently Watched, clock and tile options (remove, mark watched) done. Missing: Favorite Channels, new-in-your-categories rows, Live row, Kids variant. | M5 |
+| 1 | Home | Partial | Done: Continue watching row (progress, time left, resume from the tile, one tile per show), doors, first-run state. Recently Watched, clock and tile options (remove, mark watched) done. Favorite channels row done. Missing: new-in-your-categories rows, Live row, Kids variant. | M5 |
 | 2 | Live TV browser | Partial | Done: genre rail, channel list, 14-per-page focus-triggered paging, real data. Missing: 3-column layout with preview and programme panel, sort (number or A-Z), channel logos, HD/4K badges, parental lock badge, programme title, skeleton rows, digit tuning inside the browser. | M3 |
 | 3 | Live player | Partial | Done: full screen, overlay, buffering, errors with retry, channel up/down, digit entry, Back to the watched channel, Language and Subtitles drawer (Menu key). Missing: stream readout on screen (we only log it), info banner with programme and actions, mini channel list (Left). | M3 |
 | 4 | TV Guide (EPG) | Not started | Waiting for an EPG probe (the portal may not supply guide data; the prototype already plans a "No information" cell). | M5 |
 | 5 | Movies browser | Partial | Done: category sidebar (163 real categories), 5-column poster grid, 14-per-page paging, rating badge (IMDb, else Kinopoisk labelled), real data. Missing: minimum-rating filter, genre filter, sort bar (added, year, rating), year on cards, parental lock badge, skeleton cards, Rotten Tomatoes. | M4 / M5 |
-| 6 | Movie detail | Partial | Done: poster, title, year, age, genres, synopsis, director, cast, rating, Play with initial focus, resume on play. Missing: hero backdrop, original title, runtime, Rotten Tomatoes and audience badges, explicit Resume button, Favorites button, PIN gate. | M4 / M5 |
+| 6 | Movie detail | Partial | Done: poster, title, year, age, genres, synopsis, director, cast, rating, Play with initial focus, resume on play. Missing: hero backdrop, original title, runtime, Rotten Tomatoes and audience badges, explicit Resume button, PIN gate. | M4 / M5 |
 | 7 | Shows browser | Partial | Same as Movies (same screen, show categories). Same gaps. | M4 / M5 |
-| 8 | Show detail | Partial | Done: poster, title, year, age, rating (IMDb else Kinopoisk), genres, synopsis, Play (first episode of the season), season chips, paged episode list with real season and episode names, version chooser when an episode has several files (language and quality), per-episode resume with a "Resume m:ss" label, Back to the episode just watched. Missing: explicit Resume button on the show, Favorites, Rotten Tomatoes badges, next-episode prompt. | M4 |
+| 8 | Show detail | Partial | Done: poster, title, year, age, rating (IMDb else Kinopoisk), genres, synopsis, Play (first episode of the season), season chips, paged episode list with real season and episode names, version chooser when an episode has several files (language and quality), per-episode resume with a "Resume m:ss" label, Back to the episode just watched. Missing: explicit Resume button on the show, Rotten Tomatoes badges, next-episode prompt. | M4 |
 | 9 | VOD player | Partial | Done: bar with position and length, pause, 10 s seek, saved position and resume, Language and Subtitles drawer (Menu key) with the portal's external subtitle files. Continue Watching feed done. Missing: accelerating seek (30 s, 60 s when held), next-episode prompt. | M4 |
 | 10 | Search | Not started | D-pad keyboard and grouped results (live, movies, shows). Needs a check of the portal's server-side search. | M5 |
-| 11 | Favorites | Not started | Local store for channels, movies and shows, plus the screen and the add/remove buttons. | M5 |
+| 11 | Favorites | Done | Room store per profile, Favorites tab (channels, movies, shows), Menu key on channels, Add to favorites button on movie and show pages, hearts, Home row. Missing: favorites of live channels from inside the player. | M5 |
 | 12 | Settings | Not started | Account, Connection (masked URL and MAC, setup wizard, sync), Playback (buffer presets, preferred audio, surface), Parental Lock, Appearance (theme, channel numbers, clock, ratings toggle and cache reset), About. | M5 |
 | 13 | First-run setup wizard | Done | Welcome, URL and MAC entry, live connection test, Save. (The catalog sync progress step is not needed: the catalog is paged.) | M2 |
 | 14 | States and error gallery | Reference only | The states it shows are built into the screens as they land: stream error with retry and portal failure messages exist; skeleton placeholders, empty favorites or search, and an offline banner do not yet. | M5 |
@@ -60,7 +60,7 @@ Milestone column: where the work is planned (M3 live, M4 VOD, M5 everything else
 | Kotlin, Compose for TV, Media3 ExoPlayer | Yes | |
 | `androidx.tv.material3` components (TabRow, Card, ListItem, Dialog) | Partly | Custom focus and tab components, same behaviour. A swap is optional. |
 | Paging 3 with `pageSize = 14`, `maxSize = 84` | Own paging, page size 14 | Our loaders keep every loaded page. Deep scrolling in a 100,000-title catalog grows memory; a sliding window is a hardening item. |
-| Room SQLite for ratings cache, favorites, history | Not used | Resume positions use SharedPreferences. Favorites and watch history will need a database. |
+| Room SQLite for ratings cache, favorites, history | Used | Favorites, watch history, profiles and pinned categories are in Room; resume positions stay in SharedPreferences. A ratings cache is not built. |
 | Real counts | 163 VOD categories, about 5,000 live channels, 74 live genres, 100,000 VOD items (the spec's "164" and "4,912" are the prototype's samples). | |
 
 ## Where this leaves us

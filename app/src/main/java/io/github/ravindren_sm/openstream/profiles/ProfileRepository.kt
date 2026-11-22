@@ -104,10 +104,14 @@ class ProfileRepository(private val db: OpenStreamDb, private val nowMillis: () 
 
     // ---- favorites ----
 
-    suspend fun setFavorite(profileId: Long, kind: String, refId: String, name: String, posterUri: String?, favorite: Boolean) {
-        if (favorite) db.favorites().put(FavoriteEntity(profileId, kind, refId, name, posterUri, nowMillis()))
+    suspend fun setFavorite(profileId: Long, kind: String, refId: String, name: String, posterUri: String?, favorite: Boolean, details: FavoriteEntity? = null) {
+        // [details] carries the optional columns (command, catalog details); its key fields are replaced by the ones given.
+        if (favorite) db.favorites().put((details ?: FavoriteEntity(profileId, kind, refId, name, posterUri, 0)).copy(
+            profileId = profileId, kind = kind, refId = refId, name = name, posterUri = posterUri, addedAt = nowMillis(),
+        ))
         else db.favorites().remove(profileId, kind, refId)
     }
+    suspend fun allFavorites(profileId: Long): List<FavoriteEntity> = db.favorites().all(profileId)
 
     suspend fun isFavorite(profileId: Long, kind: String, refId: String) = db.favorites().count(profileId, kind, refId) > 0
     suspend fun favorites(profileId: Long, kind: String): List<FavoriteEntity> = db.favorites().list(profileId, kind)
