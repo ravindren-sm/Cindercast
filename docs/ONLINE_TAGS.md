@@ -13,11 +13,16 @@ themoviedb.org (TMDB) service about each title and keeps what it says on the dev
   recorded as "looked up, no match" and not asked again.
 - **What is kept** (table `title_tags`, database version 6): TMDB id, the certification label and its minimum age (the US label when known, otherwise the
   strictest of the other countries), genres, original language, rating, up to 30 keywords, and a flag when a genre or keyword is on the Kids word list.
-- **Order and pace:** titles with no portal age label first, newest first; about 8 titles a second at most (two requests each); waits when the service says
+- **Order and pace:** titles with no portal age label first, newest first; five titles at a time (two requests each), about 8 titles a second on the Fire TV, so the whole catalogue takes roughly 3.5 hours; waits when the service says
   slow down (HTTP 429); stops at once and says so if the key is refused; pauses while a video plays; resumes where it left off. It runs only while the app is
   open and idle (it does not keep the screen awake, unlike the title index).
 - **Use:** a Kids profile now takes the TMDB certification when the portal has none, and hides a title whose tag is flagged. Adult profiles are unchanged.
 - **Remove:** Settings, "Remove key and tags" deletes the key and every tag.
+
+## First real run (2026-11-22)
+Key entered through the Settings box; the crawl started on the real service. First 300 titles (newest first, no portal label): 61 percent matched, 33 percent got a
+certification (51 percent of movies, 13 percent of shows); labels were mostly Indian (U/A 16+, 16, U/A 13+) plus some TV-14, PG, R. One worker did 2 titles a second;
+five workers do about 8. The crawl resumes by itself after the app restarts.
 
 ## Not done
 - Using the tags for search filters and genres in lists for adults (genres, language and rating from TMDB could fill gaps in the portal's own fields).

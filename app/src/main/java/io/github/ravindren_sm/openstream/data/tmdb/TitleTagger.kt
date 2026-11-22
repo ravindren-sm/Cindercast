@@ -5,6 +5,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.github.ravindren_sm.openstream.profiles.db.CatalogTitleEntity
 import io.github.ravindren_sm.openstream.profiles.db.TitleTagEntity
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 
 /** Where the tagger reads the next titles and keeps its results (the database in the app, a fake in tests). */
@@ -48,15 +51,17 @@ class TitleTagger(
             if (client == null) { setEnabled(false); refreshStatus(false, "No key saved."); return }
             val batch = storage.nextUntagged(BATCH)
             if (batch.isEmpty()) { setEnabled(false); refreshStatus(true, "Every title has been checked."); return }
-            for (title in batch) {
+            for (group in batch.chunked(WORKERS)) {
                 if (!enabled()) return
                 while (!canWork()) delay(2_000)
-                when (val outcome = tagOne(client, title)) {
-                    Outcome.Done -> failures = 0
-                    Outcome.KeyRefused -> { setEnabled(false); refreshStatus(true, "The service refused the key. Check it and start again."); return }
-                    is Outcome.Wait -> { delay(outcome.seconds * 1_000); }
-                    Outcome.Failed -> { if (++failures >= MAX_FAILURES) { setEnabled(false); refreshStatus(true, "Stopped after repeated network errors."); return }; delay(5_000L * failures) }
-                }
+                // A few titles at a time: each lookup is two slow requests, and the service allows many more per second than one worker makes.
+                val outcomes = coroutineScope { group.map { t -> async { tagOne(client, t) } }.awaitAll() }
+                if (outcomes.any { it == Outcome.KeyRefused }) { setEnabled(false); refreshStatus(true, "The service refused the key. Check it and start again."); return }
+                val wait = outcomes.filterIsInstance<Outcome.Wait>().maxOfOrNull { it.seconds }
+                val failed = outcomes.count { it == Outcome.Failed }
+                if (failed == 0 && wait == null) failures = 0
+                if (wait != null) delay(wait * 1_000)
+                if (failed > 0) { if (++failures >= MAX_FAILURES) { setEnabled(false); refreshStatus(true, "Stopped after repeated network errors."); return }; delay(5_000L * failures) }
                 delay(pauseMillis)
             }
             refreshStatus(true)
@@ -101,5 +106,5 @@ class TitleTagger(
 
     private fun none(t: CatalogTitleEntity) = TitleTagEntity(t.kind, t.id, 0, null, null, null, null, null, null, false, nowMillis())
 
-    private companion object { const val BATCH = 40; const val MAX_FAILURES = 6 }
+    private companion object { const val BATCH = 40; const val WORKERS = 5; const val MAX_FAILURES = 6 }
 }
