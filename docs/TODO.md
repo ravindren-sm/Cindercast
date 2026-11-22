@@ -64,8 +64,10 @@ runs on the family TV still stands (see Environment notes).
   categories and titles use; add more language names if needed.
 - Apply the same filters to the Movies and Shows browse screens, and use the title index for instant filtered results.
 
-- English subtitles filter: with approval, look at the key names of one real list entry for a subtitle or language field; if
-  none, consider an exact check through the play-link request for the visible results only (one request each, cached).
+- English subtitles: the list has no such field (checked 2026-11-21), so only the wording check or an exact per-title check
+  through the play-link request (one request each, cached) remains.
+- Use the real list fields: keep `category_id` on each title so category filters work on one request; read `country` for an
+  origin or language filter; use `hd`, `high_quality` and `low_quality` to rank versions; use `o_name` when merging and matching.
 
 ## Title index follow-ups
 - Run the index on the real portal once (the user starts it from the Search page) and record the real size, time and any errors; tune the pause between requests.

@@ -145,3 +145,22 @@ class EpgShapeTest {
         assertTrue(EpgShape.describe(js("""{"data":[]}"""), 0).joinToString().contains("programmes: 0"))
     }
 }
+
+class VodShapeTest {
+    private fun js(body: String) = StalkerClient.parseJs("""{"js":$body}""".toByteArray())
+
+    @Test fun `field names and fill counts are reported without the values`() {
+        val text = VodShape.describe(js("""{"data":[
+            {"id":"1","name":"Secret","subtitles":[{"file":"http://x.invalid/a.srt"}],"language":"English"},
+            {"id":"2","name":"Other","subtitles":[],"language":""}]}""")).joinToString("\n")
+        assertTrue(text.contains("entries: 2") && text.contains("keys: [id, language, name, subtitles]"), text)
+        assertTrue(text.contains("field subtitles: filled in 1 of 2 (kind list, length 1)"), text)
+        assertTrue(text.contains("field language: filled in 1 of 2 (kind text, length 7)"), text)
+        assertFalse(text.contains("Secret") || text.contains("x.invalid") || text.contains("English"), text)
+    }
+
+    @Test fun `a list with no such field says so`() {
+        assertTrue(VodShape.describe(js("""{"data":[{"id":"1","name":"A"}]}""")).joinToString().contains("no field name mentions"))
+        assertTrue(VodShape.describe(js("""{"data":[]}""")).joinToString().contains("empty"))
+    }
+}

@@ -413,6 +413,10 @@ class StalkerClient(
         return r to parsed
     }
 
+    /** Probe: the field names of one page of the VOD list (see [VodShape]). Counts and key names only. */
+    fun vodListShape(category: String = "*", page: Int = 1): StalkerResult =
+        call(StalkerRequests.vodPage(ctx(), "vod", category, page)) { js -> VodShape.describe(js) }
+
     /** One page (1-based) of VOD titles matching [query]. Summary: counts only, never the text. */
     fun vodSearch(query: String, page: Int, category: String = "*"): Pair<StalkerResult, VodPage?> {
         var parsed: VodPage? = null

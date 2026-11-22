@@ -20,6 +20,9 @@
             android:name=".EpgProbeActivity"
             android:exported="true" />
         <activity
+            android:name=".VodShapeProbeActivity"
+            android:exported="true" />
+        <activity
             android:name=".ProfilesSelfTestActivity"
             android:exported="true" />
     </application>
