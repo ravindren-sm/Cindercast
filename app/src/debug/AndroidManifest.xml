@@ -17,6 +17,9 @@
             android:name=".KeystoreSelfTestActivity"
             android:exported="true" />
         <activity
+            android:name=".EpgProbeActivity"
+            android:exported="true" />
+        <activity
             android:name=".ProfilesSelfTestActivity"
             android:exported="true" />
     </application>

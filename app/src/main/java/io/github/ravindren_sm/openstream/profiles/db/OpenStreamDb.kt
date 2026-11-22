@@ -15,9 +15,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 @Database(
     entities = [
         ProfileEntity::class, HouseholdEntity::class, FavoriteEntity::class, HistoryEntity::class,
-        PinnedCategoryEntity::class, KidsAllowedCategoryEntity::class,
+        PinnedCategoryEntity::class, KidsAllowedCategoryEntity::class, RecentSearchEntity::class,
+        CatalogTitleEntity::class, IndexProgressEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class OpenStreamDb : RoomDatabase() {
@@ -27,6 +28,8 @@ abstract class OpenStreamDb : RoomDatabase() {
     abstract fun history(): HistoryDao
     abstract fun pinned(): PinnedCategoryDao
     abstract fun kidsAllowed(): KidsAllowedDao
+    abstract fun recentSearches(): RecentSearchDao
+    abstract fun catalogIndex(): CatalogIndexDao
 
     companion object {
         @Volatile private var instance: OpenStreamDb? = null
@@ -45,9 +48,20 @@ abstract class OpenStreamDb : RoomDatabase() {
             }
         }
 
+        /** Version 4: recent searches and the local title index (with its crawl progress). */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `recent_searches` (`profileId` INTEGER NOT NULL, `text` TEXT NOT NULL, `lastUsedAt` INTEGER NOT NULL, PRIMARY KEY(`profileId`, `text`), FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_recent_searches_profileId_lastUsedAt` ON `recent_searches` (`profileId`, `lastUsedAt`)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `catalog_titles` (`kind` TEXT NOT NULL, `id` TEXT NOT NULL, `name` TEXT NOT NULL, `nameKey` TEXT NOT NULL, `year` TEXT, `posterUri` TEXT, `cmd` TEXT, `age` TEXT, `categoryId` TEXT NOT NULL, PRIMARY KEY(`kind`, `id`))")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_catalog_titles_categoryId` ON `catalog_titles` (`categoryId`)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `index_progress` (`categoryId` TEXT NOT NULL, `nextPage` INTEGER NOT NULL, `totalItems` INTEGER NOT NULL, `done` INTEGER NOT NULL, PRIMARY KEY(`categoryId`))")
+            }
+        }
+
         fun get(context: Context): OpenStreamDb = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, OpenStreamDb::class.java, "openstream.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
         }
 
         /** An in-memory database for tests. */

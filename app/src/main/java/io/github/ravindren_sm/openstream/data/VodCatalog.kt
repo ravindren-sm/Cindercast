@@ -45,6 +45,15 @@ class VodCatalog(private val session: PortalSession) {
         return CatalogResult.Ok(list)
     }
 
+    /** Every category (movies and shows alike) without the portal's mixed "All" entry, in the portal's order. Used by the title index. */
+    fun allCategories(): CatalogResult<List<VodCategory>> {
+        var parsed: List<Pair<String, String>> = emptyList()
+        val result = session.withSession { m -> m.call { c -> val (r, cats) = c.vodCategories("vod"); parsed = cats; r } }
+            ?: return CatalogResult.Failed(LiveCatalog.NOT_CONNECTED)
+        if (!result.ok) return CatalogResult.Failed(NO_CATEGORIES)
+        return CatalogResult.Ok(parsed.filter { (id, _) -> id != "*" }.map { (id, title) -> VodCategory(id, PortalText.decodeEntities(title).trim().ifEmpty { "?" }) })
+    }
+
     /** One 1-based page of titles in [categoryId]. */
     fun titles(categoryId: String, page: Int): CatalogResult<VodPage> {
         var parsed: VodPage? = null

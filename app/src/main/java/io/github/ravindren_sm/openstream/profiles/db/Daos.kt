@@ -71,3 +71,26 @@ interface KidsAllowedDao {
     @Query("SELECT * FROM kids_allowed_categories WHERE profileId = :profileId ORDER BY title")
     suspend fun list(profileId: Long): List<KidsAllowedCategoryEntity>
 }
+
+@Dao
+interface RecentSearchDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun put(r: RecentSearchEntity)
+    @Query("SELECT * FROM recent_searches WHERE profileId = :profileId ORDER BY lastUsedAt DESC LIMIT :limit")
+    suspend fun recent(profileId: Long, limit: Int): List<RecentSearchEntity>
+    @Query("DELETE FROM recent_searches WHERE profileId = :profileId") suspend fun clear(profileId: Long)
+    @Query("DELETE FROM recent_searches WHERE profileId = :profileId AND text = :text") suspend fun remove(profileId: Long, text: String)
+}
+
+@Dao
+interface CatalogIndexDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putTitles(items: List<CatalogTitleEntity>)
+    @Query("SELECT COUNT(*) FROM catalog_titles") suspend fun titleCount(): Int
+    /** Titles whose name starts with the text or has a word that does; [prefix] and [wordPrefix] are the LIKE patterns. */
+    @Query("SELECT * FROM catalog_titles WHERE nameKey LIKE :prefix ESCAPE '\\' OR nameKey LIKE :wordPrefix ESCAPE '\\' LIMIT :limit")
+    suspend fun match(prefix: String, wordPrefix: String, limit: Int): List<CatalogTitleEntity>
+    @Query("DELETE FROM catalog_titles") suspend fun clearTitles()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putProgress(p: IndexProgressEntity)
+    @Query("SELECT * FROM index_progress") suspend fun progress(): List<IndexProgressEntity>
+    @Query("DELETE FROM index_progress") suspend fun clearProgress()
+}

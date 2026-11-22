@@ -96,6 +96,16 @@ object StalkerRequests {
         "type" to "itv", "action" to "get_ordered_list", "genre" to "*", "fav" to "0", "sortby" to "number",
         "search" to query, "p" to page.toString())
 
+    /** The next few programmes of one channel (the portal's short guide). */
+    fun epgShort(ctx: Context, channelId: String, size: Int = 10) = build(ctx,
+        "Guide probe: the next programmes of one channel",
+        "type" to "itv", "action" to "get_short_epg", "ch_id" to channelId, "size" to size.toString())
+
+    /** The guide for every channel for the next [periodHours] hours. Large: the caller sets a response cap. */
+    fun epgInfo(ctx: Context, periodHours: Int) = build(ctx,
+        "Guide probe: guide data for all channels for a few hours",
+        "type" to "itv", "action" to "get_epg_info", "period" to periodHours.toString())
+
     /** Every live channel in one answer (the portal has no live search of its own; the app filters them). */
     fun allChannels(ctx: Context) = build(ctx, "Search: all live channels, for filtering on the device",
         "type" to "itv", "action" to "get_all_channels")
@@ -422,6 +432,14 @@ class StalkerClient(
         }
         return r to parsed
     }
+
+    /** Guide probe: the shape (key names, counts, time spread) of one channel's short guide. Never programme text. */
+    fun epgShort(channelId: String, size: Int = 10): StalkerResult =
+        call(StalkerRequests.epgShort(ctx(), channelId, size)) { js -> EpgShape.describe(js, System.currentTimeMillis() / 1000) }
+
+    /** Guide probe: the shape of the all-channels guide for [periodHours] hours. Up to 8 MB read. */
+    fun epgInfo(periodHours: Int): StalkerResult =
+        call(StalkerRequests.epgInfo(ctx(), periodHours), bodyLimit = ALL_CHANNELS_MAX_BYTES) { js -> EpgShape.describe(js, System.currentTimeMillis() / 1000) }
 
     /** All live channels, for on-device search. Null if the payload is unusable. Summary: the count only. */
     fun allChannels(): Pair<StalkerResult, List<LiveChannel>?> {

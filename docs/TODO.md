@@ -51,6 +51,16 @@ runs on the family TV still stands (see Environment notes).
 - Results from the server can include titles that do not contain the words typed (it matches descriptions too): decide
   whether to show those under a separate heading.
 
+## Guide and programme search (the guide exists per channel, see docs/MILESTONES.md)
+- TV Guide screen: now and next for the channels on screen, loaded one channel at a time; a grid for favorites.
+- Programme search: sweep favorites and recently watched channels (not all 5,100) and search those programmes, showing title, channel and time. Check how far ahead a larger `size` reaches, and whether the catch-up flag (`mark_archive`) allows replaying.
+- Reminders for a future programme are out of scope until the guide screen exists.
+
+## Title index follow-ups
+- Run the index on the real portal once (the user starts it from the Search page) and record the real size, time and any errors; tune the pause between requests.
+- Use the index for instant results (not only suggestions) and offline-ish search while the portal is slow.
+- Show the category of a title in the version picker, since real names may not differ.
+
 ## Reliability
 - 30-minute soak on a live channel (the VOD soak passed; live was skipped because content cannot be vetted).
 - Whether the video decoder glitch seen once at about 1 min 50 s recurs, and on which streams.

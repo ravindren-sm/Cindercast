@@ -127,3 +127,21 @@ class ChannelSearchRequestTest {
         assertFalse(r.purpose.contains("cartoon"), r.purpose)
     }
 }
+
+class EpgShapeTest {
+    private fun js(body: String) = StalkerClient.parseJs("""{"js":$body}""".toByteArray())
+
+    @Test fun `a per-channel map is described by counts and field names only`() {
+        val text = EpgShape.describe(js("""{"data":{"7":[{"name":"Secret Show","start_timestamp":"1000003600","stop_timestamp":"1000007200"}],"8":[]}}"""), nowSeconds = 1_000_000_000)
+            .joinToString("\n")
+        assertTrue(text.contains("data: object with 2 entries") && text.contains("entries with programmes: 1") && text.contains("programmes: 1"), text)
+        assertTrue(text.contains("programme fields: [name, start_timestamp, stop_timestamp]"), text)
+        assertTrue(text.contains("1.0 to 2.0"), text)
+        assertFalse(text.contains("Secret"), text)
+    }
+
+    @Test fun `an array payload and an empty payload are described`() {
+        assertTrue(EpgShape.describe(js("""[{"a":1}]"""), 0).joinToString().contains("array of 1"))
+        assertTrue(EpgShape.describe(js("""{"data":[]}"""), 0).joinToString().contains("programmes: 0"))
+    }
+}

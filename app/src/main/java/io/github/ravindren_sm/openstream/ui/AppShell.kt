@@ -23,6 +23,11 @@ import io.github.ravindren_sm.openstream.data.PrefsResumeStore
 import io.github.ravindren_sm.openstream.data.CatalogResult
 import io.github.ravindren_sm.openstream.data.PagedChannels
 import io.github.ravindren_sm.openstream.data.SearchCatalog
+import io.github.ravindren_sm.openstream.data.SearchSources
+import io.github.ravindren_sm.openstream.data.TitleIndexer
+import io.github.ravindren_sm.openstream.ui.components.VersionPicker
+import io.github.ravindren_sm.openstream.ui.screens.DETAIL_VERSIONS_ID
+import io.github.ravindren_sm.openstream.ui.screens.SHOW_VERSIONS_ID
 import io.github.ravindren_sm.openstream.data.SearchRanking
 import io.github.ravindren_sm.openstream.ui.screens.SearchPhase
 import io.github.ravindren_sm.openstream.ui.screens.SearchScreen
@@ -145,12 +150,16 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     // Search: the box text and the last outcome live here so they survive opening a result and coming back.
     val searchCatalog = remember(portalEpoch) { SearchCatalog(session) }
     val searchState = remember(portalEpoch) { SearchState() }
+    val db = remember { OpenStreamDb.get(appContext) }
+    val tileScopeForSearch = rememberCoroutineScope()
+    fun recordSearch(text: String) { tileScopeForSearch.launch(Dispatchers.IO) { repo.recordSearch(profileId, text) } }
     LaunchedEffect(searchState.query, searchState.submitTick, connected) {
         val q = searchState.query.trim()
         if (q.length < SearchRanking.MIN_QUERY) { searchState.phase = SearchPhase.Idle; return@LaunchedEffect }
         if (!connected) { searchState.phase = SearchPhase.Idle; return@LaunchedEffect }
-        // Wait for a pause in typing, unless Done was pressed (the tick changed with no text change is handled by the key).
-        delay(if (searchState.submitTick > 0 && searchState.submitTick != lastSubmitHandled) 0L else 800L)
+        // Wait for a pause in typing (shorter once there are three letters), unless Done was pressed.
+        val submitted = searchState.submitTick > 0 && searchState.submitTick != lastSubmitHandled
+        delay(if (submitted) 0L else if (q.length >= 3) 350L else 800L)
         lastSubmitHandled = searchState.submitTick
         searchState.phase = SearchPhase.Loading
         val result = withContext(Dispatchers.IO) { searchCatalog.search(q) }
@@ -158,7 +167,35 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
             is CatalogResult.Ok -> SearchPhase.Done(result.value)
             is CatalogResult.Failed -> SearchPhase.Failed(result.message)
         }
+        if (submitted && result is CatalogResult.Ok) recordSearch(q)
     }
+
+    // Type-ahead suggestions from text already on the device; the channel list is read ahead once Search is first opened.
+    val onSearchRoute = stack.current.route == Route.SEARCH
+    var channelsWarm by remember(portalEpoch) { mutableStateOf(false) }
+    LaunchedEffect(onSearchRoute, connected, searchCatalog) {
+        if (onSearchRoute && connected && !channelsWarm) { withContext(Dispatchers.IO) { searchCatalog.warmChannels() }; channelsWarm = true }
+    }
+    val searchSources = remember(portalEpoch) { SearchSources(repo, favorites, db.catalogIndex()) { searchCatalog.cachedChannelNames() } }
+    // The title index: opt-in, gentle, runs only while connected and not playing.
+    val indexer = remember(portalEpoch) { TitleIndexer(vodCatalog, db.catalogIndex(), appContext.getSharedPreferences("search", android.content.Context.MODE_PRIVATE)) }
+    var indexTick by remember { mutableIntStateOf(0) }
+    val canIndex = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+    androidx.compose.runtime.SideEffect {
+        canIndex.set(connected && stack.current.route !in setOf(Route.LIVE_PLAYER, Route.VOD_PLAYER, Route.SETUP) && searchState.phase !is SearchPhase.Loading)
+        searchState.index = indexer.status
+    }
+    LaunchedEffect(portalEpoch) { if (portalEpoch > 0) indexer.clear() }
+    LaunchedEffect(indexer) { withContext(Dispatchers.IO) { indexer.refreshStatus() } }
+    LaunchedEffect(indexer, indexTick) { if (indexer.enabled) withContext(Dispatchers.IO) { indexer.run { canIndex.get() } } }
+    LaunchedEffect(searchState.query, favorites.all, channelsWarm, indexer.status.titles / 500, profileId, onSearchRoute) {
+        if (!onSearchRoute) return@LaunchedEffect
+        delay(120)
+        searchState.suggestions = withContext(Dispatchers.IO) { searchSources.suggestions(profileId, searchState.query) }
+    }
+    // A picker for the versions of a title opened from Search, and which versions the open page has.
+    var pickerOpen by remember { mutableStateOf(false) }
+    var detailVersions: List<VodItem> by remember { mutableStateOf(emptyList()) }
 
     BackHandler {
         if (memory.justFinishedEditing()) return@BackHandler    // that Back closed a keyboard
@@ -259,8 +296,10 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 val browse = if (stack.current.params["kind"] == VodKind.SHOWS.name) showsState else moviesState
                 val index = stack.current.params["item"]?.toIntOrNull() ?: -1
                 val movie = if (stack.current.params["src"] == "fav") favItem else browse.titles.items.getOrNull(index)
+                val movieVersions = if (detailVersions.any { it.id == movie?.id }) detailVersions else emptyList()
                 MovieDetailScreen(
                     item = movie, portalUrl = portalUrl, memory = memory,
+                    onShowVersions = if (movieVersions.size > 1) ({ pickerOpen = true }) else null, versionCount = movieVersions.size,
                     favorite = movie?.let(favorites::isVod) ?: false,
                     onToggleFavorite = { movie?.let(favorites::toggleVod) },
                     onPlay = { stack = stack.navigate(Route.VOD_PLAYER, stack.current.params, currentFocusId = memory.focusedId) },
@@ -270,8 +309,10 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 if (detail == null) {
                     PlaceholderScreen(entry = stack.current, memory = memory, onOpenDetail = { _, _ -> })
                 } else {
+                    val showVersions = if (detailVersions.any { it.id == detail.show.id }) detailVersions else emptyList()
                     ShowDetailScreen(
                         state = detail, connected = connected, portalUrl = portalUrl, resume = resumeStore, memory = memory,
+                        onShowVersions = if (showVersions.size > 1) ({ pickerOpen = true }) else null, versionCount = showVersions.size,
                         favorite = favorites.isVod(detail.show), onToggleFavorite = { favorites.toggleVod(detail.show) },
                         onPlay = { target, returnFocusId ->
                             detail.playTarget = target
@@ -308,14 +349,20 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                             stack = stack.navigate(Route.LIVE_PLAYER, mapOf("item" to "$i", "src" to "fav", "from" to "search"), currentFocusId = memory.focusedId)
                         }
                     },
-                    onOpenMovie = { item ->
-                        favItem = item
+                    onOpenMovie = { group ->
+                        recordSearch(searchState.query)
+                        favItem = group.best; detailVersions = group.versions
                         stack = stack.navigate(Route.MOVIE_DETAIL, mapOf("src" to "fav"), currentFocusId = memory.focusedId)
                     },
-                    onOpenShow = { item ->
-                        if (showDetail?.show?.id != item.id) showDetail = ShowDetailState(item, vodCatalog)
+                    onOpenShow = { group ->
+                        recordSearch(searchState.query)
+                        detailVersions = group.versions
+                        if (showDetail?.show?.id != group.best.id) showDetail = ShowDetailState(group.best, vodCatalog)
                         stack = stack.navigate(Route.SHOW_DETAIL, emptyMap(), currentFocusId = memory.focusedId)
                     },
+                    onPickSuggestion = { sug -> searchState.query = sug.text; searchState.submitTick++ },
+                    onEnableIndex = { indexer.enable(); indexTick++ },
+                    onPauseIndex = { indexer.pause(); tileScopeForSearch.launch(Dispatchers.IO) { delay(300); indexer.refreshStatus() } },
                 )
             } else if (stack.current.route == Route.LIVE_TV) {
                 LiveTvScreen(
@@ -340,6 +387,18 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     }
     // Connection state: small, bottom left, off the player screens.
     if (stack.current.route !in setOf(Route.SETUP, Route.LIVE_PLAYER, Route.VOD_PLAYER)) SessionStatusLine(session.status, Modifier.align(androidx.compose.ui.Alignment.BottomStart))
+    if (pickerOpen) {
+        val onShow = stack.current.route == Route.SHOW_DETAIL
+        VersionPicker(
+            versions = detailVersions, current = if (onShow) showDetail?.show else favItem, memory = memory,
+            returnFocusId = if (onShow) SHOW_VERSIONS_ID else DETAIL_VERSIONS_ID,
+            onPick = { v ->
+                pickerOpen = false
+                if (onShow) showDetail = ShowDetailState(v, vodCatalog) else favItem = v
+            },
+            onDismiss = { pickerOpen = false },
+        )
+    }
     }
 
     // Read the history whenever Home is (re)entered; a short wait lets the player's last save land first.

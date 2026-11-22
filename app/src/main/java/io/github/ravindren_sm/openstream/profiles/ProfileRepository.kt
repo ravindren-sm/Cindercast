@@ -116,6 +116,16 @@ class ProfileRepository(private val db: OpenStreamDb, private val nowMillis: () 
     suspend fun isFavorite(profileId: Long, kind: String, refId: String) = db.favorites().count(profileId, kind, refId) > 0
     suspend fun favorites(profileId: Long, kind: String): List<FavoriteEntity> = db.favorites().list(profileId, kind)
 
+    // ---- recent searches ----
+
+    /** Remembers a search text (trimmed, at least two characters); the newest use moves it to the front. */
+    suspend fun recordSearch(profileId: Long, text: String) {
+        val t = text.trim()
+        if (t.length >= 2 && profileId > 0) db.recentSearches().put(io.github.ravindren_sm.openstream.profiles.db.RecentSearchEntity(profileId, t, nowMillis()))
+    }
+    suspend fun recentSearches(profileId: Long, limit: Int = 8): List<String> = db.recentSearches().recent(profileId, limit).map { it.text }
+    suspend fun clearRecentSearches(profileId: Long) = db.recentSearches().clear(profileId)
+
     // ---- watch history ----
 
     /**

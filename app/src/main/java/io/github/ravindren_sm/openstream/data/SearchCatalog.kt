@@ -6,8 +6,8 @@ import io.github.ravindren_sm.openstream.provider.VodItem
 
 /** What a search found, grouped for the screen. [channelsFailed] means the channel list could not be read (movies and shows still count). */
 class SearchResults(
-    val movies: List<VodItem>,
-    val shows: List<VodItem>,
+    val movies: List<TitleGroup>,
+    val shows: List<TitleGroup>,
     val channels: List<LiveChannel>,
     val channelsFailed: Boolean = false,
 ) {
@@ -82,8 +82,10 @@ class SearchCatalog(private val session: PortalSession, private val maxPages: In
         }
         val ranked = rank(titles, q)
         val (channels, failed) = findChannels(q)
-        SearchHooks.event("titles=${titles.size} movies=${ranked.count { !it.isSeries }} shows=${ranked.count { it.isSeries }} channels=${channels.size} channelsFailed=$failed")
-        return CatalogResult.Ok(SearchResults(movies = ranked.filter { !it.isSeries }, shows = ranked.filter { it.isSeries }, channels = channels, channelsFailed = failed))
+        val movies = TitleMerge.group(ranked.filter { !it.isSeries })
+        val shows = TitleMerge.group(ranked.filter { it.isSeries })
+        SearchHooks.event("titles=${titles.size} movies=${movies.size} shows=${shows.size} merged=${titles.size - movies.size - shows.size} channels=${channels.size} channelsFailed=$failed")
+        return CatalogResult.Ok(SearchResults(movies = movies, shows = shows, channels = channels, channelsFailed = failed))
     }
 
     /**
@@ -118,6 +120,12 @@ class SearchCatalog(private val session: PortalSession, private val maxPages: In
     }
 
     private fun rank(items: List<VodItem>, q: String) = SearchRanking.rank(items, q)
+
+    /** The channel names read so far (empty until the channel list has been downloaded). */
+    fun cachedChannelNames(): List<String> = channelCache?.map { it.name }.orEmpty()
+
+    /** Reads the channel list ahead of the first search so channel names can be suggested. Blocking. */
+    fun warmChannels() { allChannels() }
 
     /** All channels, from the cache or one request; null if they could not be read (the next search tries again). */
     private fun allChannels(): List<LiveChannel>? {

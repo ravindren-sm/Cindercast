@@ -112,3 +112,39 @@ data class KidsAllowedCategoryEntity(
     val categoryId: String,
     val title: String,
 )
+
+/** A search the viewer ran or opened a result from, newest first in the suggestions. One row per distinct text. */
+@Entity(
+    tableName = "recent_searches",
+    primaryKeys = ["profileId", "text"],
+    foreignKeys = [ForeignKey(ProfileEntity::class, ["id"], ["profileId"], onDelete = CASCADE)],
+    indices = [Index("profileId", "lastUsedAt")],
+)
+data class RecentSearchEntity(val profileId: Long, val text: String, val lastUsedAt: Long)
+
+/**
+ * One title of the portal's catalog, kept lean (no description or cast) so about 130,000 of them stay near 20 MB.
+ * It exists to suggest and find titles instantly; opening one shows what the row holds. [nameKey] is the name lower-cased
+ * with entities decoded. The portal's catalog is shared by every profile, so this table has no profile.
+ */
+@Entity(tableName = "catalog_titles", primaryKeys = ["kind", "id"], indices = [Index("categoryId")])
+data class CatalogTitleEntity(
+    val kind: String,
+    val id: String,
+    val name: String,
+    val nameKey: String,
+    val year: String?,
+    val posterUri: String?,
+    val cmd: String?,
+    val age: String?,
+    val categoryId: String,
+)
+
+/** How far the title crawl has got in one category. */
+@Entity(tableName = "index_progress")
+data class IndexProgressEntity(
+    @PrimaryKey val categoryId: String,
+    val nextPage: Int,
+    val totalItems: Int,
+    val done: Boolean,
+)

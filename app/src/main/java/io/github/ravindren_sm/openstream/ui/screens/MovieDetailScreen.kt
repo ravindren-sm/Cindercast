@@ -24,6 +24,7 @@ import io.github.ravindren_sm.openstream.ui.theme.Tokens
 
 const val DETAIL_PLAY_ID = "detail-play"
 const val DETAIL_FAVORITE_ID = "detail-fav"
+const val DETAIL_VERSIONS_ID = "detail-versions"
 
 /**
  * A movie's page: poster, title line (year, age rating, the portal's IMDb rating), description, cast and a Play
@@ -37,6 +38,9 @@ fun MovieDetailScreen(
     onPlay: () -> Unit,
     favorite: Boolean = false,
     onToggleFavorite: () -> Unit = {},
+    /** Set when the title has other versions: shows a Versions button that calls this. */
+    onShowVersions: (() -> Unit)? = null,
+    versionCount: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     if (item == null) {
@@ -63,6 +67,10 @@ fun MovieDetailScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.S3)) {
                 OsFocusable(id = DETAIL_PLAY_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = onPlay) { _ ->
                     Text("Play", style = Tokens.TitleMedium, color = Tokens.TextPrimary,
+                        modifier = Modifier.padding(horizontal = Spacing.S4, vertical = Spacing.S2))
+                }
+                if (onShowVersions != null) OsFocusable(id = DETAIL_VERSIONS_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = onShowVersions) { _ ->
+                    Text("Versions ($versionCount)", style = Tokens.TitleMedium, color = Tokens.TextPrimary,
                         modifier = Modifier.padding(horizontal = Spacing.S4, vertical = Spacing.S2))
                 }
                 OsFocusable(id = DETAIL_FAVORITE_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = onToggleFavorite) { _ ->
