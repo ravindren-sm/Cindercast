@@ -76,4 +76,24 @@ class SearchFiltersTest {
         assertTrue(FilterRules.passes(v("Comedy"), f) { 80 })
         assertFalse(FilterRules.passes(v("Comedy"), f) { 60 })
     }
+
+    @Test fun englishSubtitleWordingIsRecognised() {
+        listOf("Film [Eng Sub]", "Film (English Subtitles)", "Film ESub", "Film | Eng Subs", "Film English Sub", "FILM HARDSUB", "Film Subbed English").forEach {
+            assertTrue(it, FilterRules.mentionsEnglishSubtitles(it))
+        }
+        listOf("Subway Surfers", "The Sub", "Film", "Substitute Teacher", "English Movies", "Hindi Sub-Plot").forEach {
+            assertFalse(it, FilterRules.mentionsEnglishSubtitles(it))
+        }
+    }
+
+    @Test fun theSubtitleFilterKeepsNamedTitlesAndTitlesFromAMentioningCategory() {
+        val f = SearchFilters(englishSubtitles = true)
+        fun named(name: String) = v(null).let { VodItem(id = "1", name = name, isSeries = false, isSeason = false, isEpisode = false, cmd = "c", episodeNumbers = emptyList()) }
+        assertTrue(FilterRules.passes(named("Film [Eng Sub]"), f))
+        assertFalse(FilterRules.passes(named("Film"), f))
+        assertTrue(FilterRules.passes(named("Film"), f, categoryHint = true))
+        assertTrue(f.isActive)
+        assertEquals(f, SearchFilters.decode(f.encode()))
+        assertEquals("subs=1", f.encode())
+    }
 }

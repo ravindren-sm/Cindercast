@@ -372,3 +372,9 @@ Method: a debug-only activity (`EpgProbeActivity`) using the app's saved setting
 - **Not checked on the real portal:** that the `category` parameter restricts a search there as it does on the fake portal; the genre text and language wording the real categories use (the language list is built from the real category names, so it adapts).
 - Tests: `SearchFiltersTest` (saving and loading, language reading, category plan, genre and rating rules). Checked on the Fire TV against the fake portal: pickers, combined filters, restricted requests (only the two English categories were asked), the saved default after a restart. Focus fix: after Save, Use default or Clear the focus returns to the Language button instead of falling to the tab bar.
 
+## Search filter: English subtitles (2026-11-21; fake portal, no provider contact)
+- A toggle beside the other filters, saved with the default set. It keeps a title when its name or its category name says it has English subtitles ("[Eng Sub]", "English Subtitles", "ESub", "Eng Subs", "Hardsub"); words like "Subway" or "Substitute" do not count.
+- **Why a wording check.** The portal gives a title's subtitle files only when it is played (the play-link answer), not in its catalog lists, so the catalog cannot be filtered by real subtitle data. The screen says so. Titles that have subtitles but do not say so in their name are missed.
+- **Not yet known:** whether the real catalog's list entries carry any subtitle or language field (a key-names-only look at one real list answer would show it; needs an approved run), and how often real names use these words. A per-title check through the play-link request would be exact but costs one request per result and may count as a play, so it is not done.
+- Tests: wording recognition (including the false friends) and the filter rule. Checked on the Fire TV against the fake portal: only the "[Eng Sub]" titles remained.
+

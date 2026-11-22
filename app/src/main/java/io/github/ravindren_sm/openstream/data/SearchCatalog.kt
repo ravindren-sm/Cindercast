@@ -78,8 +78,10 @@ class SearchCatalog(private val session: PortalSession, private val maxPages: In
         val targets = plan.ids ?: listOf("*")
         val pagesPerTarget = if (plan.ids == null) maxPages else 2
         val titles = mutableListOf<VodItem>()
+        val hinted = HashSet<String>()                    // ids of titles from a category whose name mentions English subtitles
         var firstRequest = true
         for (category in targets) {
+            val categoryMentionsSubs = categories.firstOrNull { it.id == category }?.let { FilterRules.mentionsEnglishSubtitles(it.title) } == true
             for (page in 1..pagesPerTarget) {
                 var parsed: io.github.ravindren_sm.openstream.provider.VodPage? = null
                 val result = session.withSession { m -> m.call { c -> val (r, p) = c.vodSearch(q, page, category); parsed = p; r } }
@@ -92,10 +94,11 @@ class SearchCatalog(private val session: PortalSession, private val maxPages: In
                 firstRequest = false
                 val known = titles.mapTo(HashSet()) { it.id }
                 titles += p.items.filter { it.id !in known }
+                if (categoryMentionsSubs) p.items.forEach { hinted += it.id }
                 if (!p.hasMore(p.items.size * page)) break
             }
         }
-        val kept = titles.filter { FilterRules.passes(it, filters) }
+        val kept = titles.filter { FilterRules.passes(it, filters, categoryHint = it.id in hinted) }
         val ranked = rank(kept, q)
         val (channels, failed) = if (filters.isActive) emptyList<LiveChannel>() to false else findChannels(q)
         val movies = TitleMerge.group(ranked.filter { !it.isSeries })

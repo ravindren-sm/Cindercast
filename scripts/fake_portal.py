@@ -71,6 +71,8 @@ def vod_item(cat, n, host):
     is_series = cat in ("20", "21", "22")
     rating = "0" if n % 4 == 0 else f"{5 + n % 5}.{n % 10}"        # every 4th has no rating: the badge must hide
     name = f"Tom &amp; Jerry {n}" if n % 7 == 0 else f"{'Show' if is_series else 'Movie'} {n} (c{cat})"
+    if n % 5 == 0 and n % 7 != 0:
+        name += " [Eng Sub]"
     return {
             "id": f"{cat}-{n}", "name": name, "year": str(1990 + n % 35), "rating_imdb": rating, "rating_kinopoisk": "0",
             "rating_mpaa": "PG-13" if n % 2 else "R", "genres_str": ["Drama, Thriller", "Comedy", "Comedy, Family", "Action"][n % 4],

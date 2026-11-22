@@ -14,8 +14,10 @@ data class SearchFilters(
     /** Minimum of the rating the portal gives (its IMDb value, else its Kinopoisk value), or null for any. */
     val minRating: Double? = null,
     val minRottenTomatoes: Int? = null,
+    /** Keep only titles whose name or category says they have English subtitles (the portal's lists carry no subtitle field). */
+    val englishSubtitles: Boolean = false,
 ) {
-    val isActive get() = languages.isNotEmpty() || genres.isNotEmpty() || categoryIds.isNotEmpty() || minRating != null || minRottenTomatoes != null
+    val isActive get() = englishSubtitles || languages.isNotEmpty() || genres.isNotEmpty() || categoryIds.isNotEmpty() || minRating != null || minRottenTomatoes != null
 
     /** A compact text for saving: `lang=English|Hindi;genre=Comedy;cat=12|14;rating=7.0;rt=75`. Empty parts are left out. */
     fun encode(): String = listOfNotNull(
@@ -24,6 +26,7 @@ data class SearchFilters(
         categoryIds.takeIf { it.isNotEmpty() }?.let { "cat=" + it.sorted().joinToString("|") },
         minRating?.let { "rating=$it" },
         minRottenTomatoes?.let { "rt=$it" },
+        "subs=1".takeIf { englishSubtitles },
     ).joinToString(";")
 
     fun summary(categoryTitle: (String) -> String? = { it }): String = listOfNotNull(
@@ -32,6 +35,7 @@ data class SearchFilters(
         categoryIds.takeIf { it.isNotEmpty() }?.mapNotNull(categoryTitle)?.joinToString(", "),
         minRating?.let { "rating ${"%.0f".format(it)}+" },
         minRottenTomatoes?.let { "RT $it%+" },
+        "English subtitles".takeIf { englishSubtitles },
     ).joinToString(" · ")
 
     companion object {
@@ -47,7 +51,7 @@ data class SearchFilters(
             if (text.isNullOrBlank()) return SearchFilters()
             val parts = text.split(';').mapNotNull { p -> p.split('=', limit = 2).takeIf { it.size == 2 }?.let { it[0] to it[1] } }.toMap()
             fun set(key: String) = parts[key]?.split('|')?.filter { it.isNotBlank() }?.toSet().orEmpty()
-            return SearchFilters(set("lang"), set("genre"), set("cat"), parts["rating"]?.toDoubleOrNull(), parts["rt"]?.toIntOrNull())
+            return SearchFilters(set("lang"), set("genre"), set("cat"), parts["rating"]?.toDoubleOrNull(), parts["rt"]?.toIntOrNull(), parts["subs"] == "1")
         }
     }
 }
@@ -84,8 +88,17 @@ object FilterRules {
         return CategoryPlan(candidates.take(cap).map { it.id }, candidates.size > cap, candidates.size)
     }
 
-    /** Genre and rating checks on one title (language and category were applied by the plan). */
-    fun passes(item: VodItem, f: SearchFilters, rottenScore: (VodItem) -> Int? = { null }): Boolean {
+    private val ENGLISH_SUBS = Regex("(?i)\\b(e-?subs?|eng(lish)?[\\s._-]*sub(s|bed|titles?)?|sub(s|bed|titles?)?[\\s._-]*eng(lish)?|english[\\s._-]+subtitles?|hardsubs?)\\b")
+
+    /** Whether a title or category name says it has English subtitles ("[Eng Sub]", "English Subtitles", "ESub"). */
+    fun mentionsEnglishSubtitles(text: String): Boolean = ENGLISH_SUBS.containsMatchIn(text)
+
+    /**
+     * Genre, rating and subtitle checks on one title (language and category were applied by the plan). [categoryHint] says
+     * the title's category name already mentions English subtitles.
+     */
+    fun passes(item: VodItem, f: SearchFilters, categoryHint: Boolean = false, rottenScore: (VodItem) -> Int? = { null }): Boolean {
+        if (f.englishSubtitles && !categoryHint && !mentionsEnglishSubtitles(item.name)) return false
         if (f.genres.isNotEmpty()) {
             val text = (item.genres ?: "").lowercase()
             if (f.genres.none { text.contains(it.lowercase()) }) return false

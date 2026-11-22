@@ -268,6 +268,7 @@ private fun FilterBar(
             FilterChip(chipId(FilterPicker.GENRE), chipLabel("Genre", f.genres.sorted()), f.genres.isNotEmpty(), memory) { onOpen(FilterPicker.GENRE) }
             FilterChip(chipId(FilterPicker.CATEGORY), chipLabel("Category", f.categoryIds.mapNotNull { titles[it] }.sorted()), f.categoryIds.isNotEmpty(), memory) { onOpen(FilterPicker.CATEGORY) }
             FilterChip(chipId(FilterPicker.RATING), if (f.minRating == null) "Rating" else "Rating ${"%.0f".format(f.minRating)}+", f.minRating != null, memory) { onOpen(FilterPicker.RATING) }
+            FilterChip("search-filter-subs", if (f.englishSubtitles) "✓ English subtitles" else "English subtitles", f.englishSubtitles, memory) { onChange(f.copy(englishSubtitles = !f.englishSubtitles)) }
             FilterChip(chipId(FilterPicker.ROTTEN), "Rotten Tomatoes", false, memory) { onOpen(FilterPicker.ROTTEN) }
         }
         val saved = state.defaultFilters
@@ -279,6 +280,7 @@ private fun FilterBar(
             }
         }
         if (f.isActive) Text("Filters apply to movies and shows; channels are hidden while a filter is on.", style = Tokens.Body, color = Tokens.TextSecondary)
+        if (f.englishSubtitles) Text("English subtitles: only titles whose name or category says so; the portal does not list subtitles in its catalog, so some titles that have them are missed.", style = Tokens.Body, color = Tokens.TextSecondary)
     }
 }
 
