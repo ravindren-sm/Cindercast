@@ -34,6 +34,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
+import io.github.ravindren_sm.openstream.data.PinKinds
+import io.github.ravindren_sm.openstream.data.PinnedRow
 import io.github.ravindren_sm.openstream.data.PosterUrl
 import io.github.ravindren_sm.openstream.nav.Route
 import io.github.ravindren_sm.openstream.profiles.ContinueTile
@@ -49,6 +51,7 @@ import kotlinx.coroutines.delay
 fun continueFocusId(index: Int) = "home-cw-$index"
 fun recentFocusId(index: Int) = "home-rw-$index"
 fun doorFocusId(index: Int) = "home-door-$index"
+fun homePinFocusId(row: Int, index: Int) = "home-pin-$row-$index"
 private fun menuFocusId(index: Int) = "home-menu-$index"
 
 /** The four doors every profile has. Search has no screen yet, so it opens the placeholder like the tab does. */
@@ -69,6 +72,9 @@ fun HomeScreen(
     recentTiles: List<ContinueTile>,
     favoriteChannels: List<io.github.ravindren_sm.openstream.profiles.db.FavoriteEntity>,
     onOpenFavoriteChannel: (Int) -> Unit,
+    pinnedRows: List<PinnedRow>,
+    onOpenPinnedTitle: (io.github.ravindren_sm.openstream.provider.VodItem) -> Unit,
+    onOpenPinnedChannel: (rowIndex: Int, channels: List<io.github.ravindren_sm.openstream.provider.LiveChannel>, index: Int) -> Unit,
     portalUrl: String,
     memory: FocusMemory,
     onResume: (ContinueTile) -> Unit,
@@ -79,7 +85,7 @@ fun HomeScreen(
     var menuTile: ContinueTile? by remember { mutableStateOf(null) }
     var menuFocusIdBefore by remember { mutableStateOf<String?>(null) }
     var refocus by remember { mutableStateOf<List<String>?>(null) }
-    val empty = continueTiles.isNullOrEmpty() && recentTiles.isEmpty() && favoriteChannels.isEmpty()
+    val empty = continueTiles.isNullOrEmpty() && recentTiles.isEmpty() && favoriteChannels.isEmpty() && pinnedRows.isEmpty()
 
     // After the menu closes, put focus back where the viewer was (the tile may be gone: fall back to a door).
     LaunchedEffect(refocus) {
@@ -129,6 +135,27 @@ fun HomeScreen(
                     }
                 }
             }
+            pinnedRows.forEachIndexed { r, row ->
+                val live = row.pin.kind == PinKinds.LIVE
+                Text(if (live) "Live · ${PortalText.decodeEntities(row.pin.title)}" else "New in ${PortalText.decodeEntities(row.pin.title)}", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
+                when {
+                    row.channels != null -> LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = PaddingValues(end = Spacing.S1, top = Spacing.S1, bottom = Spacing.S1)) {
+                        itemsIndexed(row.channels, key = { _, c -> c.id }) { i, c -> ChannelCard(homePinFocusId(r, i), c.number, c.name, memory, { onOpenPinnedChannel(r, row.channels, i) }) }
+                    }
+                    row.titles != null -> LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = PaddingValues(end = Spacing.S1, top = Spacing.S1, bottom = Spacing.S1)) {
+                        itemsIndexed(row.titles, key = { _, v -> v.id }) { i, v ->
+                            OsFocusable(id = homePinFocusId(r, i), memory = memory, variant = FocusVariant.CARD, modifier = Modifier.width(170.dp), onSelect = { onOpenPinnedTitle(v) }) { _ ->
+                                Column(Modifier.background(Tokens.Surface1)) {
+                                    Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f)) { Poster(PosterUrl.resolve(v.posterUri, portalUrl), Modifier.fillMaxSize(), targetWidthPx = 300) }
+                                    Text(PortalText.decodeEntities(v.name), style = Tokens.Body, color = Tokens.TextPrimary, maxLines = 1, modifier = Modifier.padding(Spacing.S1))
+                                }
+                            }
+                        }
+                    }
+                    row.failed -> Text("Could not load this row.", style = Tokens.Body, color = Tokens.StatusWarning)
+                    else -> Text("Loading…", style = Tokens.Body, color = Tokens.TextSecondary)
+                }
+            }
             Text("Browse", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), modifier = Modifier.fillMaxWidth()) {
                 DOORS.forEachIndexed { i, (route, label) ->
@@ -139,6 +166,7 @@ fun HomeScreen(
                     }
                 }
             }
+            if (pinnedRows.isEmpty()) Text("Tip: press Menu on a category in Movies or Shows, or a group in Live TV, to show it here (a tick marks pinned ones).", style = Tokens.Body, color = Tokens.TextSecondary)
             if (!continueTiles.isNullOrEmpty() || recentTiles.isNotEmpty()) Text("Press Menu on a title for options", style = Tokens.Body, color = Tokens.TextSecondary)
         }
         menuTile?.let { tile -> TileMenu(tile, memory, onChoose = ::close) }

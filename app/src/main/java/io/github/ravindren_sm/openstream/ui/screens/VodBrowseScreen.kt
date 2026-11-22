@@ -45,6 +45,7 @@ import io.github.ravindren_sm.openstream.provider.VodItem
 import io.github.ravindren_sm.openstream.ui.components.FocusVariant
 import io.github.ravindren_sm.openstream.ui.components.HEART
 import io.github.ravindren_sm.openstream.ui.components.OsFocusable
+import io.github.ravindren_sm.openstream.ui.components.onMenuKey
 import io.github.ravindren_sm.openstream.ui.components.Poster
 import io.github.ravindren_sm.openstream.ui.focus.FocusMemory
 import io.github.ravindren_sm.openstream.ui.theme.Radii
@@ -105,6 +106,9 @@ fun VodBrowseScreen(
     memory: FocusMemory,
     onOpen: (index: Int, item: VodItem) -> Unit,
     isFavorite: (VodItem) -> Boolean = { false },
+    /** Categories shown as "New in ..." rows on Home; Menu on a category rail row pins or unpins it. */
+    isPinned: (VodCategory) -> Boolean = { false },
+    onTogglePin: (VodCategory) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -123,10 +127,10 @@ fun VodBrowseScreen(
                     itemsIndexed(state.categories, key = { _, c -> c.id }) { index, category ->
                         OsFocusable(
                             id = categoryFocusId(index), memory = memory, variant = FocusVariant.ROW,
-                            modifier = Modifier.fillMaxWidth(), onSelect = { state.select(index) },
+                            modifier = Modifier.fillMaxWidth().onMenuKey { onTogglePin(category) }, onSelect = { state.select(index) },
                         ) { _ ->
                             Text(
-                                category.title, style = Tokens.BodyLarge, maxLines = 1,
+                                category.title + if (isPinned(category)) "  ✓" else "", style = Tokens.BodyLarge, maxLines = 1,
                                 color = if (index == state.selected) Tokens.AccentPrimary else Tokens.TextPrimary,
                                 modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1 + 4.dp),
                             )

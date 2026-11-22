@@ -407,3 +407,8 @@ Method: a debug-only activity (`VodShapeProbeActivity`), one request for the fir
 - No device setting is changed by this screen. Checked on the Fire TV against the fake portal: the layout, the automatic-play toggle and the confirmation for clearing favorites.
 - Not here yet: the parental-control and profile settings (deferred), and a theme choice.
 
+## Home rows from pinned categories and a live group (2026-11-21; fake portal)
+- **Pinning.** Menu on a category in Movies or Shows pins it; Menu on a group in Live TV pins it as the Home live group (one at a time; pinning another replaces it). A tick marks pinned entries. Pins are saved per profile in Room (the existing pinned-categories table).
+- **Home rows.** "New in <category>" for up to three pinned categories (the portal lists newest first, so the first twelve titles are shown), and "Live · <group>" with the first twelve channels. Select opens a title's page or plays the channel (the row is what zapping then moves through); Back returns to the tile. Rows appear as "Loading…" at once and fill in one portal request each, only while Home is showing and connected, and are kept ten minutes. With no pins, Home shows a one-line tip.
+- Tests: `HomeRowPlanTest` (order, the cap of three, the live pin kept apart, the next position). Checked on the Fire TV against the fake portal: a pinned movies category and a pinned live group both appeared as rows.
+

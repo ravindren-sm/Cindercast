@@ -23,6 +23,11 @@ import io.github.ravindren_sm.openstream.data.PrefsResumeStore
 import io.github.ravindren_sm.openstream.data.CatalogResult
 import io.github.ravindren_sm.openstream.data.PagedChannels
 import io.github.ravindren_sm.openstream.data.GuideLoader
+import io.github.ravindren_sm.openstream.data.HomeFeed
+import io.github.ravindren_sm.openstream.data.HomeRowPlan
+import io.github.ravindren_sm.openstream.data.PinKinds
+import io.github.ravindren_sm.openstream.data.PinnedRow
+import io.github.ravindren_sm.openstream.ui.screens.homePinFocusId
 import io.github.ravindren_sm.openstream.ui.components.PosterLoader
 import io.github.ravindren_sm.openstream.ui.screens.SettingsModel
 import io.github.ravindren_sm.openstream.ui.screens.SettingsScreen
@@ -204,6 +209,25 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
             }
         }
     }
+    // Pinned categories and the live group, shown as rows on Home. Pins are per profile; each row asks the portal once and is kept 10 minutes.
+    var pins: List<io.github.ravindren_sm.openstream.profiles.db.PinnedCategoryEntity> by remember { mutableStateOf(emptyList()) }
+    suspend fun loadPins() {
+        pins = listOf(PinKinds.MOVIES, PinKinds.SHOWS, PinKinds.LIVE).flatMap { repo.pinnedCategories(profileId, it) }
+    }
+    LaunchedEffect(profileId) { if (profileId > 0L) withContext(Dispatchers.IO) { loadPins() } }
+    val homeFeed = remember(portalEpoch) { HomeFeed(vodCatalog, liveCatalog) }
+    var pinnedRows: List<PinnedRow> by remember { mutableStateOf(emptyList()) }
+    fun togglePin(kind: String, id: String, title: String) {
+        tileScopeForSearch.launch(Dispatchers.IO) {
+            val exists = pins.any { it.kind == kind && it.categoryId == id }
+            if (exists) repo.unpinCategory(profileId, kind, id)
+            else {
+                if (kind == PinKinds.LIVE) pins.filter { it.kind == PinKinds.LIVE }.forEach { repo.unpinCategory(profileId, PinKinds.LIVE, it.categoryId) }
+                repo.pinCategory(profileId, kind, id, title)
+            }
+            loadPins()
+        }
+    }
     // The guide's first group: favorites when there are some, otherwise the portal's first group ("All channels").
     val onGuide = stack.current.route == Route.TV_GUIDE
     LaunchedEffect(onGuide, connected, favorites.all.size) {
@@ -269,7 +293,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 onChannelChanged = { i ->
                     // Back should land on the channel being watched, with its row on screen.
                     if (fromFavorites) {
-                        stack = stack.withPreviousFocus(when (from) { "home" -> homeFavChannelFocusId(i); "search" -> searchChannelFocusId(i); "guide" -> guideRowFocusId(i); else -> favChannelFocusId(i) })
+                        stack = stack.withPreviousFocus(when (from) { "home" -> homeFavChannelFocusId(i); "search" -> searchChannelFocusId(i); "guide" -> guideRowFocusId(i); "homepin" -> homePinFocusId(stack.current.params["row"]?.toIntOrNull() ?: 0, i); else -> favChannelFocusId(i) })
                     } else {
                         stack = stack.withPreviousFocus(channelFocusId(i))
                         liveState.channelListState.requestScrollToItem(maxOf(i - 3, 0))
@@ -301,6 +325,20 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
             if (stack.current.route == Route.HOME) {
                 HomeScreen(
                     continueTiles = continueTiles, recentTiles = recentTiles, portalUrl = portalUrl, memory = memory,
+                    pinnedRows = pinnedRows,
+                    onOpenPinnedTitle = { item ->
+                        if (item.isSeries) {
+                            if (showDetail?.show?.id != item.id) showDetail = ShowDetailState(item, vodCatalog)
+                            stack = stack.navigate(Route.SHOW_DETAIL, emptyMap(), currentFocusId = memory.focusedId)
+                        } else {
+                            favItem = item; detailVersions = emptyList()
+                            stack = stack.navigate(Route.MOVIE_DETAIL, mapOf("src" to "fav"), currentFocusId = memory.focusedId)
+                        }
+                    },
+                    onOpenPinnedChannel = { r, list, i ->
+                        favPlayer = PagedChannels.fixed(list)
+                        stack = stack.navigate(Route.LIVE_PLAYER, mapOf("item" to "$i", "src" to "fav", "from" to "homepin", "row" to "$r"), currentFocusId = memory.focusedId)
+                    },
                     favoriteChannels = favorites.channels(),
                     onOpenFavoriteChannel = { i ->
                         favPlayer = PagedChannels.fixed(favorites.channels().map(FavoriteItems::toChannel))
@@ -332,6 +370,8 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 val browse = if (stack.current.route == Route.SHOWS) showsState else moviesState
                 VodBrowseScreen(
                     state = browse, connected = connected, portalUrl = portalUrl, memory = memory, isFavorite = favorites::isVod,
+                    isPinned = { c -> pins.any { it.kind == (if (browse.kind == VodKind.SHOWS) PinKinds.SHOWS else PinKinds.MOVIES) && it.categoryId == c.id } },
+                    onTogglePin = { c -> togglePin(if (browse.kind == VodKind.SHOWS) PinKinds.SHOWS else PinKinds.MOVIES, c.id, c.title) },
                     onOpen = { index, item ->
                         // The portal keeps shows among the movies: the title's own flag decides which page opens.
                         val route = if (item.isSeries) Route.SHOW_DETAIL else Route.MOVIE_DETAIL
@@ -464,6 +504,8 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                     connected = connected,
                     memory = memory,
                     isFavorite = favorites::isChannel, onToggleFavorite = favorites::toggleChannel,
+                    pinnedGenreId = pins.firstOrNull { it.kind == PinKinds.LIVE }?.categoryId,
+                    onTogglePinGenre = { g -> togglePin(PinKinds.LIVE, g.id, g.title) },
                     onOpenChannel = { index, _ ->
                         stack = stack.navigate(Route.LIVE_PLAYER, mapOf("item" to "$index"), currentFocusId = memory.focusedId)
                     },
@@ -505,6 +547,20 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         delay(300)
         loadTiles()
         tilesFresh = true
+    }
+
+    // Pinned rows: placeholders at once, then one portal request per row (cached), only while Home is showing and connected.
+    LaunchedEffect(onHome, connected, pins) {
+        if (!onHome || !connected) return@LaunchedEffect
+        val wanted = HomeRowPlan.titlePins(pins) + listOfNotNull(HomeRowPlan.livePin(pins))
+        pinnedRows = wanted.map { PinnedRow(it, null, null, false) }
+        wanted.forEachIndexed { i, pin ->
+            val row = withContext(Dispatchers.IO) {
+                if (pin.kind == PinKinds.LIVE) homeFeed.channelsOf(pin.categoryId)?.let { PinnedRow(pin, null, it, false) }
+                else homeFeed.titlesOf(pin.categoryId)?.let { PinnedRow(pin, it, null, false) }
+            } ?: PinnedRow(pin, null, null, true)
+            pinnedRows = pinnedRows.toMutableList().also { if (i < it.size) it[i] = row }
+        }
     }
 
     // After each stack change, once the new screen is on screen, put focus where it belongs. On Home that waits for

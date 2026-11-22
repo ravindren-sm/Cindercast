@@ -28,7 +28,7 @@ Milestone column: where the work is planned (M3 live, M4 VOD, M5 everything else
 
 | # | Route | Status | What is built / what is missing | Milestone |
 |---|---|---|---|---|
-| 1 | Home | Partial | Done: Continue watching row (progress, time left, resume from the tile, one tile per show), doors, first-run state. Recently Watched, clock and tile options (remove, mark watched) done. Favorite channels row done. Missing: new-in-your-categories rows, Live row, Kids variant. | M5 |
+| 1 | Home | Partial | Done: Continue watching row (progress, time left, resume from the tile, one tile per show), doors, first-run state. Recently Watched, clock, tile options, Favorite channels, pinned "New in" rows and a pinned Live row done. Missing: Kids variant. | M5 |
 | 2 | Live TV browser | Partial | Done: genre rail, channel list, 14-per-page focus-triggered paging, real data. Missing: 3-column layout with preview and programme panel, sort (number or A-Z), channel logos, HD/4K badges, parental lock badge, programme title, skeleton rows, digit tuning inside the browser. | M3 |
 | 3 | Live player | Partial | Done: full screen, overlay, buffering, errors with retry, channel up/down, digit entry, Back to the watched channel, Language and Subtitles drawer (Menu key). Missing: stream readout on screen (we only log it), info banner with programme and actions, mini channel list (Left). | M3 |
 | 4 | TV Guide (EPG) | Partial | Now and next per channel for a group or the favorites, loaded one channel at a time and cached ten minutes. Missing: a time grid, programme details, programme search. | M5 |

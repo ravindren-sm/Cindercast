@@ -98,6 +98,9 @@ fun LiveTvScreen(
     onOpenChannel: (index: Int, channel: LiveChannel) -> Unit,
     isFavorite: (LiveChannel) -> Boolean = { false },
     onToggleFavorite: (LiveChannel) -> Unit = {},
+    /** The group shown as a row on Home; Menu on a group in the rail pins it (one at a time) or unpins it. */
+    pinnedGenreId: String? = null,
+    onTogglePinGenre: (LiveGenre) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -118,11 +121,11 @@ fun LiveTvScreen(
                     itemsIndexed(state.genres, key = { _, g -> g.id }) { index, genre ->
                         OsFocusable(
                             id = genreFocusId(index), memory = memory, variant = FocusVariant.ROW,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().onMenuKey { onTogglePinGenre(genre) },
                             onSelect = { state.select(index) },
                         ) { _ ->
                             Text(
-                                genre.title, style = Tokens.BodyLarge,
+                                genre.title + if (genre.id == pinnedGenreId) "  ✓" else "", style = Tokens.BodyLarge,
                                 color = if (index == state.selected) Tokens.AccentPrimary else Tokens.TextPrimary,
                                 maxLines = 1,
                                 modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1 + 4.dp),
