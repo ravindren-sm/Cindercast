@@ -56,6 +56,14 @@ runs on the family TV still stands (see Environment notes).
 - Programme search: sweep favorites and recently watched channels (not all 5,100) and search those programmes, showing title, channel and time. Check how far ahead a larger `size` reaches, and whether the catch-up flag (`mark_archive`) allows replaying.
 - Reminders for a future programme are out of scope until the guide screen exists.
 
+## Ratings and filters follow-ups
+- Rotten Tomatoes (and real IMDb scores, since the portal's IMDb value is usually 0): an optional outside ratings service
+  with a key entered by the owner, looked up per result and cached on the device. Needs the owner's decision: it sends title
+  names to that service.
+- Check on the real portal that the category-restricted search works and see which language and genre words the real
+  categories and titles use; add more language names if needed.
+- Apply the same filters to the Movies and Shows browse screens, and use the title index for instant filtered results.
+
 ## Title index follow-ups
 - Run the index on the real portal once (the user starts it from the Search page) and record the real size, time and any errors; tune the pause between requests.
 - Use the index for instant results (not only suggestions) and offline-ish search while the portal is slow.

@@ -73,7 +73,7 @@ def vod_item(cat, n, host):
     name = f"Tom &amp; Jerry {n}" if n % 7 == 0 else f"{'Show' if is_series else 'Movie'} {n} (c{cat})"
     return {
             "id": f"{cat}-{n}", "name": name, "year": str(1990 + n % 35), "rating_imdb": rating, "rating_kinopoisk": "0",
-            "rating_mpaa": "PG-13" if n % 2 else "R", "genres_str": "Drama, Thriller",
+            "rating_mpaa": "PG-13" if n % 2 else "R", "genres_str": ["Drama, Thriller", "Comedy", "Comedy, Family", "Action"][n % 4],
             "description": "An invented story used only to test the layout of the detail page. " * 4,
             "actors": "Actor One, Actor Two, Actor Three", "director": "Director Name",
             "screenshot_uri": f"http://{host}/poster/{n}.png", "cmd": f"/media/{cat}-{n}.mpg",
@@ -89,12 +89,14 @@ def vod_page(cat, page, host):
     return {"total_items": str(total), "max_page_items": PAGE, "data": data}
 
 
-def vod_search(text, page, host):
+def vod_search(text, page, host, category="*"):
     """Titles of every category whose (entity-decoded) name contains the text, paged like the real lists."""
     import html
     needle = text.lower()
     hits = []
     for c in VOD_CATEGORIES[1:]:
+        if category != "*" and c["id"] != category:
+            continue
         for n in range(1, vod_total(c["id"]) + 1):
             item = vod_item(c["id"], n, host)
             if needle in html.unescape(item["name"]).lower():
@@ -256,7 +258,7 @@ class H(BaseHTTPRequestHandler):
             if q.get("movie_id", "0") != "0":
                 js = vod_children(q["movie_id"], q.get("season_id", "0"), q.get("episode_id", "0"), int(q.get("p", "1") or "1"))
             elif q.get("search"):
-                js = vod_search(q["search"], int(q.get("p", "1") or "1"), host)
+                js = vod_search(q["search"], int(q.get("p", "1") or "1"), host, q.get("category", "*"))
             else:
                 js = vod_page(q.get("category", "*"), int(q.get("p", "1") or "1"), host)
         elif (t, a) == ("vod", "create_link"):

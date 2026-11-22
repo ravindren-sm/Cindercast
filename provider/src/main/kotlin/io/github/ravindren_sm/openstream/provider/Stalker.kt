@@ -84,10 +84,10 @@ object StalkerRequests {
      * One page of VOD titles whose name matches [query], across all categories (the portal's own `search` parameter).
      * The query is what the viewer typed, so it is only in the request, never in the purpose text that gets logged.
      */
-    fun vodSearch(ctx: Context, query: String, page: Int = 1) = build(ctx,
+    fun vodSearch(ctx: Context, query: String, page: Int = 1, category: String = "*") = build(ctx,
         "Search: VOD titles matching the typed text, page $page",
         "type" to "vod", "action" to "get_ordered_list", "movie_id" to "0", "season_id" to "0",
-        "episode_id" to "0", "category" to "*", "fav" to "0", "sortby" to "added",
+        "episode_id" to "0", "category" to category, "fav" to "0", "sortby" to "added",
         "hd" to "0", "not_ended" to "0", "search" to query, "p" to page.toString())
 
     /** One page of live channels matching [query] (the portal's `search` parameter on the channel list, if it honours it). */
@@ -414,9 +414,9 @@ class StalkerClient(
     }
 
     /** One page (1-based) of VOD titles matching [query]. Summary: counts only, never the text. */
-    fun vodSearch(query: String, page: Int): Pair<StalkerResult, VodPage?> {
+    fun vodSearch(query: String, page: Int, category: String = "*"): Pair<StalkerResult, VodPage?> {
         var parsed: VodPage? = null
-        val r = call(StalkerRequests.vodSearch(ctx(), query, page)) { js ->
+        val r = call(StalkerRequests.vodSearch(ctx(), query, page, category)) { js ->
             parsed = VodCatalogParser.page(js, page)
             listOf("search page $page: ${parsed?.items?.size ?: "?"} of ${parsed?.totalItems ?: "?"}")
         }

@@ -23,6 +23,7 @@ import io.github.ravindren_sm.openstream.data.PrefsResumeStore
 import io.github.ravindren_sm.openstream.data.CatalogResult
 import io.github.ravindren_sm.openstream.data.PagedChannels
 import io.github.ravindren_sm.openstream.data.SearchCatalog
+import io.github.ravindren_sm.openstream.data.SearchFilters
 import io.github.ravindren_sm.openstream.data.SearchSources
 import io.github.ravindren_sm.openstream.data.TitleIndexer
 import io.github.ravindren_sm.openstream.ui.components.VersionPicker
@@ -153,7 +154,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     val db = remember { OpenStreamDb.get(appContext) }
     val tileScopeForSearch = rememberCoroutineScope()
     fun recordSearch(text: String) { tileScopeForSearch.launch(Dispatchers.IO) { repo.recordSearch(profileId, text) } }
-    LaunchedEffect(searchState.query, searchState.submitTick, connected) {
+    LaunchedEffect(searchState.query, searchState.submitTick, connected, searchState.filters) {
         val q = searchState.query.trim()
         if (q.length < SearchRanking.MIN_QUERY) { searchState.phase = SearchPhase.Idle; return@LaunchedEffect }
         if (!connected) { searchState.phase = SearchPhase.Idle; return@LaunchedEffect }
@@ -162,7 +163,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         delay(if (submitted) 0L else if (q.length >= 3) 350L else 800L)
         lastSubmitHandled = searchState.submitTick
         searchState.phase = SearchPhase.Loading
-        val result = withContext(Dispatchers.IO) { searchCatalog.search(q) }
+        val result = withContext(Dispatchers.IO) { searchCatalog.search(q, searchState.filters, searchState.categories) }
         searchState.phase = when (result) {
             is CatalogResult.Ok -> SearchPhase.Done(result.value)
             is CatalogResult.Failed -> SearchPhase.Failed(result.message)
@@ -170,6 +171,21 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         if (submitted && result is CatalogResult.Ok) recordSearch(q)
     }
 
+    // Filters: the portal's categories (for the pickers and the language choices) and the saved default set.
+    val searchPrefs = remember { appContext.getSharedPreferences("search", android.content.Context.MODE_PRIVATE) }
+    LaunchedEffect(portalEpoch) {
+        val saved = searchPrefs.getString("default_filters", null)?.let(SearchFilters::decode)?.takeIf { it.isActive }
+        searchState.defaultFilters = saved
+        if (saved != null) searchState.filters = saved           // the default applies from the start of each visit
+    }
+    LaunchedEffect(stack.current.route == Route.SEARCH, connected, vodCatalog) {
+        if (stack.current.route == Route.SEARCH && connected && searchState.categories.isEmpty()) {
+            when (val r = withContext(Dispatchers.IO) { vodCatalog.allCategories() }) {
+                is CatalogResult.Ok -> searchState.categories = r.value.filterNot { io.github.ravindren_sm.openstream.profiles.CategoryRules.isAdult(it.title) }
+                is CatalogResult.Failed -> Unit
+            }
+        }
+    }
     // Type-ahead suggestions from text already on the device; the channel list is read ahead once Search is first opened.
     val onSearchRoute = stack.current.route == Route.SEARCH
     var channelsWarm by remember(portalEpoch) { mutableStateOf(false) }
@@ -362,6 +378,11 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                     },
                     onPickSuggestion = { sug -> searchState.query = sug.text; searchState.submitTick++ },
                     onEnableIndex = { indexer.enable(); indexTick++ },
+                    onFiltersChange = { searchState.filters = it },
+                    onSaveDefaultFilters = {
+                        searchPrefs.edit().putString("default_filters", searchState.filters.encode()).apply()
+                        searchState.defaultFilters = searchState.filters
+                    },
                     onPauseIndex = { indexer.pause(); tileScopeForSearch.launch(Dispatchers.IO) { delay(300); indexer.refreshStatus() } },
                 )
             } else if (stack.current.route == Route.LIVE_TV) {

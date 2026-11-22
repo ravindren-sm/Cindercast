@@ -19,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -27,12 +28,17 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
 import io.github.ravindren_sm.openstream.data.PosterUrl
 import io.github.ravindren_sm.openstream.data.IndexStatus
+import io.github.ravindren_sm.openstream.data.FilterRules
+import io.github.ravindren_sm.openstream.data.SearchFilters
 import io.github.ravindren_sm.openstream.data.SearchResults
+import io.github.ravindren_sm.openstream.data.VodCategory
 import io.github.ravindren_sm.openstream.data.Suggestion
 import io.github.ravindren_sm.openstream.data.TitleGroup
 import io.github.ravindren_sm.openstream.provider.LiveChannel
 import io.github.ravindren_sm.openstream.provider.PortalText
 import io.github.ravindren_sm.openstream.provider.VodItem
+import io.github.ravindren_sm.openstream.ui.components.Choice
+import io.github.ravindren_sm.openstream.ui.components.ChoicePicker
 import io.github.ravindren_sm.openstream.ui.components.FocusVariant
 import io.github.ravindren_sm.openstream.ui.components.OsFocusable
 import io.github.ravindren_sm.openstream.ui.components.OsTextField
@@ -66,6 +72,11 @@ class SearchState {
     /** Type-ahead suggestions from text the device already holds (recent searches, favorites, history, channels, the title index). */
     var suggestions: List<Suggestion> by mutableStateOf(emptyList())
     var index: IndexStatus by mutableStateOf(IndexStatus.OFF)
+    /** The filters in force, and the portal's categories they can name (adult categories left out). */
+    var filters: SearchFilters by mutableStateOf(SearchFilters())
+    var categories: List<VodCategory> by mutableStateOf(emptyList())
+    /** The saved default filters, if any. */
+    var defaultFilters: SearchFilters? by mutableStateOf(null)
 }
 
 fun searchSuggestionFocusId(i: Int) = "search-sug-$i"
@@ -88,8 +99,11 @@ fun SearchScreen(
     onPickSuggestion: (Suggestion) -> Unit,
     onEnableIndex: () -> Unit,
     onPauseIndex: () -> Unit,
+    onFiltersChange: (SearchFilters) -> Unit,
+    onSaveDefaultFilters: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var picker: FilterPicker? by remember { mutableStateOf(null) }
     // When the index button disappears (indexing finished or paused) focus would fall to the tab bar: bring it back to the box.
     LaunchedEffect(state.index.enabled, state.index.complete) {
         delay(150)
@@ -103,8 +117,9 @@ fun SearchScreen(
             if (memory.focusedId?.startsWith("nav-") != false) memory.tryFocus(SEARCH_INPUT_ID) else return@LaunchedEffect
         }
     }
+    Box(modifier.fillMaxSize()) {
     Column(
-        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.S2),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.S2),
         verticalArrangement = Arrangement.spacedBy(Spacing.S3),
     ) {
         OsTextField(
@@ -112,6 +127,7 @@ fun SearchScreen(
             label = "Search", hint = "Movies, shows and channels", imeAction = ImeAction.Done,
             onDone = { state.submitTick++ },
         )
+        FilterBar(state, memory, onOpen = { picker = it }, onChange = onFiltersChange, onSaveDefault = onSaveDefaultFilters)
         if (state.suggestions.isNotEmpty()) {
             Text(if (state.query.isBlank()) "Recent searches" else "Suggestions", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.S1)) {
@@ -132,9 +148,11 @@ fun SearchScreen(
             )
             SearchPhase.Loading -> Text("Searching…", style = Tokens.BodyLarge, color = Tokens.TextSecondary)
             is SearchPhase.Failed -> Text(phase.message, style = Tokens.BodyLarge, color = Tokens.StatusError)
-            is SearchPhase.Done -> Results(phase.results, state.query.trim(), portalUrl, memory, isFavoriteVod, isFavoriteChannel, onOpenChannel, onOpenMovie, onOpenShow)
+            is SearchPhase.Done -> Results(phase.results, state.query.trim(), state.filters.isActive, portalUrl, memory, isFavoriteVod, isFavoriteChannel, onOpenChannel, onOpenMovie, onOpenShow)
         }
         IndexPanel(state.index, memory, onEnableIndex, onPauseIndex)
+    }
+    picker?.let { kind -> FilterPickerHost(kind, state, memory, onFiltersChange) { picker = null } }
     }
 }
 
@@ -171,12 +189,13 @@ private fun IndexPanel(status: IndexStatus, memory: FocusMemory, onEnable: () ->
 
 @Composable
 private fun Results(
-    r: SearchResults, query: String, portalUrl: String, memory: FocusMemory, isFavoriteVod: (VodItem) -> Boolean,
+    r: SearchResults, query: String, filtersOn: Boolean, portalUrl: String, memory: FocusMemory, isFavoriteVod: (VodItem) -> Boolean,
     isFavoriteChannel: (LiveChannel) -> Boolean, onOpenChannel: (Int) -> Unit, onOpenMovie: (TitleGroup) -> Unit, onOpenShow: (TitleGroup) -> Unit,
 ) {
     if (r.isEmpty) {
-        Text("No matches for “$query”", style = Tokens.BodyLarge, color = Tokens.TextSecondary)
+        Text("No matches for “$query”" + if (filtersOn) " with these filters" else "", style = Tokens.BodyLarge, color = Tokens.TextSecondary)
     }
+    r.note?.let { Text(it, style = Tokens.Body, color = Tokens.StatusWarning) }
     if (r.channels.isNotEmpty()) {
         Text("Channels", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = PaddingValues(end = Spacing.S1, top = Spacing.S1, bottom = Spacing.S1)) {
@@ -215,3 +234,93 @@ private fun PosterRow(
         }
     }
 }
+
+
+/** Which filter list is open. */
+enum class FilterPicker { LANGUAGE, GENRE, CATEGORY, RATING, ROTTEN }
+
+private fun chipId(kind: FilterPicker) = "search-filter-${kind.name.lowercase()}"
+
+private fun chipLabel(name: String, chosen: List<String>) = when {
+    chosen.isEmpty() -> name
+    chosen.size == 1 -> "$name: ${chosen[0]}"
+    else -> "$name: ${chosen[0]} +${chosen.size - 1}"
+}
+
+/**
+ * Filter buttons under the search box. Language, genre, category and rating combine (all must hold); the buttons show what is
+ * chosen. Save as default keeps the current set for every later visit; Clear turns them all off.
+ */
+@Composable
+private fun FilterBar(
+    state: SearchState, memory: FocusMemory, onOpen: (FilterPicker) -> Unit, onChange: (SearchFilters) -> Unit, onSaveDefault: () -> Unit,
+) {
+    val f = state.filters
+    val titles = state.categories.associate { it.id to it.title }
+    // Save, Use default and Clear disappear once they have done their job; without this focus would fall to the tab bar.
+    var refocus by remember { mutableIntStateOf(0) }
+    LaunchedEffect(refocus) {
+        if (refocus > 0) { delay(200); memory.tryFocus(chipId(FilterPicker.LANGUAGE)) }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.S1)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.S1)) {
+            FilterChip(chipId(FilterPicker.LANGUAGE), chipLabel("Language", f.languages.sorted()), f.languages.isNotEmpty(), memory) { onOpen(FilterPicker.LANGUAGE) }
+            FilterChip(chipId(FilterPicker.GENRE), chipLabel("Genre", f.genres.sorted()), f.genres.isNotEmpty(), memory) { onOpen(FilterPicker.GENRE) }
+            FilterChip(chipId(FilterPicker.CATEGORY), chipLabel("Category", f.categoryIds.mapNotNull { titles[it] }.sorted()), f.categoryIds.isNotEmpty(), memory) { onOpen(FilterPicker.CATEGORY) }
+            FilterChip(chipId(FilterPicker.RATING), if (f.minRating == null) "Rating" else "Rating ${"%.0f".format(f.minRating)}+", f.minRating != null, memory) { onOpen(FilterPicker.RATING) }
+            FilterChip(chipId(FilterPicker.ROTTEN), "Rotten Tomatoes", false, memory) { onOpen(FilterPicker.ROTTEN) }
+        }
+        val saved = state.defaultFilters
+        if (f.isActive || (saved != null && saved != f)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.S1)) {
+                if (f.isActive && saved != f) FilterChip("search-filter-save", "Save as default", false, memory, onSelect = { onSaveDefault(); refocus++ })
+                if (saved != null && saved != f) FilterChip("search-filter-usedefault", "Use default (${saved.summary(titles::get)})", false, memory) { onChange(saved); refocus++ }
+                if (f.isActive) FilterChip("search-filter-clear", "Clear filters", false, memory) { onChange(SearchFilters()); refocus++ }
+            }
+        }
+        if (f.isActive) Text("Filters apply to movies and shows; channels are hidden while a filter is on.", style = Tokens.Body, color = Tokens.TextSecondary)
+    }
+}
+
+@Composable
+private fun FilterChip(id: String, label: String, active: Boolean, memory: FocusMemory, onSelect: () -> Unit) {
+    OsFocusable(id = id, memory = memory, variant = FocusVariant.BUTTON, onSelect = onSelect) { _ ->
+        Text(label, style = Tokens.Body, color = if (active) Tokens.AccentPrimary else Tokens.TextPrimary, maxLines = 1,
+            modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1))
+    }
+}
+
+/** Builds the options for [kind] from the state and shows the picker. */
+@Composable
+private fun FilterPickerHost(kind: FilterPicker, state: SearchState, memory: FocusMemory, onChange: (SearchFilters) -> Unit, onClose: () -> Unit) {
+    val f = state.filters
+    when (kind) {
+        FilterPicker.LANGUAGE -> ChoicePicker(
+            "Language", FilterRules.languageOptions(state.categories).map { Choice(it, it) }, f.languages, multi = true,
+            note = if (state.categories.isEmpty()) "The portal's categories have not loaded yet." else "Languages are read from category names.",
+            memory = memory, returnFocusId = chipId(kind),
+            onToggle = { id -> onChange(f.copy(languages = f.languages.toggled(id))) }, onClose = onClose,
+        )
+        FilterPicker.GENRE -> ChoicePicker(
+            "Genre", SearchFilters.GENRES.map { Choice(it, it) }, f.genres, multi = true, note = "Matches the genres each title lists.",
+            memory = memory, returnFocusId = chipId(kind), onToggle = { id -> onChange(f.copy(genres = f.genres.toggled(id))) }, onClose = onClose,
+        )
+        FilterPicker.CATEGORY -> ChoicePicker(
+            "Category", state.categories.map { Choice(it.id, PortalText.decodeEntities(it.title)) }, f.categoryIds, multi = true,
+            note = if (state.categories.isEmpty()) "The portal's categories have not loaded yet." else "The portal is asked one category at a time (up to six).",
+            memory = memory, returnFocusId = chipId(kind), onToggle = { id -> onChange(f.copy(categoryIds = f.categoryIds.toggled(id))) }, onClose = onClose,
+        )
+        FilterPicker.RATING -> ChoicePicker(
+            "Minimum rating", listOf(Choice("any", "Any rating")) + SearchFilters.RATING_STEPS.map { Choice("$it", "${"%.0f".format(it)} and above") },
+            setOf(f.minRating?.toString() ?: "any"), multi = false, note = "The portal's own rating: IMDb when it has one, otherwise Kinopoisk. Titles with no rating are left out.",
+            memory = memory, returnFocusId = chipId(kind), onToggle = { id -> onChange(f.copy(minRating = id.toDoubleOrNull())) }, onClose = onClose,
+        )
+        FilterPicker.ROTTEN -> ChoicePicker(
+            "Rotten Tomatoes", emptyList(), emptySet(), multi = false,
+            note = "The portal has no Rotten Tomatoes scores. They would come from an outside ratings service with a free key from you; none is set up.",
+            memory = memory, returnFocusId = chipId(kind), onToggle = {}, onClose = onClose,
+        )
+    }
+}
+
+private fun Set<String>.toggled(id: String): Set<String> = if (id in this) this - id else this + id

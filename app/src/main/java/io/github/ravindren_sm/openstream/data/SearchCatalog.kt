@@ -10,6 +10,8 @@ class SearchResults(
     val shows: List<TitleGroup>,
     val channels: List<LiveChannel>,
     val channelsFailed: Boolean = false,
+    /** A line to show with the results, for example that only some matching categories were searched. */
+    val note: String? = null,
 ) {
     val isEmpty get() = movies.isEmpty() && shows.isEmpty() && channels.isEmpty()
 }
@@ -64,28 +66,43 @@ class SearchCatalog(private val session: PortalSession, private val maxPages: In
     /** Set once the portal has shown it ignores `search` on the channel list, so later searches skip that request. */
     @Volatile private var serverChannelSearchIgnored = false
 
-    fun search(query: String): CatalogResult<SearchResults> {
+    /**
+     * Searches titles (through the portal, one request per category when the filters name categories or languages) and
+     * channels (only when no filter is on, since channels have no category, genre or rating). Genre and rating filters
+     * are applied here to what the portal returns.
+     */
+    fun search(query: String, filters: SearchFilters = SearchFilters(), categories: List<VodCategory> = emptyList()): CatalogResult<SearchResults> {
         val q = query.trim()
+        val plan = FilterRules.plan(categories, filters)
+        if (plan.none) return CatalogResult.Ok(SearchResults(emptyList(), emptyList(), emptyList(), note = "No category matches the language and category choices."))
+        val targets = plan.ids ?: listOf("*")
+        val pagesPerTarget = if (plan.ids == null) maxPages else 2
         val titles = mutableListOf<VodItem>()
-        for (page in 1..maxPages) {
-            var parsed: io.github.ravindren_sm.openstream.provider.VodPage? = null
-            val result = session.withSession { m -> m.call { c -> val (r, p) = c.vodSearch(q, page); parsed = p; r } }
-                ?: return CatalogResult.Failed(LiveCatalog.NOT_CONNECTED)
-            val p = parsed
-            if (!result.ok || p == null) {
-                if (page == 1) return CatalogResult.Failed(NO_RESULTS)
-                break                                                  // keep what was read
+        var firstRequest = true
+        for (category in targets) {
+            for (page in 1..pagesPerTarget) {
+                var parsed: io.github.ravindren_sm.openstream.provider.VodPage? = null
+                val result = session.withSession { m -> m.call { c -> val (r, p) = c.vodSearch(q, page, category); parsed = p; r } }
+                    ?: return CatalogResult.Failed(LiveCatalog.NOT_CONNECTED)
+                val p = parsed
+                if (!result.ok || p == null) {
+                    if (firstRequest) return CatalogResult.Failed(NO_RESULTS)
+                    break                                                  // keep what was read
+                }
+                firstRequest = false
+                val known = titles.mapTo(HashSet()) { it.id }
+                titles += p.items.filter { it.id !in known }
+                if (!p.hasMore(p.items.size * page)) break
             }
-            val known = titles.mapTo(HashSet()) { it.id }
-            titles += p.items.filter { it.id !in known }
-            if (!p.hasMore(titles.size)) break
         }
-        val ranked = rank(titles, q)
-        val (channels, failed) = findChannels(q)
+        val kept = titles.filter { FilterRules.passes(it, filters) }
+        val ranked = rank(kept, q)
+        val (channels, failed) = if (filters.isActive) emptyList<LiveChannel>() to false else findChannels(q)
         val movies = TitleMerge.group(ranked.filter { !it.isSeries })
         val shows = TitleMerge.group(ranked.filter { it.isSeries })
-        SearchHooks.event("titles=${titles.size} movies=${movies.size} shows=${shows.size} merged=${titles.size - movies.size - shows.size} channels=${channels.size} channelsFailed=$failed")
-        return CatalogResult.Ok(SearchResults(movies = movies, shows = shows, channels = channels, channelsFailed = failed))
+        SearchHooks.event("titles=${titles.size} kept=${kept.size} movies=${movies.size} shows=${shows.size} categories=${targets.size} channels=${channels.size} channelsFailed=$failed")
+        val note = if (plan.capped) "Searched the first ${targets.size} of ${plan.matching} matching categories." else null
+        return CatalogResult.Ok(SearchResults(movies = movies, shows = shows, channels = channels, channelsFailed = failed, note = note))
     }
 
     /**
