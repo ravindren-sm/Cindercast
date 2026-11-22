@@ -9,7 +9,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -68,5 +75,17 @@ fun TopNavBar(
                 }
             }
         }
+        Spacer(Modifier.weight(1f))
+        Clock()
     }
+}
+
+/** The time of day, refreshed on the minute. Uses the device's own 12 or 24 hour setting. */
+@Composable
+private fun Clock() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis(); delay(60_000 - now % 60_000) } }
+    val text = remember(now) { android.text.format.DateFormat.getTimeFormat(context).format(java.util.Date(now)) }
+    Text(text, style = Tokens.BodyLarge, color = Tokens.TextSecondary, modifier = Modifier.padding(end = Spacing.S2))
 }

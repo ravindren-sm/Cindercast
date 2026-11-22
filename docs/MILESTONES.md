@@ -314,3 +314,11 @@ Design in `docs/HOME_AND_PROFILES.md`. Built: Room 2.7.1 with KSP (the owner cho
 - Checked on the Fire TV with a side-by-side install against the fake portal: first-run Home with focus on the first door; a movie played 40 s appeared as a tile with "4 min left"; selecting it resumed at 0:53 (40 s earlier plus a few seconds); two episodes of one show gave a single tile ("Season 1 · S01 E02") ahead of the movie. Side app uninstalled, fake portal stopped, screenshots deleted. The real portal was not contacted.
 - Known gaps: after Back from the player focus lands on the tab you came from (not the tile); no way yet to remove a tile or mark watched; Search door opens the placeholder.
 
+## Home: Recently watched, options menu, clock, focus (2026-11-21; fake portal and a local test video, no provider contact)
+- Home rows: Continue watching, then Recently watched (finished titles, green "Watched" bar; a show already in the first row is not repeated), then the doors. The page scrolls when the rows are taller than the screen.
+- Menu key on a tile opens options: Remove from Home, Mark as watched or Mark as not watched (starts again from the beginning), Cancel. The D-pad stays inside the menu and Back closes it. Focus follows the tile to its new row, or to the next tile after a removal.
+- A clock (the device's 12 or 24 hour setting) sits at the right of the tab bar on every screen.
+- Focus: Home waits for its rows to be re-read before taking focus, so Back from a player lands on the tile that was played. With only finished titles, the first Recently watched tile takes first focus.
+- Tests: two more `ContinueItemsTest` cases (watched label and full bar; no repeat across the two rows). Checked on the Fire TV with a side-by-side install: tile, menu, mark watched (moves to Recently watched), mark not watched (moves back), Back from the player onto the tile, remove (welcome state). Side app uninstalled, fake portal stopped, scratch files deleted. The real portal was not contacted.
+- Not done: Favorite channels, "new in your categories" and Live rows (need favorites and a category chooser first).
+

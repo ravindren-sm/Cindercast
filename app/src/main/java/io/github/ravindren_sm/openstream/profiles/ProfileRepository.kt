@@ -134,6 +134,10 @@ class ProfileRepository(private val db: OpenStreamDb, private val nowMillis: () 
     }
 
     suspend fun continueWatching(profileId: Long, limit: Int = 14): List<HistoryEntity> = db.history().unfinished(profileId, limit)
+    /** Titles watched to the end, newest first (Home's Recently watched row). */
+    suspend fun recentlyFinished(profileId: Long, limit: Int = 14): List<HistoryEntity> = db.history().finished(profileId, limit)
+    suspend fun setWatched(profileId: Long, resumeKey: String, watched: Boolean) =
+        if (watched) db.history().markWatched(profileId, resumeKey, nowMillis()) else db.history().markUnwatched(profileId, resumeKey, nowMillis())
     suspend fun recentlyWatched(profileId: Long, limit: Int = 14): List<HistoryEntity> = db.history().recent(profileId, limit)
     suspend fun forget(profileId: Long, resumeKey: String) = db.history().remove(profileId, resumeKey)
     suspend fun clearHistory(profileId: Long) = db.history().clear(profileId)

@@ -17,7 +17,11 @@ data class ContinueTile(
     /** "12 min left", or null when the length is unknown. */
     val timeLeft: String?,
     val positionMs: Long,
-)
+    val completed: Boolean = false,
+) {
+    /** The title this tile stands for (a show's episodes share one). */
+    val titleKey: String get() = ContinueItems.titleKey(kind, titleId)
+}
 
 /** Turns history rows (newest first) into the tiles Home shows. Plain Kotlin so it is tested without Android. */
 object ContinueItems {
@@ -27,20 +31,24 @@ object ContinueItems {
      * Keeps the newest row of each show (a viewer mid-way through three episodes sees one tile: the latest) and drops
      * rows that cannot be played again (no stored command). Input order is preserved.
      */
-    fun from(rows: List<HistoryEntity>, max: Int = MAX_TILES): List<ContinueTile> {
-        val seen = HashSet<String>()
+    fun from(rows: List<HistoryEntity>, max: Int = MAX_TILES, exclude: Set<String> = emptySet()): List<ContinueTile> {
+        val seen = HashSet<String>(exclude)
         val out = ArrayList<ContinueTile>()
         for (r in rows) {
             val cmd = r.playCmd ?: continue
-            if (!seen.add("${r.kind}/${r.titleId}")) continue
+            if (!seen.add(titleKey(r.kind, r.titleId))) continue
             out += ContinueTile(
                 r.resumeKey, r.kind, r.titleId, r.title, r.subtitle, r.posterUri, cmd,
-                progress(r.positionMs, r.durationMs), timeLeft(r.positionMs, r.durationMs), r.positionMs,
+                if (r.completed) 1f else progress(r.positionMs, r.durationMs),
+                if (r.completed) "Watched" else timeLeft(r.positionMs, r.durationMs), r.positionMs, r.completed,
             )
             if (out.size >= max) break
         }
         return out
     }
+
+    /** What makes two rows the same title for Home: a movie, or a show (all its episodes). */
+    fun titleKey(kind: String, titleId: String) = "$kind/$titleId"
 
     fun progress(positionMs: Long, durationMs: Long): Float =
         if (durationMs <= 0) 0f else (positionMs.toFloat() / durationMs).coerceIn(0f, 1f)

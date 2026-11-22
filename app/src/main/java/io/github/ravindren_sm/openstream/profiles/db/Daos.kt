@@ -41,6 +41,13 @@ interface HistoryDao {
     suspend fun unfinished(profileId: Long, limit: Int): List<HistoryEntity>
     @Query("SELECT * FROM history WHERE profileId = :profileId ORDER BY updatedAt DESC LIMIT :limit")
     suspend fun recent(profileId: Long, limit: Int): List<HistoryEntity>
+    @Query("SELECT * FROM history WHERE profileId = :profileId AND completed = 1 ORDER BY updatedAt DESC LIMIT :limit")
+    suspend fun finished(profileId: Long, limit: Int): List<HistoryEntity>
+    @Query("UPDATE history SET completed = 1, updatedAt = :now WHERE profileId = :profileId AND resumeKey = :key")
+    suspend fun markWatched(profileId: Long, key: String, now: Long)
+    /** Back to unwatched: the title starts again from the beginning. */
+    @Query("UPDATE history SET completed = 0, positionMs = 0, updatedAt = :now WHERE profileId = :profileId AND resumeKey = :key")
+    suspend fun markUnwatched(profileId: Long, key: String, now: Long)
     @Query("DELETE FROM history WHERE profileId = :profileId AND resumeKey = :key") suspend fun remove(profileId: Long, key: String)
     @Query("DELETE FROM history WHERE profileId = :profileId") suspend fun clear(profileId: Long)
 }

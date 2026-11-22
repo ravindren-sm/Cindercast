@@ -41,8 +41,7 @@ runs on the family TV still stands (see Environment notes).
   playlists keep enough history; check how much the real channels keep.
 - Accelerating seek when a key is held (30 s, 60 s), and a way to jump far in a 2-hour film (for example a position
   scrubber), since 10 s per press is slow.
-- Continue Watching on Home is built (2026-11-21). Still to do: mark a title watched or unwatched by hand, remove a
-  tile, and land focus on the tile (not the tab) after Back from the player.
+- Continue Watching on Home is built (2026-11-21). Mark watched, remove and focus after Back are done too.
 - Next-episode prompt at the end of an episode.
 
 ## Reliability

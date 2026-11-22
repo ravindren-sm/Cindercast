@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -27,7 +28,10 @@ import io.github.ravindren_sm.openstream.profiles.RoomHistoryRecorder
 import io.github.ravindren_sm.openstream.profiles.db.OpenStreamDb
 import io.github.ravindren_sm.openstream.provider.VodItem
 import io.github.ravindren_sm.openstream.ui.screens.HomeScreen
+import io.github.ravindren_sm.openstream.ui.screens.TileAction
+import kotlinx.coroutines.launch
 import io.github.ravindren_sm.openstream.ui.screens.doorFocusId
+import io.github.ravindren_sm.openstream.ui.screens.recentFocusId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -100,6 +104,16 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     val recorder = remember { RoomHistoryRecorder(repo, { profileId }, CoroutineScope(SupervisorJob() + Dispatchers.IO)) }
     // Continue watching, re-read each time Home is shown (null until the first read finishes).
     var continueTiles: List<ContinueTile>? by remember { mutableStateOf(null) }
+    var tilesFresh by remember { mutableStateOf(false) }   // Home's rows were re-read since it was entered
+    var recentTiles: List<ContinueTile> by remember { mutableStateOf(emptyList()) }
+    val tileScope = rememberCoroutineScope()
+    suspend fun loadTiles() {
+        val (unfinished, finished) = withContext(Dispatchers.IO) { repo.continueWatching(profileId, 30) to repo.recentlyFinished(profileId, 30) }
+        val keep = ContinueItems.from(unfinished)
+        continueTiles = keep
+        // A show already under Continue watching is not repeated under Recently watched.
+        recentTiles = ContinueItems.from(finished, exclude = keep.mapTo(HashSet()) { it.titleKey })
+    }
     // The title chosen from Continue watching, kept while it plays.
     var historyTarget: PlayTarget? by remember { mutableStateOf(null) }
     val connected = session.status.let { it is SessionStatus.Ready || it is SessionStatus.Degraded }
@@ -154,7 +168,18 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
             SessionStatusLine(session.status)
             if (stack.current.route == Route.HOME) {
                 HomeScreen(
-                    tiles = continueTiles, portalUrl = portalUrl, memory = memory,
+                    continueTiles = continueTiles, recentTiles = recentTiles, portalUrl = portalUrl, memory = memory,
+                    onTileAction = { tile, action ->
+                        tileScope.launch {
+                            withContext(Dispatchers.IO) {
+                                when (action) {
+                                    TileAction.REMOVE -> { repo.forget(profileId, tile.resumeKey); resumeStore.clear(tile.resumeKey) }
+                                    TileAction.TOGGLE_WATCHED -> { repo.setWatched(profileId, tile.resumeKey, !tile.completed); resumeStore.clear(tile.resumeKey) }
+                                }
+                            }
+                            loadTiles()
+                        }
+                    },
                     onResume = { tile ->
                         // Rebuild the play target from what was stored: the command plays it, the resume key finds the position.
                         val file = VodItem(tile.resumeKey, tile.title, false, false, false, tile.playCmd, emptyList())
@@ -221,17 +246,19 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     // Read the history whenever Home is (re)entered; a short wait lets the player's last save land first.
     val onHome = stack.current.route == Route.HOME
     LaunchedEffect(onHome, profileId) {
-        if (!onHome || profileId <= 0L) return@LaunchedEffect
+        if (!onHome) { tilesFresh = false; return@LaunchedEffect }
+        if (profileId <= 0L) return@LaunchedEffect
         delay(300)
-        continueTiles = withContext(Dispatchers.IO) { ContinueItems.from(repo.continueWatching(profileId, 30)) }
+        loadTiles()
+        tilesFresh = true
     }
 
     // After each stack change, once the new screen is on screen, put focus where it belongs. On Home that waits for
     // the history, so the first Continue watching tile (not a door) gets it.
-    val homeReady = !onHome || continueTiles != null
+    val homeReady = !onHome || tilesFresh
     LaunchedEffect(stack, homeReady) {
         if (!homeReady) return@LaunchedEffect
         androidx.compose.runtime.withFrameNanos { }   // let the new screen compose and attach
-        memory.tryFocusFirst(stack.restoreFocusId, initialFocusId(stack.current.route), if (onHome) doorFocusId(0) else null, topTab?.let(::tabFocusId))
+        memory.tryFocusFirst(stack.restoreFocusId, initialFocusId(stack.current.route), if (onHome) recentFocusId(0) else null, if (onHome) doorFocusId(0) else null, topTab?.let(::tabFocusId))
     }
 }

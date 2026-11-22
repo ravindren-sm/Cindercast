@@ -25,6 +25,20 @@ class ContinueItemsTest {
         assertEquals(2, ContinueItems.from(rows).size)
     }
 
+    @Test fun finishedTitlesAreMarkedWatchedAndShowAFullBar() {
+        val t = ContinueItems.from(listOf(row("a").copy(completed = true, positionMs = 5_990_000))).single()
+        assertEquals("Watched", t.timeLeft)
+        assertEquals(1f, t.progress, 0f)
+        assertEquals(true, t.completed)
+    }
+
+    @Test fun aShowAlreadyInTheFirstRowIsLeftOutOfTheSecond() {
+        val inContinue = ContinueItems.from(listOf(row("s1/e1", "EPISODE", "s1")))
+        val finished = listOf(row("s1/e0", "EPISODE", "s1"), row("m9").copy(completed = true))
+        val recent = ContinueItems.from(finished, exclude = inContinue.mapTo(HashSet()) { it.titleKey })
+        assertEquals(listOf("m9"), recent.map { it.resumeKey })
+    }
+
     @Test fun capsTheRow() {
         assertEquals(3, ContinueItems.from(List(10) { row("m$it") }, max = 3).size)
     }
