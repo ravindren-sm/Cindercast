@@ -141,6 +141,8 @@ data class CatalogTitleEntity(
     /** The portal's own ratings (null when it gave none or zero). The one shown is IMDb when present, else Kinopoisk. */
     val imdbRating: Double? = null,
     val kinopoiskRating: Double? = null,
+    /** The genres the title lists (text as the portal sends it). */
+    val genres: String? = null,
     /** Position in the category as the portal lists it, newest added first (0 is the newest). */
     @androidx.room.ColumnInfo(defaultValue = "0") val ord: Int = 0,
 )
@@ -153,3 +155,16 @@ data class IndexProgressEntity(
     val totalItems: Int,
     val done: Boolean,
 )
+
+/**
+ * What a profile watches, counted once per title the viewer has actually watched for a minute or more. [kind] is GENRE, LANGUAGE or
+ * TITLE (a show or movie, keyed by its name with quality and language tags removed so versions count together). [label] is how it
+ * is shown. Used to order search results and to show "most watched" in Settings. Stays on the device.
+ */
+@Entity(
+    tableName = "viewing_stats",
+    primaryKeys = ["profileId", "kind", "key"],
+    foreignKeys = [ForeignKey(ProfileEntity::class, ["id"], ["profileId"], onDelete = CASCADE)],
+    indices = [Index("profileId", "kind")],
+)
+data class ViewingStatEntity(val profileId: Long, val kind: String, val key: String, val label: String, val count: Int, val lastAt: Long)

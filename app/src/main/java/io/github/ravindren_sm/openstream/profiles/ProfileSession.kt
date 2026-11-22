@@ -20,6 +20,11 @@ class RoomHistoryRecorder(
             repo.recordProgress(
                 profile, target.resumeKey, target.kind, target.titleId, target.historyTitle, target.subtitle,
                 target.posterUri, positionMs, durationMs, playCmd = cmd,
+                watch = WatchInfo(
+                    io.github.ravindren_sm.openstream.data.WatchTags.titleKey(target.historyTitle), target.historyTitle,
+                    io.github.ravindren_sm.openstream.data.WatchTags.genresOf(target.genres),
+                    io.github.ravindren_sm.openstream.data.WatchTags.languagesOf("${target.historyTitle} ${target.languageText.orEmpty()}"),
+                ),
             )
         }
     }

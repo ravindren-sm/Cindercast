@@ -143,7 +143,7 @@ class TitleIndexer(
         private fun entityOf0(item: VodItem, categoryId: String, ord: Int) = CatalogTitleEntity(
             kind = if (item.isSeries) "SHOW" else "MOVIE", id = item.id, name = PortalText0.clean(item.name), nameKey = SearchRanking.normalize(item.name),
             year = item.year, posterUri = item.posterUri, cmd = item.cmd ?: item.fileCmds.firstOrNull(), age = item.age, categoryId = categoryId,
-            imdbRating = item.imdbRating, kinopoiskRating = item.kinopoiskRating, ord = ord,
+            imdbRating = item.imdbRating, kinopoiskRating = item.kinopoiskRating, ord = ord, genres = item.genres,
         )
     }
 }

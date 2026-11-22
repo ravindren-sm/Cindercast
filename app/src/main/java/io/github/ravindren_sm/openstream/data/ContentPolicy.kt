@@ -32,6 +32,10 @@ class ContentPolicyStore(private val prefs: SharedPreferences) {
         return ContentPolicy(min, prefs.getBoolean(key(profileId, "hide_unrated"), false))
     }
 
+    /** A yes/no choice kept for one profile (for example whether search is ordered by what the profile watches). */
+    fun flag(profileId: Long, name: String, default: Boolean): Boolean = prefs.getBoolean(key(profileId, name), default)
+    fun setFlag(profileId: Long, name: String, value: Boolean) { prefs.edit().putBoolean(key(profileId, name), value).apply() }
+
     fun save(profileId: Long, policy: ContentPolicy) {
         prefs.edit()
             .putFloat(key(profileId, "min_rating"), policy.minRating?.toFloat() ?: -1f)

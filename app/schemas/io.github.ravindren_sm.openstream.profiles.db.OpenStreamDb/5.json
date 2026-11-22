@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 5,
-    "identityHash": "972c2c09619c0d160ca18477cb263ff8",
+    "identityHash": "f525b642731bc1d40800216a175c2671",
     "entities": [
       {
         "tableName": "profiles",
@@ -520,7 +520,7 @@
       },
       {
         "tableName": "catalog_titles",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`kind` TEXT NOT NULL, `id` TEXT NOT NULL, `name` TEXT NOT NULL, `nameKey` TEXT NOT NULL, `year` TEXT, `posterUri` TEXT, `cmd` TEXT, `age` TEXT, `categoryId` TEXT NOT NULL, `imdbRating` REAL, `kinopoiskRating` REAL, `ord` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`kind`, `id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`kind` TEXT NOT NULL, `id` TEXT NOT NULL, `name` TEXT NOT NULL, `nameKey` TEXT NOT NULL, `year` TEXT, `posterUri` TEXT, `cmd` TEXT, `age` TEXT, `categoryId` TEXT NOT NULL, `imdbRating` REAL, `kinopoiskRating` REAL, `genres` TEXT, `ord` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`kind`, `id`))",
         "fields": [
           {
             "fieldPath": "kind",
@@ -581,6 +581,11 @@
             "fieldPath": "kinopoiskRating",
             "columnName": "kinopoiskRating",
             "affinity": "REAL"
+          },
+          {
+            "fieldPath": "genres",
+            "columnName": "genres",
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "ord",
@@ -644,11 +649,86 @@
             "categoryId"
           ]
         }
+      },
+      {
+        "tableName": "viewing_stats",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`profileId` INTEGER NOT NULL, `kind` TEXT NOT NULL, `key` TEXT NOT NULL, `label` TEXT NOT NULL, `count` INTEGER NOT NULL, `lastAt` INTEGER NOT NULL, PRIMARY KEY(`profileId`, `kind`, `key`), FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "profileId",
+            "columnName": "profileId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "key",
+            "columnName": "key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "count",
+            "columnName": "count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastAt",
+            "columnName": "lastAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "profileId",
+            "kind",
+            "key"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_viewing_stats_profileId_kind",
+            "unique": false,
+            "columnNames": [
+              "profileId",
+              "kind"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_viewing_stats_profileId_kind` ON `${TABLE_NAME}` (`profileId`, `kind`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "profiles",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "profileId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '972c2c09619c0d160ca18477cb263ff8')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f525b642731bc1d40800216a175c2671')"
     ]
   }
 }

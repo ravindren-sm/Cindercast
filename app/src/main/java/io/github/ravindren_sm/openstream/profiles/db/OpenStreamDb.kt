@@ -16,7 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     entities = [
         ProfileEntity::class, HouseholdEntity::class, FavoriteEntity::class, HistoryEntity::class,
         PinnedCategoryEntity::class, KidsAllowedCategoryEntity::class, RecentSearchEntity::class,
-        CatalogTitleEntity::class, IndexProgressEntity::class,
+        CatalogTitleEntity::class, IndexProgressEntity::class, ViewingStatEntity::class,
     ],
     version = 5,
     exportSchema = true,
@@ -30,6 +30,7 @@ abstract class OpenStreamDb : RoomDatabase() {
     abstract fun kidsAllowed(): KidsAllowedDao
     abstract fun recentSearches(): RecentSearchDao
     abstract fun catalogIndex(): CatalogIndexDao
+    abstract fun viewingStats(): ViewingStatDao
 
     companion object {
         @Volatile private var instance: OpenStreamDb? = null
@@ -65,6 +66,9 @@ abstract class OpenStreamDb : RoomDatabase() {
                 db.execSQL("ALTER TABLE catalog_titles ADD COLUMN imdbRating REAL")
                 db.execSQL("ALTER TABLE catalog_titles ADD COLUMN kinopoiskRating REAL")
                 db.execSQL("ALTER TABLE catalog_titles ADD COLUMN ord INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE catalog_titles ADD COLUMN genres TEXT")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `viewing_stats` (`profileId` INTEGER NOT NULL, `kind` TEXT NOT NULL, `key` TEXT NOT NULL, `label` TEXT NOT NULL, `count` INTEGER NOT NULL, `lastAt` INTEGER NOT NULL, PRIMARY KEY(`profileId`, `kind`, `key`), FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_viewing_stats_profileId_kind` ON `viewing_stats` (`profileId`, `kind`)")
             }
         }
 

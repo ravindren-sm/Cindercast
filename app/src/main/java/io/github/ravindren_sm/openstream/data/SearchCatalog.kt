@@ -25,13 +25,17 @@ object SearchRanking {
     fun normalize(text: String): String = PortalText.decodeEntities(text).lowercase().trim().replace(Regex("\\s+"), " ")
 
     /** Titles that start with the query first, then those containing it, then the rest (the portal matched them on other fields). Order within a group is kept. */
-    fun rank(items: List<VodItem>, query: String): List<VodItem> {
+    fun rank(items: List<VodItem>, query: String, personal: Personalization? = null): List<VodItem> {
         val q = normalize(query)
         fun group(item: VodItem): Int {
             val name = normalize(item.name)
             return when { name.startsWith(q) -> 0; q in name -> 1; else -> 2 }
         }
-        return items.withIndex().sortedWith(compareBy({ group(it.value) }, { it.index })).map { it.value }
+        // Relevance first (starts with, contains, other); inside each group what the viewer watches comes first; then the portal's order.
+        val scores = if (personal == null || personal.isEmpty) null else items.associateWith { personal.score(it) }
+        return items.withIndex()
+            .sortedWith(compareBy({ group(it.value) }, { -(scores?.get(it.value) ?: 0.0) }, { it.index }))
+            .map { it.value }
     }
 
     /** Channels the portal found for [query]: its order is kept, but names starting with the text come first and the list is capped. */
@@ -71,7 +75,7 @@ class SearchCatalog(private val session: PortalSession, private val maxPages: In
      * channels (only when no filter is on, since channels have no category, genre or rating). Genre and rating filters
      * are applied here to what the portal returns.
      */
-    fun search(query: String, filters: SearchFilters = SearchFilters(), categories: List<VodCategory> = emptyList(), policy: ContentPolicy = ContentPolicy()): CatalogResult<SearchResults> {
+    fun search(query: String, filters: SearchFilters = SearchFilters(), categories: List<VodCategory> = emptyList(), policy: ContentPolicy = ContentPolicy(), personal: Personalization? = null): CatalogResult<SearchResults> {
         val q = query.trim()
         val plan = FilterRules.plan(categories, filters)
         if (plan.none) return CatalogResult.Ok(SearchResults(emptyList(), emptyList(), emptyList(), note = "No category matches the language and category choices."))
@@ -100,7 +104,7 @@ class SearchCatalog(private val session: PortalSession, private val maxPages: In
         }
         // The profile's rating floor applies unless the viewer chose a rating filter for this search.
         val kept = titles.filter { FilterRules.passes(it, filters, categoryHint = it.id in hinted) && (filters.minRating != null || policy.passes(it)) }
-        val ranked = rank(kept, q)
+        val ranked = SearchRanking.rank(kept, q, personal)
         val (channels, failed) = if (filters.isActive) emptyList<LiveChannel>() to false else findChannels(q)
         val movies = TitleMerge.group(ranked.filter { !it.isSeries })
         val shows = TitleMerge.group(ranked.filter { it.isSeries })
@@ -140,7 +144,6 @@ class SearchCatalog(private val session: PortalSession, private val maxPages: In
         return if (all == null) emptyList<LiveChannel>() to true else SearchRanking.matchChannels(all, q) to false
     }
 
-    private fun rank(items: List<VodItem>, q: String) = SearchRanking.rank(items, q)
 
     /** The channel names read so far (empty until the channel list has been downloaded). */
     fun cachedChannelNames(): List<String> = channelCache?.map { it.name }.orEmpty()

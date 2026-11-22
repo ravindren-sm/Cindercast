@@ -50,7 +50,7 @@ class NextEpisodeFinder(private val catalog: VodCatalog) {
         return PlayTarget(
             file, "${current.historyTitle}: $name", ResumeKeys.episode(showId, next.season.item.id, next.episode.item.id),
             kind = "EPISODE", titleId = showId, subtitle = "${PortalTextLite.clean(next.season.item.name)} · $name",
-            posterUri = current.posterUri, historyTitle = current.historyTitle,
+            posterUri = current.posterUri, historyTitle = current.historyTitle, genres = current.genres, languageText = current.languageText,
         )
     }
 

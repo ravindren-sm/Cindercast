@@ -37,6 +37,8 @@ import io.github.ravindren_sm.openstream.data.CatalogResult
 import io.github.ravindren_sm.openstream.data.LiveCatalog
 import io.github.ravindren_sm.openstream.data.BrowseSort
 import io.github.ravindren_sm.openstream.data.ContentPolicy
+import io.github.ravindren_sm.openstream.data.DefaultScope
+import io.github.ravindren_sm.openstream.provider.VodPage
 import io.github.ravindren_sm.openstream.data.IndexedTitles
 import io.github.ravindren_sm.openstream.data.PagedTitles
 import io.github.ravindren_sm.openstream.ui.components.Choice
@@ -67,6 +69,8 @@ import kotlinx.coroutines.withContext
  * keeps the categories, the loaded pages and both scroll positions.
  */
 class VodBrowseState(private val catalog: VodCatalog, val kind: VodKind) {
+    private var allCategories: List<VodCategory> = emptyList()
+    private var scope: DefaultScope? = null
     var categories: List<VodCategory> by mutableStateOf(emptyList())
         private set
     var categoriesLoaded: Boolean by mutableStateOf(false)
@@ -101,7 +105,7 @@ class VodBrowseState(private val catalog: VodCatalog, val kind: VodKind) {
     /** Loads the categories and selects the first. Blocking: call off the main thread. */
     fun loadCategories() {
         when (val r = catalog.categories(kind)) {
-            is CatalogResult.Ok -> { categories = r.value; categoriesLoaded = true; categoriesError = null; select(0, resetScroll = false) }
+            is CatalogResult.Ok -> { allCategories = r.value; categories = visible(r.value); categoriesLoaded = true; categoriesError = null; select(0, resetScroll = false) }
             is CatalogResult.Failed -> categoriesError = r.message
         }
     }
@@ -117,22 +121,38 @@ class VodBrowseState(private val catalog: VodCatalog, val kind: VodKind) {
     fun changeSort(newSort: BrowseSort) { sort = newSort; reload(); gridState.requestScrollToItem(0) }
     fun changeMinRating(value: Double?) { minRating = value; reload(); gridState.requestScrollToItem(0) }
 
+    private fun visible(all: List<VodCategory>) = scope?.takeIf { it.active }?.let { sc -> all.filter(sc::categoryAllowed) } ?: all
+
+    /** Applies (or, with null, removes) the saved search defaults to this list: fewer categories, and a filter on each title. */
+    fun applyScope(newScope: DefaultScope?) {
+        scope = newScope
+        if (!categoriesLoaded) return
+        categories = visible(allCategories)
+        select(0, resetScroll = true)
+    }
+
     /** Takes the profile's default rating floor (called when Settings changes it and when the screen starts). */
     fun applyProfilePolicy(policy: ContentPolicy) { minRating = policy.minRating; hideUnrated = policy.hideUnrated; if (categoriesLoaded) reload() }
 
-    /** Builds the list for the selected category: from the device copy when a sort or rating floor needs it and it is complete, else from the portal. */
+    /** Builds the list for the selected category: from the device copy when a sort, a rating floor or a default needs it and it is complete, else from the portal. */
     private fun reload() {
-        val category = categories.getOrNull(selected) ?: return
+        val category = categories.getOrNull(selected) ?: run { titles = PagedTitles { CatalogResult.Ok(VodPage(1, emptyList(), 0, 14)) }; return }
         val policy = ContentPolicy(minRating, hideUnrated)
+        val sc = scope?.takeIf { it.active }
         val local = indexed
         val haveCopy = local != null && ready(category.id)
-        if (haveCopy && (sort != BrowseSort.NEWEST || policy.active)) {
+        val genres = sc?.indexGenres
+        val deviceCanDoIt = sc == null || genres != null                      // the subtitle wording check needs the portal's own pages
+        if (haveCopy && deviceCanDoIt && (sort != BrowseSort.NEWEST || policy.active || sc != null)) {
             usingIndex = true; sortUnavailable = false
-            titles = PagedTitles { page -> local!!.page(category.id, sort, policy, page) }
+            // The defaults' rating floor also leaves out unrated titles, as it does in search.
+            val floor = listOfNotNull(policy.minRating, sc?.minRating).maxOrNull()
+            val effective = ContentPolicy(floor, policy.hideUnrated || sc?.minRating != null)
+            titles = PagedTitles { page -> local!!.page(category.id, sort, effective, page, genres.orEmpty()) }
         } else {
             usingIndex = false; sortUnavailable = sort != BrowseSort.NEWEST
-            // The portal's pages, with the rating floor applied to each page as it arrives.
-            titles = PagedTitles(keep = { policy.passes(it) }) { page -> catalog.titles(category.id, page) }
+            // The portal's pages, with the rating floor and the defaults applied to each page as it arrives.
+            titles = PagedTitles(keep = { policy.passes(it) && (sc?.titlePasses(it) ?: true) }) { page -> catalog.titles(category.id, page) }
         }
     }
 }

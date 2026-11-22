@@ -99,6 +99,8 @@ interface CatalogIndexDao {
     @Query("""SELECT * FROM catalog_titles WHERE categoryId = :categoryId
         AND (:minRating IS NULL OR COALESCE(imdbRating, kinopoiskRating) >= :minRating
              OR (COALESCE(imdbRating, kinopoiskRating) IS NULL AND :keepUnrated = 1))
+        AND (:g1 IS NULL OR genres LIKE '%' || :g1 || '%'
+             OR (:g2 IS NOT NULL AND genres LIKE '%' || :g2 || '%') OR (:g3 IS NOT NULL AND genres LIKE '%' || :g3 || '%'))
         ORDER BY
           CASE :sort WHEN 1 THEN ord END ASC,
           CASE :sort WHEN 2 THEN CAST(year AS INTEGER) END DESC,
@@ -108,14 +110,26 @@ interface CatalogIndexDao {
           CASE :sort WHEN 6 THEN nameKey END ASC,
           ord ASC
         LIMIT :limit OFFSET :offset""")
-    suspend fun browse(categoryId: String, minRating: Double?, keepUnrated: Int, sort: Int, limit: Int, offset: Int): List<CatalogTitleEntity>
+    suspend fun browse(categoryId: String, minRating: Double?, keepUnrated: Int, g1: String?, g2: String?, g3: String?, sort: Int, limit: Int, offset: Int): List<CatalogTitleEntity>
 
     @Query("""SELECT COUNT(*) FROM catalog_titles WHERE categoryId = :categoryId
         AND (:minRating IS NULL OR COALESCE(imdbRating, kinopoiskRating) >= :minRating
-             OR (COALESCE(imdbRating, kinopoiskRating) IS NULL AND :keepUnrated = 1))""")
-    suspend fun browseCount(categoryId: String, minRating: Double?, keepUnrated: Int): Int
+             OR (COALESCE(imdbRating, kinopoiskRating) IS NULL AND :keepUnrated = 1))
+        AND (:g1 IS NULL OR genres LIKE '%' || :g1 || '%'
+             OR (:g2 IS NOT NULL AND genres LIKE '%' || :g2 || '%') OR (:g3 IS NOT NULL AND genres LIKE '%' || :g3 || '%'))""")
+    suspend fun browseCount(categoryId: String, minRating: Double?, keepUnrated: Int, g1: String?, g2: String?, g3: String?): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putProgress(p: IndexProgressEntity)
     @Query("SELECT * FROM index_progress") suspend fun progress(): List<IndexProgressEntity>
     @Query("DELETE FROM index_progress") suspend fun clearProgress()
+}
+
+@Dao
+interface ViewingStatDao {
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insert(e: ViewingStatEntity): Long
+    @Query("UPDATE viewing_stats SET count = count + 1, lastAt = :now, label = :label WHERE profileId = :profileId AND kind = :kind AND `key` = :key")
+    suspend fun bump(profileId: Long, kind: String, key: String, label: String, now: Long): Int
+    @Query("SELECT * FROM viewing_stats WHERE profileId = :profileId AND kind = :kind ORDER BY count DESC, lastAt DESC LIMIT :limit")
+    suspend fun top(profileId: Long, kind: String, limit: Int): List<ViewingStatEntity>
+    @Query("DELETE FROM viewing_stats WHERE profileId = :profileId") suspend fun clear(profileId: Long)
 }

@@ -78,6 +78,14 @@ runs on the family TV still stands (see Environment notes).
 - Use the index for instant results (not only suggestions) and offline-ish search while the portal is slow.
 - Show the category of a title in the version picker, since real names may not differ.
 
+## Buffering and memory (reported 2026-11-21 while watching a live channel)
+- At the time: stream segments arrived in 70 to 180 ms each (about 6 s of video per segment), Wi-Fi signal -52 dBm, CPU about 70 percent idle,
+  so the feed and the network were not the limit; but the stick had about 40 MB of RAM free and 95 percent of its 800 MB swap in use,
+  and this app held about 170 MB (Java heap 63 MB, up from 12 MB at the start of the title crawl). Memory pressure is the suspect.
+- Done: the poster cache is dropped when a player opens. To do: find what grows the Java heap during long sessions (heap dump), consider
+  a smaller player buffer, pause the title crawl's memory while playing, and add the health sampler listed above so rebuffers can be
+  matched to free memory over a long watch.
+
 ## Reliability
 - 30-minute soak on a live channel (the VOD soak passed; live was skipped because content cannot be vetted).
 - Whether the video decoder glitch seen once at about 1 min 50 s recurs, and on which streams.

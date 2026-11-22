@@ -24,6 +24,7 @@ import io.github.ravindren_sm.openstream.data.CatalogResult
 import io.github.ravindren_sm.openstream.data.PagedChannels
 import io.github.ravindren_sm.openstream.data.ContentPolicy
 import io.github.ravindren_sm.openstream.data.ContentPolicyStore
+import io.github.ravindren_sm.openstream.data.DefaultScope
 import io.github.ravindren_sm.openstream.data.GuideLoader
 import io.github.ravindren_sm.openstream.data.IndexedTitles
 import io.github.ravindren_sm.openstream.data.VodHydrator
@@ -183,9 +184,27 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     val policyStore = remember { ContentPolicyStore(appContext.getSharedPreferences("search", android.content.Context.MODE_PRIVATE)) }
     var contentPolicy by remember { mutableStateOf(ContentPolicy()) }
     LaunchedEffect(profileId) { if (profileId > 0L) contentPolicy = policyStore.load(profileId) }
+    // Per-profile switches: order search by viewing stats (on by default), and use the saved search defaults beyond search (off by default).
+    var orderByStats by remember { mutableStateOf(true) }
+    var applyDefaultsEverywhere by remember { mutableStateOf(false) }
+    LaunchedEffect(profileId) {
+        if (profileId > 0L) { orderByStats = policyStore.flag(profileId, "order_by_stats", true); applyDefaultsEverywhere = policyStore.flag(profileId, "apply_defaults", false) }
+    }
+    var personalization by remember { mutableStateOf(io.github.ravindren_sm.openstream.data.Personalization()) }
+    var statsTick by remember { mutableIntStateOf(0) }
+    var statsSummary by remember { mutableStateOf("Nothing yet") }
+    LaunchedEffect(profileId, statsTick) {
+        if (profileId <= 0L) return@LaunchedEffect
+        withContext(Dispatchers.IO) {
+            personalization = repo.personalization(profileId)
+            suspend fun top(kind: String) = repo.topStats(profileId, kind, 3).joinToString(", ") { it.label }
+            val parts = listOf("Shows" to top("TITLE"), "Genres" to top("GENRE"), "Languages" to top("LANGUAGE")).filter { it.second.isNotEmpty() }
+            statsSummary = if (parts.isEmpty()) "Nothing yet" else parts.joinToString(" · ") { "${it.first}: ${it.second}" }
+        }
+    }
     val tileScopeForSearch = rememberCoroutineScope()
     fun recordSearch(text: String) { tileScopeForSearch.launch(Dispatchers.IO) { repo.recordSearch(profileId, text) } }
-    LaunchedEffect(searchState.query, searchState.submitTick, connected, searchState.filters, contentPolicy) {
+    LaunchedEffect(searchState.query, searchState.submitTick, connected, searchState.filters, contentPolicy, orderByStats) {
         val q = searchState.query.trim()
         if (q.length < SearchRanking.MIN_QUERY) { searchState.phase = SearchPhase.Idle; return@LaunchedEffect }
         if (!connected) { searchState.phase = SearchPhase.Idle; return@LaunchedEffect }
@@ -194,7 +213,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         delay(if (submitted) 0L else if (q.length >= 3) 350L else 800L)
         lastSubmitHandled = searchState.submitTick
         searchState.phase = SearchPhase.Loading
-        val result = withContext(Dispatchers.IO) { searchCatalog.search(q, searchState.filters, searchState.categories, contentPolicy) }
+        val result = withContext(Dispatchers.IO) { searchCatalog.search(q, searchState.filters, searchState.categories, contentPolicy, if (orderByStats) personalization else null) }
         searchState.phase = when (result) {
             is CatalogResult.Ok -> SearchPhase.Done(result.value)
             is CatalogResult.Failed -> SearchPhase.Failed(result.message)
@@ -262,6 +281,12 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         for (st in listOf(moviesState, showsState)) { st.indexed = indexedTitles; st.ready = { id -> id in indexer.readyCategories } }
     }
     LaunchedEffect(contentPolicy, moviesState, showsState) { moviesState.applyProfilePolicy(contentPolicy); showsState.applyProfilePolicy(contentPolicy) }
+    // The saved search defaults, when this profile asked for them everywhere.
+    val defaultScope = if (applyDefaultsEverywhere) searchState.defaultFilters?.takeIf { it.isActive }?.let(::DefaultScope) else null
+    LaunchedEffect(defaultScope?.summary(), moviesState, showsState, liveState) {
+        moviesState.applyScope(defaultScope); showsState.applyScope(defaultScope)
+        liveState.applyGroupFilter(defaultScope?.let { sc -> { g -> sc.groupAllowed(g) } })
+    }
     val canIndex = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     androidx.compose.runtime.SideEffect {
         canIndex.set(connected && stack.current.route !in setOf(Route.LIVE_PLAYER, Route.VOD_PLAYER, Route.SETUP) && searchState.phase !is SearchPhase.Loading)
@@ -331,7 +356,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
             } else {
                 val browse = if (stack.current.params["kind"] == VodKind.SHOWS.name) showsState else moviesState
                 browse.titles.items.getOrNull(stack.current.params["item"]?.toIntOrNull() ?: -1)
-                    ?.let { PlayTarget(it, it.name, ResumeKeys.movie(it.id)) }
+                    ?.let { PlayTarget(it, it.name, ResumeKeys.movie(it.id), languageText = browse.categories.getOrNull(browse.selected)?.title) }
             }
             VodPlayerScreen(target = target, playback = vodPlayback, resume = resumeStore, memory = memory, portalUrl = portalUrl, history = recorder,
                 findNext = nextFinder::find, onPlayNext = { playOverride = it }, autoPlayNext = autoPlayNext)
@@ -485,12 +510,18 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                         onClearPosterCache = { PosterLoader.clearCache() },
                         contentPolicy = contentPolicy,
                         onSetMinRating = { v -> contentPolicy = contentPolicy.copy(minRating = v).also { policyStore.save(profileId, it) } },
+                        orderByStats = orderByStats, statsSummary = statsSummary,
+                        onToggleOrderByStats = { orderByStats = !orderByStats; policyStore.setFlag(profileId, "order_by_stats", orderByStats) },
+                        onResetStats = { tileScopeForSearch.launch(Dispatchers.IO) { repo.clearStats(profileId); statsTick++ } },
+                        applyDefaultsEverywhere = applyDefaultsEverywhere,
+                        defaultsSummary = searchState.defaultFilters?.summary()?.ifEmpty { null } ?: "None saved (set them in Search, Save as default)",
+                        onToggleApplyDefaults = { applyDefaultsEverywhere = !applyDefaultsEverywhere; policyStore.setFlag(profileId, "apply_defaults", applyDefaultsEverywhere) },
                         onToggleHideUnrated = { contentPolicy = contentPolicy.copy(hideUnrated = !contentPolicy.hideUnrated).also { policyStore.save(profileId, it) } },
                     ),
                 )
             } else if (stack.current.route == Route.TV_GUIDE) {
                 GuideScreen(
-                    state = guideState, favoriteCount = favorites.channels().size, genres = liveState.genres, loader = guideLoader,
+                    state = guideState, favoriteCount = favorites.channels().size, genres = liveState.allGenres.filter { g -> defaultScope?.groupAllowed(g) ?: true }, loader = guideLoader,
                     connected = connected, memory = memory,
                     onChooseGroup = { id, title ->
                         guideState.select(id, title,
@@ -572,6 +603,9 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     }
 
     LaunchedEffect(stack.current.route == Route.VOD_PLAYER) { if (stack.current.route != Route.VOD_PLAYER) playOverride = null }
+    // Memory is tight on this stick (about 1.7 GB for everything): when a player opens, let go of the poster pictures kept for browsing.
+    val inPlayer = stack.current.route == Route.LIVE_PLAYER || stack.current.route == Route.VOD_PLAYER
+    LaunchedEffect(inPlayer) { if (inPlayer) { PosterLoader.clearCache(); System.gc() } else { delay(800); statsTick++ } }
 
     // Read the history whenever Home is (re)entered; a short wait lets the player's last save land first.
     val onHome = stack.current.route == Route.HOME
@@ -584,14 +618,14 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     }
 
     // Pinned rows: placeholders at once, then one portal request per row (cached), only while Home is showing and connected.
-    LaunchedEffect(onHome, connected, pins, contentPolicy) {
+    LaunchedEffect(onHome, connected, pins, contentPolicy, defaultScope?.summary()) {
         if (!onHome || !connected) return@LaunchedEffect
         val wanted = HomeRowPlan.titlePins(pins) + listOfNotNull(HomeRowPlan.livePin(pins))
         pinnedRows = wanted.map { PinnedRow(it, null, null, false) }
         wanted.forEachIndexed { i, pin ->
             val row = withContext(Dispatchers.IO) {
                 if (pin.kind == PinKinds.LIVE) homeFeed.channelsOf(pin.categoryId)?.let { PinnedRow(pin, null, it, false) }
-                else homeFeed.titlesOf(pin.categoryId, keep = contentPolicy::passes)?.let { PinnedRow(pin, it, null, false) }
+                else homeFeed.titlesOf(pin.categoryId, keep = { contentPolicy.passes(it) && (defaultScope?.titlePasses(it) ?: true) })?.let { PinnedRow(pin, it, null, false) }
             } ?: PinnedRow(pin, null, null, true)
             pinnedRows = pinnedRows.toMutableList().also { if (i < it.size) it[i] = row }
         }

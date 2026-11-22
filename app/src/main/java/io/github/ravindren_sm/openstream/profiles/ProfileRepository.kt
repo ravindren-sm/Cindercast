@@ -8,6 +8,7 @@ import io.github.ravindren_sm.openstream.profiles.db.KidsAllowedCategoryEntity
 import io.github.ravindren_sm.openstream.profiles.db.OpenStreamDb
 import io.github.ravindren_sm.openstream.profiles.db.PinnedCategoryEntity
 import io.github.ravindren_sm.openstream.profiles.db.ProfileEntity
+import io.github.ravindren_sm.openstream.profiles.db.ViewingStatEntity
 
 /** The kinds of things a profile can favorite or pin. */
 object Kinds {
@@ -17,6 +18,12 @@ object Kinds {
     const val EPISODE = "EPISODE"
     const val MOVIES = "MOVIES"
 }
+
+/** What to count when a title has been watched for a minute. */
+class WatchInfo(val titleKey: String, val label: String, val genres: List<String>, val languages: Set<String>)
+
+/** A title counts as watched after this much playing. */
+const val WATCH_THRESHOLD_MS = 60_000L
 
 /** Stores the household PIN record in the database's single `household` row. */
 class RoomPinStore(private val db: OpenStreamDb) : PinStore {
@@ -117,6 +124,31 @@ class ProfileRepository(private val db: OpenStreamDb, private val nowMillis: () 
     suspend fun isFavorite(profileId: Long, kind: String, refId: String) = db.favorites().count(profileId, kind, refId) > 0
     suspend fun favorites(profileId: Long, kind: String): List<FavoriteEntity> = db.favorites().list(profileId, kind)
 
+    // ---- viewing stats ----
+
+    /** Counts one watched title: its name key, each of its genres and each of its languages. */
+    suspend fun recordWatch(profileId: Long, w: WatchInfo) {
+        val now = nowMillis()
+        suspend fun bump(kind: String, key: String, label: String) {
+            if (db.viewingStats().bump(profileId, kind, key, label, now) == 0) db.viewingStats().insert(ViewingStatEntity(profileId, kind, key, label, 1, now))
+        }
+        bump("TITLE", w.titleKey, w.label)
+        w.genres.forEach { bump("GENRE", it, it) }
+        w.languages.forEach { bump("LANGUAGE", it, it) }
+    }
+
+    suspend fun topStats(profileId: Long, kind: String, limit: Int = 5): List<ViewingStatEntity> = db.viewingStats().top(profileId, kind, limit)
+    suspend fun clearStats(profileId: Long) = db.viewingStats().clear(profileId)
+
+    /** The profile's viewing as scoring input for search ordering. */
+    suspend fun personalization(profileId: Long): io.github.ravindren_sm.openstream.data.Personalization {
+        if (profileId <= 0) return io.github.ravindren_sm.openstream.data.Personalization()
+        val g = db.viewingStats().top(profileId, "GENRE", 60).associate { it.key to it.count }
+        val l = db.viewingStats().top(profileId, "LANGUAGE", 30).associate { it.key to it.count }
+        val t = db.viewingStats().top(profileId, "TITLE", 400).associate { it.key to it.count }
+        return io.github.ravindren_sm.openstream.data.Personalization(g, l, t)
+    }
+
     // ---- recent searches ----
 
     /** Remembers a search text (trimmed, at least two characters); the newest use moves it to the front. */
@@ -136,10 +168,12 @@ class ProfileRepository(private val db: OpenStreamDb, private val nowMillis: () 
      */
     suspend fun recordProgress(
         profileId: Long, resumeKey: String, kind: String, titleId: String, title: String, subtitle: String?,
-        posterUri: String?, positionMs: Long, durationMs: Long, playCmd: String? = null,
+        posterUri: String?, positionMs: Long, durationMs: Long, playCmd: String? = null, watch: WatchInfo? = null,
     ) {
         val existing = db.history().get(profileId, resumeKey)
         if (existing == null && positionMs < ResumePolicy.MIN_MILLIS) return
+        // A title counts toward the viewing stats the first time it passes a minute of watching.
+        if (watch != null && positionMs >= WATCH_THRESHOLD_MS && (existing == null || existing.positionMs < WATCH_THRESHOLD_MS)) recordWatch(profileId, watch)
         db.history().put(
             HistoryEntity(
                 profileId, resumeKey, kind, titleId, title, subtitle, posterUri, positionMs, durationMs,

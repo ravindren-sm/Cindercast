@@ -116,6 +116,8 @@ class PlayTarget(
     val kind: String = "MOVIE", val titleId: String = file.id, val subtitle: String? = null, val posterUri: String? = file.posterUri,
     /** The name Home shows (an episode's show name; [title] is the longer line the player shows). */
     val historyTitle: String = title,
+    /** The title's genre text and any text naming its language (a category name), for the viewing stats. */
+    val genres: String? = file.genres, val languageText: String? = null,
 ) {
     override fun toString() = "PlayTarget(title=$title)"
 }

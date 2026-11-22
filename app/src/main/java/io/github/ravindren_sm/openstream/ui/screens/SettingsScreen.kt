@@ -51,6 +51,13 @@ class SettingsModel(
     val contentPolicy: io.github.ravindren_sm.openstream.data.ContentPolicy,
     val onSetMinRating: (Double?) -> Unit,
     val onToggleHideUnrated: () -> Unit,
+    val orderByStats: Boolean,
+    val statsSummary: String,
+    val onToggleOrderByStats: () -> Unit,
+    val onResetStats: () -> Unit,
+    val applyDefaultsEverywhere: Boolean,
+    val defaultsSummary: String,
+    val onToggleApplyDefaults: () -> Unit,
 )
 
 private class Row_(val title: String, val value: String, val action: String, val confirm: String? = null, val run: () -> Unit)
@@ -77,7 +84,13 @@ fun SettingsScreen(model: SettingsModel, memory: FocusMemory, modifier: Modifier
             Row_("Hide movies and shows rated below", model.contentPolicy.summary(), "Change") { ratingPicker = true },
             Row_("Titles with no rating", if (model.contentPolicy.hideUnrated) "Hidden" else "Shown", if (model.contentPolicy.hideUnrated) "Show" else "Hide", run = model.onToggleHideUnrated),
         ),
+        "Your viewing · this profile" to listOf(
+            Row_("Order search by what you watch", if (model.orderByStats) "On" else "Off", if (model.orderByStats) "Turn off" else "Turn on", run = model.onToggleOrderByStats),
+            Row_("Most watched", model.statsSummary, "Reset", "Reset what this profile has watched? Search goes back to the portal's order.", model.onResetStats),
+        ),
         "Search" to listOf(
+            Row_("Use my search defaults everywhere", if (model.applyDefaultsEverywhere) "On" else "Off", if (model.applyDefaultsEverywhere) "Turn off" else "Turn on", run = model.onToggleApplyDefaults),
+            Row_("Defaults applied", model.defaultsSummary, "", run = {}),
             Row_("Title index", indexValue, if (model.index.enabled) "Pause" else if (model.index.titles > 0) "Resume" else "Build",
                 run = { if (model.index.enabled) model.onPauseIndex() else model.onBuildIndex() }),
             Row_("Title index data", if (model.index.titles > 0) "%,d titles on this device".format(model.index.titles) else "None", "Delete", "Delete the title index? It can be built again.", model.onClearIndex),
