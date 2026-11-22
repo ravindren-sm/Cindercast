@@ -22,6 +22,7 @@ import io.github.ravindren_sm.openstream.data.PortalSession
 import io.github.ravindren_sm.openstream.data.PrefsResumeStore
 import io.github.ravindren_sm.openstream.data.CatalogResult
 import io.github.ravindren_sm.openstream.data.PagedChannels
+import io.github.ravindren_sm.openstream.data.NextEpisodeFinder
 import io.github.ravindren_sm.openstream.data.SearchCatalog
 import io.github.ravindren_sm.openstream.data.SearchFilters
 import io.github.ravindren_sm.openstream.data.SearchSources
@@ -144,6 +145,9 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     }
     // The title chosen from Continue watching, kept while it plays.
     var historyTarget: PlayTarget? by remember { mutableStateOf(null) }
+    // Set when an episode hands over to the next one ("Up next"); cleared when the player is left.
+    var playOverride: PlayTarget? by remember { mutableStateOf(null) }
+    val nextFinder = remember(portalEpoch) { NextEpisodeFinder(vodCatalog) }
     val connected = session.status.let { it is SessionStatus.Ready || it is SessionStatus.Degraded }
     // A portal already saved: hand it to the session (it connects while the app is in the foreground).
     LaunchedEffect(Unit) { (loaded as? SettingsStore.Loaded.Found)?.let { session.configure(it.settings) } }
@@ -249,7 +253,9 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 },
             )
         } else if (stack.current.route == Route.VOD_PLAYER) {
-            val target: PlayTarget? = if (stack.current.params["play"] == "history") {
+            val target: PlayTarget? = if (playOverride != null) {
+                playOverride
+            } else if (stack.current.params["play"] == "history") {
                 historyTarget
             } else if (stack.current.params["play"] == "episode") {
                 showDetail?.playTarget
@@ -260,7 +266,8 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 browse.titles.items.getOrNull(stack.current.params["item"]?.toIntOrNull() ?: -1)
                     ?.let { PlayTarget(it, it.name, ResumeKeys.movie(it.id)) }
             }
-            VodPlayerScreen(target = target, playback = vodPlayback, resume = resumeStore, memory = memory, portalUrl = portalUrl, history = recorder)
+            VodPlayerScreen(target = target, playback = vodPlayback, resume = resumeStore, memory = memory, portalUrl = portalUrl, history = recorder,
+                findNext = nextFinder::find, onPlayNext = { playOverride = it })
         } else {
             TopNavBar(
                 activeTab = topTab,
@@ -421,6 +428,8 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         )
     }
     }
+
+    LaunchedEffect(stack.current.route == Route.VOD_PLAYER) { if (stack.current.route != Route.VOD_PLAYER) playOverride = null }
 
     // Read the history whenever Home is (re)entered; a short wait lets the player's last save land first.
     val onHome = stack.current.route == Route.HOME

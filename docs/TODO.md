@@ -39,10 +39,9 @@ runs on the family TV still stands (see Environment notes).
   forward skip were also verified on the real portal; rewind and the media keys only on the fake one.
 - Live TV has no pause or rewind. Add a time-shift window for live (pause, rewind a few minutes) if the live HLS
   playlists keep enough history; check how much the real channels keep.
-- Accelerating seek when a key is held (30 s, 60 s), and a way to jump far in a 2-hour film (for example a position
-  scrubber), since 10 s per press is slow.
+- Accelerating seek is done (2026-11-21, steps grow while a key is held). A visible position scrubber is not.
 - Continue Watching on Home is built (2026-11-21). Mark watched, remove and focus after Back are done too.
-- Next-episode prompt at the end of an episode.
+- Next-episode prompt: done (2026-11-21).
 
 ## Search follow-ups
 - Recent searches, result counts per group, a "more results" page beyond the first three, and grouping repeated titles

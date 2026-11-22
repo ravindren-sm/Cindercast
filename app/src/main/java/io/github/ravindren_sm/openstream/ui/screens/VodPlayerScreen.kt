@@ -63,6 +63,7 @@ import io.github.ravindren_sm.openstream.data.TrackLabels
 import io.github.ravindren_sm.openstream.data.PlaybackMessages
 import io.github.ravindren_sm.openstream.data.ResumePolicy
 import io.github.ravindren_sm.openstream.data.ResumeStore
+import io.github.ravindren_sm.openstream.data.SeekRamp
 import io.github.ravindren_sm.openstream.data.StreamLink
 import io.github.ravindren_sm.openstream.data.TimeText
 import io.github.ravindren_sm.openstream.data.VodPlayback
@@ -82,7 +83,9 @@ private sealed interface VodPhase {
     class Failed(val message: String) : VodPhase
 }
 
-private const val SEEK_MILLIS = 10_000L
+private const val UP_NEXT_MILLIS = 30_000L          // "Up next" shows in the last 30 s
+private const val PREFETCH_MILLIS = 150_000L       // the next episode is looked up in the last 2.5 minutes
+private const val AUTO_NEXT_SECONDS = 8            // and starts this long after the end
 private const val BIG_SEEK_MILLIS = 30_000L
 
 /**
@@ -100,6 +103,9 @@ fun VodPlayerScreen(
     memory: FocusMemory,
     portalUrl: String,
     history: HistoryRecorder = NoHistory,
+    /** Finds and prepares the episode after the one playing (blocking; null if there is none). Set for episodes only. */
+    findNext: ((PlayTarget) -> PlayTarget?)? = null,
+    onPlayNext: (PlayTarget) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -118,6 +124,11 @@ fun VodPlayerScreen(
     var duration by remember { mutableLongStateOf(0L) }
     var notice: String? by remember { mutableStateOf(null) }
     var resumeApplied by remember { mutableStateOf(false) }
+    // The episode that follows: looked for near the end, offered in the last 30 s, started 8 s after the end.
+    var nextTarget: PlayTarget? by remember { mutableStateOf(null) }
+    var nextLooked by remember { mutableStateOf(false) }
+    var ended by remember { mutableStateOf(false) }
+    var countdown by remember { mutableIntStateOf(0) }
     val id = target?.resumeKey
 
     fun knownDuration(): Long = player.duration.takeIf { it > 0 } ?: 0L
@@ -143,6 +154,7 @@ fun VodPlayerScreen(
                     val start = ResumePolicy.startPosition(id?.let(resume::get), knownDuration())
                     if (start > 0) { player.seekTo(start); notice = "Resumed at ${TimeText.format(start)}" }
                 }
+                if (state == Player.STATE_ENDED) ended = true
                 if (state == Player.STATE_ENDED && id != null) {
                     resume.clear(id)
                     if (target != null) history.record(target, knownDuration(), knownDuration())   // finished: leaves Continue watching
@@ -177,6 +189,7 @@ fun VodPlayerScreen(
 
     LaunchedEffect(id, attempt) {   // id is the resume key
         if (target == null) { phase = VodPhase.Failed("This title is not available."); return@LaunchedEffect }
+        nextTarget = null; nextLooked = false; ended = false; countdown = 0
         phase = VodPhase.Resolving
         resumeApplied = false
         recovery.reset()
@@ -207,6 +220,23 @@ fun VodPlayerScreen(
         while (true) { position = player.currentPosition.coerceAtLeast(0); duration = knownDuration(); delay(500) }
     }
     LaunchedEffect(phase) { if (phase is VodPhase.Playing) while (true) { delay(5_000); savePosition() } }
+
+    // Look for the next episode once the last couple of minutes begin (a few portal requests), or at the end if not yet found.
+    // The condition is a plain boolean, so the effect restarts only when it flips (a changing position would cancel the lookup).
+    val lookForNext = findNext != null && target?.kind == "EPISODE" && (ended || (duration > 0 && duration - position <= PREFETCH_MILLIS))
+    LaunchedEffect(id, lookForNext) {
+        val finder = findNext ?: return@LaunchedEffect
+        val current = target ?: return@LaunchedEffect
+        if (!lookForNext || nextLooked) return@LaunchedEffect
+        nextLooked = true
+        nextTarget = withContext(Dispatchers.IO) { finder(current) }
+    }
+    LaunchedEffect(ended, nextTarget) {
+        val next = nextTarget ?: return@LaunchedEffect
+        if (!ended) return@LaunchedEffect
+        for (s in AUTO_NEXT_SECONDS downTo 1) { countdown = s; delay(1_000) }
+        onPlayNext(next)
+    }
 
     LaunchedEffect(overlayTick, paused) { overlayVisible = true; if (!paused) { delay(4_000); overlayVisible = false } }
     LaunchedEffect(notice) { if (notice != null) { delay(3_000); notice = null } }
@@ -246,11 +276,17 @@ fun VodPlayerScreen(
                 overlayTick++
                 when (e.key) {
                     Key.Menu, Key.Captions, Key.L -> { tracksOpen = true; true }
-                    Key.DirectionLeft -> { seekBy(-SEEK_MILLIS); true }
-                    Key.DirectionRight -> { seekBy(SEEK_MILLIS); true }
+                    Key.DirectionLeft -> { seekBy(-SeekRamp.stepMillis(e.nativeKeyEvent.repeatCount)); true }
+                    Key.DirectionRight -> { seekBy(SeekRamp.stepMillis(e.nativeKeyEvent.repeatCount)); true }
                     Key.MediaRewind -> { seekBy(-BIG_SEEK_MILLIS); true }
                     Key.MediaFastForward -> { seekBy(BIG_SEEK_MILLIS); true }
-                    Key.MediaPlayPause, Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> { player.playWhenReady = !player.playWhenReady; true }
+                    Key.MediaPlayPause, Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                        // With "Up next" showing, Select starts the next episode instead of pausing.
+                        val upNext = nextTarget
+                        if (upNext != null && (ended || (duration > 0 && duration - position <= UP_NEXT_MILLIS))) onPlayNext(upNext)
+                        else player.playWhenReady = !player.playWhenReady
+                        true
+                    }
                     Key.MediaPlay -> { player.playWhenReady = true; true }
                     Key.MediaPause -> { player.playWhenReady = false; true }
                     else -> false   // Back and everything else still reach the shell
@@ -278,6 +314,21 @@ fun VodPlayerScreen(
                     .background(Tokens.BgCanvas.copy(alpha = 0.7f)).padding(Spacing.S2),
             )
             ProgressBar(position, duration, Modifier.align(Alignment.BottomCenter))
+        }
+
+        nextTarget?.let { next ->
+            val remaining = duration - position
+            if (phase is VodPhase.Playing && (ended || (duration > 0 && remaining <= UP_NEXT_MILLIS))) {
+                Column(
+                    Modifier.align(Alignment.BottomEnd).padding(Spacing.SafeHorizontal, Spacing.SafeVertical + 96.dp)
+                        .background(Tokens.BgCanvas.copy(alpha = 0.85f)).padding(Spacing.S2),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.S1),
+                ) {
+                    Text("Up next", style = Tokens.Body, color = Tokens.TextSecondary)
+                    Text(PortalText.decodeEntities(next.subtitle ?: next.title), style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 1)
+                    Text(if (ended && countdown > 0) "Starting in $countdown s · Back to stay out" else "OK to play now", style = Tokens.Body, color = Tokens.AccentPrimary)
+                }
+            }
         }
 
         when (val p = phase) {
