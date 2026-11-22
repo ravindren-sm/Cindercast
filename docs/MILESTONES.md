@@ -45,7 +45,7 @@ Compose for TV on top of `:provider`.
 | `setup` (first run) | M2 |
 | `live-tv`, `live-player`, channel-number overlay | M3 |
 | `movies`, `movie-detail`, `shows`, `show-detail`, `vod-player`, language/subtitles overlay | M4 |
-| `home`, `search`, `favorites`, `settings`, `tv-guide`, ratings overlay, PIN modal | M5 |
+| `home`, `search`, `favorites`, `settings`, `tv-guide`, PIN modal | M5 |
 | `states`, `design-notes`, prototype menu | reference only, not shipped |
 
 Tasks, in order:
@@ -239,3 +239,7 @@ Debug build over the existing app (saved settings kept). Watch-only: browse Live
 - **Closes earlier gaps:** the debug Application class and traffic log on a real portal; a real keep-alive seen as a log line; real page sizes and genre list shape; the stream user agent question; live HLS through redirects to an edge.
 - **Log hygiene:** every captured line was redacted (host shows as `<HOST>` or `host#n`); a scan found no address, MAC, token or header. The capture, screenshots and log were deleted after the run.
 - **Still not verified:** 30 minutes of continuous playback; HEVC and AC-3 or E-AC-3 channels; resuming a real live stream after Home or after a long pause (live-window rejoin); Save from setup and re-auth on a real expiry; channel up/down and number entry (not built); VOD (M4).
+
+## Decision: ratings come with the movie screens in M4 (2026-11-21, user)
+The prototype's IMDb and Rotten Tomatoes badges are kept as intended functionality, not deferred to M5. The portal's own movie data carries `rating_imdb`, `rating_kinopoisk`, `rating_mpaa` and `age`, plus year, description, actors, director, genres and poster fields, so IMDb ratings need no OMDb key. Plan for M4: parse these fields, show the IMDb rating on cards and the detail screen, hide a rating the portal sends as 0 or empty (quality of the values is unverified until a live VOD check), and keep an optional user-supplied OMDb or MDBList key for gaps and for Rotten Tomatoes as a later extra. Rotten Tomatoes has no portal field.
+
