@@ -16,6 +16,6 @@ class TagEnricher(private val dao: TitleTagDao) {
         if (ids.isEmpty()) return items
         val tags = try { ids.chunked(500).flatMap { chunk -> runBlocking { dao.byIds(chunk) } }.associateBy { it.id } } catch (_: Exception) { return items }
         if (tags.isEmpty()) return items
-        return items.map { item -> tags[item.id]?.let { t -> item.withTags(t.rating, t.genres, t.certLabel, t.imdbScore, t.rtScore) } ?: item }
+        return items.map { item -> tags[item.id]?.let { t -> item.withTags(t.rating, t.genres, t.certLabel) } ?: item }
     }
 }

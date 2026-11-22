@@ -16,7 +16,6 @@ class TitleTaggerTest {
     private class FakeStorage(val pending: MutableList<CatalogTitleEntity>) : TagStorage {
         val saved = mutableMapOf<String, TitleTagEntity>()
         override suspend fun nextUntagged(limit: Int) = pending.filter { it.id !in saved }.take(limit)
-        override suspend fun nextNeedingImdbId(limit: Int) = saved.values.filter { it.tmdbId > 0 && it.imdbId == null }.take(limit)
         override suspend fun save(tag: TitleTagEntity) { saved[tag.id] = tag }
         override suspend fun counts() = TaggerCounts(saved.size, saved.values.count { it.tmdbId > 0 }, saved.values.count { it.certAge != null })
     }
@@ -89,12 +88,4 @@ class TitleTaggerTest {
         assertEquals("tt2294629", storage.saved["9"]!!.imdbId)
     }
 
-    @Test fun `rows from before the id was stored are filled in once everything is checked`() {
-        val storage = FakeStorage(mutableListOf())
-        storage.saved["10"] = TitleTagEntity("MOVIE", "10", 11, "PG", 8, null, null, null, null, false, 0, imdbId = null)
-        storage.saved["12"] = TitleTagEntity("MOVIE", "12", 12, null, null, null, null, null, null, false, 0, imdbId = null)
-        val api = FakeApi({ error("not called") }, { id -> if (id == 11L) TmdbResult.Ok(details("PG").copy(imdbId = "tt0000011")) else TmdbResult.Ok(details(null)) })
-        run(storage, api)
-        assertEquals("tt0000011", storage.saved["10"]!!.imdbId); assertEquals("", storage.saved["12"]!!.imdbId)
-    }
 }

@@ -237,7 +237,7 @@ private fun PosterRow(
 
 
 /** Which filter list is open. */
-enum class FilterPicker { LANGUAGE, GENRE, CATEGORY, RATING, ROTTEN }
+enum class FilterPicker { LANGUAGE, GENRE, CATEGORY, RATING }
 
 private fun chipId(kind: FilterPicker) = "search-filter-${kind.name.lowercase()}"
 
@@ -269,7 +269,6 @@ private fun FilterBar(
             FilterChip(chipId(FilterPicker.CATEGORY), chipLabel("Category", f.categoryIds.mapNotNull { titles[it] }.sorted()), f.categoryIds.isNotEmpty(), memory) { onOpen(FilterPicker.CATEGORY) }
             FilterChip(chipId(FilterPicker.RATING), if (f.minRating == null) "Rating" else "Rating ${"%.0f".format(f.minRating)}+", f.minRating != null, memory) { onOpen(FilterPicker.RATING) }
             FilterChip("search-filter-subs", if (f.englishSubtitles) "✓ English subtitles" else "English subtitles", f.englishSubtitles, memory) { onChange(f.copy(englishSubtitles = !f.englishSubtitles)) }
-            FilterChip(chipId(FilterPicker.ROTTEN), if (state.filters.minRottenTomatoes != null) "Rotten Tomatoes ${state.filters.minRottenTomatoes}%+" else "Rotten Tomatoes", state.filters.minRottenTomatoes != null, memory) { onOpen(FilterPicker.ROTTEN) }
         }
         val saved = state.defaultFilters
         if (f.isActive || (saved != null && saved != f)) {
@@ -316,12 +315,6 @@ private fun FilterPickerHost(kind: FilterPicker, state: SearchState, memory: Foc
             "Minimum rating", listOf(Choice("any", "Any rating")) + SearchFilters.RATING_STEPS.map { Choice("$it", "${"%.0f".format(it)} and above") },
             setOf(f.minRating?.toString() ?: "any"), multi = false, note = "The portal's own rating: IMDb when it has one, otherwise Kinopoisk. Titles with no rating are left out.",
             memory = memory, returnFocusId = chipId(kind), onToggle = { id -> onChange(f.copy(minRating = id.toDoubleOrNull())) }, onClose = onClose,
-        )
-        FilterPicker.ROTTEN -> ChoicePicker(
-            "Rotten Tomatoes", listOf(Choice("any", "Any score")) + listOf(60, 70, 80, 90).map { Choice("$it", "$it% and above") },
-            setOf(f.minRottenTomatoes?.toString() ?: "any"), multi = false,
-            note = "Scores come from the optional OMDb key in Settings, once a title has been read. Titles with no score are left out.",
-            memory = memory, returnFocusId = chipId(kind), onToggle = { id -> onChange(f.copy(minRottenTomatoes = id.toIntOrNull())) }, onClose = onClose,
         )
     }
 }

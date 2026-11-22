@@ -20,24 +20,18 @@ themoviedb.org (TMDB) service about each title and keeps what it says on the dev
 - **Use:** a Kids profile now takes the TMDB certification when the portal has none, and hides a title whose tag is flagged. Adult profiles are unchanged.
 - **Remove:** Settings, "Remove key and tags" deletes the key and every tag.
 
-## Second source: OMDb (IMDb score and Rotten Tomatoes), added 2026-11-22
-- Optional, its own key (Settings, "IMDb and Rotten Tomatoes scores (optional)"), stored sealed in `files/score-key.bin`. Sends only an IMDb id and the key.
-- The IMDb id comes from the first source (TMDB gives it for most titles); the tag crawl now stores it, and once every title has a row it asks for the id of
-  rows made earlier (one request each). The OMDb crawl then reads, for every title with an id: the real IMDb score, the Rotten Tomatoes percentage, and the
-  Rated label (which fills the age label only where TMDB had none).
-- **Limits:** the free key allows about 1,000 titles a day; when the day's allowance is used up the crawl waits 30 minutes and tries again, so a free key
-  works through the list over weeks and a paid key (about 100,000 a day, a few dollars a month as of writing; check omdbapi.com) finishes in a day or two.
-  The scores stay on the device if the paid plan is cancelled, and the free key still covers new titles and slow refreshes.
-- **Use:** the real IMDb score takes the portal's IMDb slot (badge with a star, rating floor, Best rated order, SQL join); Rotten Tomatoes shows on the movie
-  page and drives the Search "Rotten Tomatoes" filter (60, 70, 80, 90 percent and above).
-- Tested with a fake service only (`OmdbTest`).
+## Second source: dropped (2026-11-22)
+OMDb (IMDb score and Rotten Tomatoes through a one-person aggregator) was built and then removed: its data comes from IMDb and Rotten Tomatoes with no public
+licence from those owners. The official routes are commercial: IMDb licenses its data through AWS Data Exchange (pricing by contract), and the Rotten Tomatoes API is
+partner-only through Fandango (reported in the tens of thousands of dollars a year, unconfirmed; no open keys). On 2026-11-22 an email went to imdb-licensing@imdb.com asking
+whether IMDb offers any licence or terms for a free, non-commercial, open-source app, what the commercial price range is, and what its free datasets permit. Until an answer
+arrives, the app shows only the portal's own scores and TMDB's. Left over: database version 7 columns `imdbScore`, `rtScore`, `omdbAt` (unused; SQLite here cannot drop columns)
+and the IMDb id that TMDB returns, stored on new tags. The Search screen has no Rotten Tomatoes filter.
 
 ## Data sources and terms (to settle before a public release)
 - **TMDB:** community-contributed, free for non-commercial use, and requires an attribution notice ("This product uses the TMDB API but is not endorsed or
   certified by TMDB"), now shown in Settings > About; a logo is also expected in the store listing. A commercial release needs TMDB's commercial terms.
-- **OMDb:** a one-person aggregator whose answers carry IMDb and Rotten Tomatoes data with no public licence from those owners (grey area). It stays optional and
-  per-user (the viewer's own key, nothing bundled or redistributed, data kept on the viewer's device). Do not bundle its data; say so in the store listing; the app must
-  work fully without it. If OMDb changes its terms or disappears, the scores already read stay on the device.
+- **IMDb and Rotten Tomatoes:** no licence; see the section above. Do not show their scores in a public release without one.
 
 ## First real run (2026-11-22)
 Key entered through the Settings box; the crawl started on the real service. First 300 titles (newest first, no portal label): 61 percent matched, 33 percent got a

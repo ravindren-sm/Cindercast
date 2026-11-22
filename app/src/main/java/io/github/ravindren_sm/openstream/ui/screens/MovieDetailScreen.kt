@@ -59,7 +59,6 @@ fun MovieDetailScreen(
                 item.year?.let { Text(it, style = Tokens.BodyLarge, color = Tokens.TextSecondary) }
                 item.age?.let { Text(PortalText.decodeEntities(it), style = Tokens.BodyLarge, color = Tokens.TextSecondary) }
                 item.shownRating?.let { Text("${it.source} %.1f".format(it.value), style = Tokens.BodyLarge, color = Tokens.StatusWarning) }
-                item.rottenScore?.let { Text("Rotten Tomatoes $it%", style = Tokens.BodyLarge, color = Tokens.StatusWarning) }
                 item.genres?.let { Text(PortalText.decodeEntities(it), style = Tokens.BodyLarge, color = Tokens.TextSecondary, maxLines = 1) }
             }
             item.description?.let { Text(PortalText.decodeEntities(it), style = Tokens.Body, color = Tokens.TextPrimary, maxLines = 6) }

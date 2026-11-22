@@ -98,7 +98,7 @@ object FilterRules {
      * Genre, rating and subtitle checks on one title (language and category were applied by the plan). [categoryHint] says
      * the title's category name already mentions English subtitles.
      */
-    fun passes(item: VodItem, f: SearchFilters, categoryHint: Boolean = false, rottenScore: (VodItem) -> Int? = { it.rottenScore }): Boolean {
+    fun passes(item: VodItem, f: SearchFilters, categoryHint: Boolean = false, rottenScore: (VodItem) -> Int? = { null }): Boolean {
         if (f.englishSubtitles && !categoryHint && !mentionsEnglishSubtitles(item.name)) return false
         if (f.genres.isNotEmpty()) {
             val text = (item.genres ?: "").lowercase()

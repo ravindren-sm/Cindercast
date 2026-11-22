@@ -54,9 +54,6 @@ import io.github.ravindren_sm.openstream.data.tmdb.TaggerCounts
 import io.github.ravindren_sm.openstream.data.tmdb.TitleTagger
 import io.github.ravindren_sm.openstream.data.tmdb.TmdbClient
 import io.github.ravindren_sm.openstream.data.tmdb.TmdbKeyStore
-import io.github.ravindren_sm.openstream.data.omdb.OmdbClient
-import io.github.ravindren_sm.openstream.data.omdb.OmdbStorage
-import io.github.ravindren_sm.openstream.data.omdb.OmdbTagger
 import io.github.ravindren_sm.openstream.ui.components.TextEntryDialog
 import io.github.ravindren_sm.openstream.profiles.CategoryRules
 import io.github.ravindren_sm.openstream.profiles.ParentalPolicy
@@ -229,7 +226,6 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         TitleTagger(
             storage = object : TagStorage {
                 override suspend fun nextUntagged(limit: Int) = tags.untagged(limit)
-                override suspend fun nextNeedingImdbId(limit: Int) = tags.needingImdbId(limit)
                 override suspend fun save(tag: io.github.ravindren_sm.openstream.profiles.db.TitleTagEntity) = tags.put(tag)
                 override suspend fun counts() = TaggerCounts(tags.checked(), tags.matched(), tags.graded())
             },
@@ -237,24 +233,6 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         )
     }
     LaunchedEffect(tagger, tagTick) { withContext(Dispatchers.IO) { tagger.refreshStatus(tagKey != null) } }
-    // The optional second source for IMDb and Rotten Tomatoes scores (OMDb), its own key.
-    val scoreKeyStore = remember { TmdbKeyStore(java.io.File(appContext.filesDir, "score-key.bin"), io.github.ravindren_sm.openstream.data.AndroidKeystoreKey.box(), "openstream-score-key-v1") }
-    var scoreKey by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) { scoreKey = withContext(Dispatchers.IO) { scoreKeyStore.load() } }
-    var scoreKeyDialog by remember { mutableStateOf(false) }
-    val scorer = remember(scoreKey) {
-        val client = scoreKey?.let { OmdbClient(it) }
-        val tags = db.titleTags()
-        OmdbTagger(
-            storage = object : OmdbStorage {
-                override suspend fun nextPending(limit: Int) = tags.needingScores(limit)
-                override suspend fun save(tag: io.github.ravindren_sm.openstream.profiles.db.TitleTagEntity) = tags.put(tag)
-                override suspend fun counts() = tags.withImdbId() to tags.scored()
-            },
-            api = { client }, enabled = { tagPrefs.getBoolean("scoring_on", false) }, setEnabled = { tagPrefs.edit().putBoolean("scoring_on", it).apply() },
-        )
-    }
-    LaunchedEffect(scorer, tagTick) { withContext(Dispatchers.IO) { scorer.refreshStatus(scoreKey != null) } }
     var kidsTags by remember { mutableStateOf(KidsTags.NONE) }
     LaunchedEffect(profileId, profiles, tagger.status.counts.checked / 200) {
         kidsTags = if (profile?.isKids == true) withContext(Dispatchers.IO) {
@@ -436,7 +414,6 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     val canTag = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     androidx.compose.runtime.SideEffect { canTag.set(stack.current.route !in setOf(Route.LIVE_PLAYER, Route.VOD_PLAYER, Route.SETUP)) }
     LaunchedEffect(tagger, tagTick) { if (tagKey != null && tagPrefs.getBoolean("tagging_on", false)) withContext(Dispatchers.IO) { tagger.run { canTag.get() } } }
-    LaunchedEffect(scorer, tagTick) { if (scoreKey != null && tagPrefs.getBoolean("scoring_on", false)) withContext(Dispatchers.IO) { scorer.run { canTag.get() } } }
     // While the title index is building keep this window awake, or the screensaver would stop the crawl (the app releases its
     // portal session when it is not in front). A flag on this app's own window: no device setting changes.
     val rootView = androidx.compose.ui.platform.LocalView.current
@@ -674,10 +651,6 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                         onSetTagKey = { tagKeyDialog = true },
                         onToggleTagging = { tagPrefs.edit().putBoolean("tagging_on", !tagPrefs.getBoolean("tagging_on", false)).apply(); tagTick++ },
                         onClearTags = { shellScope.launch(Dispatchers.IO) { tagPrefs.edit().putBoolean("tagging_on", false).apply(); tagKeyStore.clear(); db.titleTags().clear(); tagKey = null; tagTick++ } },
-                        scoreStatus = scorer.status,
-                        onSetScoreKey = { scoreKeyDialog = true },
-                        onToggleScoring = { tagPrefs.edit().putBoolean("scoring_on", !tagPrefs.getBoolean("scoring_on", false)).apply(); tagTick++ },
-                        onClearScores = { shellScope.launch(Dispatchers.IO) { tagPrefs.edit().putBoolean("scoring_on", false).apply(); scoreKeyStore.clear(); db.titleTags().forgetScores(); scoreKey = null; tagTick++ } },
                         onToggleHideUnrated = { contentPolicy = contentPolicy.copy(hideUnrated = !contentPolicy.hideUnrated).also { policyStore.save(profileId, it) } },
                     ),
                 )
@@ -762,13 +735,6 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
             onDismiss = { pickerOpen = false },
         )
     }
-        if (scoreKeyDialog) {
-            TextEntryDialog(
-                title = "OMDb key", label = "Key", memory = memory,
-                note = "Paste your key from omdbapi.com. The app then sends only an IMDb id, one title at a time, and keeps the IMDb score and Rotten Tomatoes percentage that come back on this device. The key is stored sealed and never shown again. The free key allows about 1,000 titles a day; the app carries on the next day.",
-                onSave = { k -> scoreKeyDialog = false; shellScope.launch(Dispatchers.IO) { scoreKeyStore.save(k); scoreKey = k; tagTick++ } }, onCancel = { scoreKeyDialog = false },
-            )
-        }
         if (tagKeyDialog) {
             TextEntryDialog(
                 title = "Online tag service key", label = "Key", memory = memory,
