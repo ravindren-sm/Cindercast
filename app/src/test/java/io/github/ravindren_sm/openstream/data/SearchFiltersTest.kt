@@ -101,4 +101,9 @@ class SearchFiltersTest {
         assertEquals(SearchFilters.GENRES.sortedBy { it.lowercase() }, SearchFilters.GENRES)
         assertEquals("Action", SearchFilters.GENRES.first())
     }
+
+    @Test fun theLanguagePickerListsLanguagesAlphabetically() {
+        val many = listOf(VodCategory("1", "TAMIL MOVIES"), VodCategory("2", "ENGLISH MOVIES"), VodCategory("3", "HINDI MOVIES"), VodCategory("4", "ARABIC MOVIES"))
+        assertEquals(listOf("Arabic", "English", "Hindi", "Tamil"), FilterRules.languageOptions(many))
+    }
 }

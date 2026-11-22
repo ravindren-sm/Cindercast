@@ -73,7 +73,7 @@ object FilterRules {
     /** Languages that at least one category mentions, in the usual order, so the picker offers only real choices. */
     fun languageOptions(categories: List<VodCategory>): List<String> {
         val present = categories.flatMapTo(HashSet()) { languagesIn(it.title) }
-        return SearchFilters.LANGUAGE_NAMES.filter { it in present }
+        return SearchFilters.LANGUAGE_NAMES.filter { it in present }.sorted()          // alphabetical for the picker
     }
 
     /**
