@@ -16,6 +16,7 @@ themoviedb.org (TMDB) service about each title and keeps what it says on the dev
 - **Order and pace:** titles with no portal age label first, newest first; five titles at a time (two requests each), about 8 titles a second on the Fire TV, so the whole catalogue takes roughly 3.5 hours; waits when the service says
   slow down (HTTP 429); stops at once and says so if the key is refused; pauses while a video plays; resumes where it left off. It runs only while the app is
   open and idle (it does not keep the screen awake, unlike the title index).
+- **Use for adults (2026-11-22):** wherever a list loads (Movies and Shows from the portal or the on-device copy, and Search), a title the portal gave no score gets the TMDB score (badge "TMDB 7.4", used by the rating floor, the rating filter and the Best rated order), and no genres or age label get the TMDB ones; the portal's own values always win. The rating floor and sort read the score in SQL; the genre filter in a category reads TMDB genres where the portal gave none.
 - **Use:** a Kids profile now takes the TMDB certification when the portal has none, and hides a title whose tag is flagged. Adult profiles are unchanged.
 - **Remove:** Settings, "Remove key and tags" deletes the key and every tag.
 
@@ -25,7 +26,7 @@ certification (51 percent of movies, 13 percent of shows); labels were mostly In
 five workers do about 8. The crawl resumes by itself after the app restarts.
 
 ## Not done
-- Using the tags for search filters and genres in lists for adults (genres, language and rating from TMDB could fill gaps in the portal's own fields).
+- TMDB original language is stored but not used yet (the language filter still works from category names).
 - A second source (OMDb) for titles TMDB cannot grade, and Rotten Tomatoes scores.
 - Checking the crawl against the real service: the key has not been entered yet, so all tests use a fake service (`TitleTaggerTest`, `TmdbTest`). The first
   real run should be watched for the match rate (how many of the 104,000 titles get a certification), speed and any 429 answers.

@@ -217,6 +217,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     val tagKeyStore = remember { TmdbKeyStore(java.io.File(appContext.filesDir, "tag-key.bin"), io.github.ravindren_sm.openstream.data.AndroidKeystoreKey.box()) }
     var tagKey by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { tagKey = withContext(Dispatchers.IO) { tagKeyStore.load() } }
+    val tagEnricher = remember { io.github.ravindren_sm.openstream.data.TagEnricher(db.titleTags()) }
     var tagTick by remember { mutableIntStateOf(0) }
     var tagKeyDialog by remember { mutableStateOf(false) }
     val tagger = remember(tagKey) {
@@ -330,7 +331,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         delay(if (submitted) 0L else if (q.length >= 3) 350L else 800L)
         lastSubmitHandled = searchState.submitTick
         searchState.phase = SearchPhase.Loading
-        val result = withContext(Dispatchers.IO) { searchCatalog.search(q, searchState.filters, searchState.categories, effectivePolicy, if (orderByStats) personalization else null) }
+        val result = withContext(Dispatchers.IO) { searchCatalog.search(q, searchState.filters, searchState.categories, effectivePolicy, if (orderByStats) personalization else null, tagEnricher::enrich) }
         searchState.phase = when (result) {
             is CatalogResult.Ok -> SearchPhase.Done(result.value)
             is CatalogResult.Failed -> SearchPhase.Failed(result.message)
@@ -392,10 +393,10 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     val indexer = remember(portalEpoch) { TitleIndexer(vodCatalog, db.catalogIndex(), appContext.getSharedPreferences("search", android.content.Context.MODE_PRIVATE)) }
     var indexTick by remember { mutableIntStateOf(0) }
     // The profile's content filter (rating floor), kept per profile on the device, and the on-device copy of the catalog.
-    val indexedTitles = remember { IndexedTitles(db.catalogIndex()) }
+    val indexedTitles = remember { IndexedTitles(db.catalogIndex(), enricher = tagEnricher) }
     val hydrator = remember(portalEpoch) { VodHydrator(session) }
     androidx.compose.runtime.SideEffect {
-        for (st in listOf(moviesState, showsState)) { st.indexed = indexedTitles; st.ready = { id -> id in indexer.readyCategories } }
+        for (st in listOf(moviesState, showsState)) { st.indexed = indexedTitles; st.enricher = tagEnricher::enrich; st.ready = { id -> id in indexer.readyCategories } }
     }
     LaunchedEffect(effectivePolicy, moviesState, showsState) { moviesState.applyProfilePolicy(effectivePolicy); showsState.applyProfilePolicy(effectivePolicy) }
     LaunchedEffect(vodCategoryRule, moviesState, showsState) { moviesState.applyCategoryRule(vodCategoryRule); showsState.applyCategoryRule(vodCategoryRule) }

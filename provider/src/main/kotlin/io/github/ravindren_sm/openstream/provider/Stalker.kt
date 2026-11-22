@@ -222,13 +222,26 @@ class VodItem(
     val age: String? = null,
     /** Poster address as sent: absolute, or a path on the portal host. Resolved by the app. */
     val posterUri: String? = null,
+    /** The online tag service's score (0 to 10), when the viewer turned that on and the title was matched. Shown only if the portal sent none. */
+    val tmdbRating: Double? = null,
 ) {
     /**
      * The rating to show: the portal's IMDb value if it sent one, else its Kinopoisk value, labelled as that and
      * never passed off as IMDb. On the real portal IMDb is almost always 0 and Kinopoisk is filled for about half.
      */
     val shownRating: ShownRating?
-        get() = imdbRating?.let { ShownRating(it, "IMDb") } ?: kinopoiskRating?.let { ShownRating(it, "Kinopoisk") }
+        get() = imdbRating?.let { ShownRating(it, "IMDb") } ?: kinopoiskRating?.let { ShownRating(it, "Kinopoisk") } ?: tmdbRating?.let { ShownRating(it, "TMDB") }
+
+    /**
+     * This entry with what the online tag service added: its score, and its genres and age label where the portal gave none.
+     * The portal's own values always win; only gaps are filled.
+     */
+    fun withTags(rating: Double?, tagGenres: String?, ageLabel: String?) = VodItem(
+        id = id, name = name, isSeries = isSeries, isSeason = isSeason, isEpisode = isEpisode, cmd = cmd, episodeNumbers = episodeNumbers,
+        isFile = isFile, fileCmds = fileCmds, year = year, description = description, actors = actors, director = director,
+        genres = genres ?: tagGenres, imdbRating = imdbRating, kinopoiskRating = kinopoiskRating, age = age ?: ageLabel, posterUri = posterUri,
+        tmdbRating = tmdbRating ?: rating,
+    )
 
     override fun toString() = "VodItem(id=$id, name=$name, series=$isSeries, season=$isSeason, episode=$isEpisode, file=$isFile, inlineFiles=${fileCmds.size})"
 

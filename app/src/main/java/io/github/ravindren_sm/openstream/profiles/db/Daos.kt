@@ -96,27 +96,27 @@ interface CatalogIndexDao {
      * 3 best rated (IMDb, else Kinopoisk), 4 IMDb, 5 Kinopoisk, 6 name. Unrated titles come last in the rating orders, and are
      * kept or dropped by [keepUnrated] (1 or 0) when [minRating] is set.
      */
-    @Query("""SELECT * FROM catalog_titles WHERE categoryId = :categoryId
-        AND (:minRating IS NULL OR COALESCE(imdbRating, kinopoiskRating) >= :minRating
-             OR (COALESCE(imdbRating, kinopoiskRating) IS NULL AND :keepUnrated = 1))
-        AND (:g1 IS NULL OR genres LIKE '%' || :g1 || '%'
-             OR (:g2 IS NOT NULL AND genres LIKE '%' || :g2 || '%') OR (:g3 IS NOT NULL AND genres LIKE '%' || :g3 || '%'))
+    @Query("""SELECT c.* FROM catalog_titles c LEFT JOIN title_tags t ON t.kind = c.kind AND t.id = c.id WHERE c.categoryId = :categoryId
+        AND (:minRating IS NULL OR COALESCE(c.imdbRating, c.kinopoiskRating, t.rating) >= :minRating
+             OR (COALESCE(c.imdbRating, c.kinopoiskRating, t.rating) IS NULL AND :keepUnrated = 1))
+        AND (:g1 IS NULL OR COALESCE(c.genres, t.genres) LIKE '%' || :g1 || '%'
+             OR (:g2 IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g2 || '%') OR (:g3 IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g3 || '%'))
         ORDER BY
-          CASE :sort WHEN 1 THEN ord END ASC,
-          CASE :sort WHEN 2 THEN CAST(year AS INTEGER) END DESC,
-          CASE :sort WHEN 3 THEN COALESCE(imdbRating, kinopoiskRating) END DESC,
-          CASE :sort WHEN 4 THEN imdbRating END DESC,
-          CASE :sort WHEN 5 THEN kinopoiskRating END DESC,
-          CASE :sort WHEN 6 THEN nameKey END ASC,
-          ord ASC
+          CASE :sort WHEN 1 THEN c.ord END ASC,
+          CASE :sort WHEN 2 THEN CAST(c.year AS INTEGER) END DESC,
+          CASE :sort WHEN 3 THEN COALESCE(c.imdbRating, c.kinopoiskRating, t.rating) END DESC,
+          CASE :sort WHEN 4 THEN c.imdbRating END DESC,
+          CASE :sort WHEN 5 THEN c.kinopoiskRating END DESC,
+          CASE :sort WHEN 6 THEN c.nameKey END ASC,
+          c.ord ASC
         LIMIT :limit OFFSET :offset""")
     suspend fun browse(categoryId: String, minRating: Double?, keepUnrated: Int, g1: String?, g2: String?, g3: String?, sort: Int, limit: Int, offset: Int): List<CatalogTitleEntity>
 
-    @Query("""SELECT COUNT(*) FROM catalog_titles WHERE categoryId = :categoryId
-        AND (:minRating IS NULL OR COALESCE(imdbRating, kinopoiskRating) >= :minRating
-             OR (COALESCE(imdbRating, kinopoiskRating) IS NULL AND :keepUnrated = 1))
-        AND (:g1 IS NULL OR genres LIKE '%' || :g1 || '%'
-             OR (:g2 IS NOT NULL AND genres LIKE '%' || :g2 || '%') OR (:g3 IS NOT NULL AND genres LIKE '%' || :g3 || '%'))""")
+    @Query("""SELECT COUNT(*) FROM catalog_titles c LEFT JOIN title_tags t ON t.kind = c.kind AND t.id = c.id WHERE c.categoryId = :categoryId
+        AND (:minRating IS NULL OR COALESCE(c.imdbRating, c.kinopoiskRating, t.rating) >= :minRating
+             OR (COALESCE(c.imdbRating, c.kinopoiskRating, t.rating) IS NULL AND :keepUnrated = 1))
+        AND (:g1 IS NULL OR COALESCE(c.genres, t.genres) LIKE '%' || :g1 || '%'
+             OR (:g2 IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g2 || '%') OR (:g3 IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g3 || '%'))""")
     suspend fun browseCount(categoryId: String, minRating: Double?, keepUnrated: Int, g1: String?, g2: String?, g3: String?): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putProgress(p: IndexProgressEntity)
@@ -141,6 +141,7 @@ interface TitleTagDao {
     @Query("""SELECT c.* FROM catalog_titles c LEFT JOIN title_tags t ON t.kind = c.kind AND t.id = c.id
         WHERE t.id IS NULL ORDER BY (c.age IS NULL) DESC, c.ord ASC LIMIT :limit""")
     suspend fun untagged(limit: Int): List<CatalogTitleEntity>
+    @Query("SELECT * FROM title_tags WHERE id IN (:ids) AND tmdbId > 0") suspend fun byIds(ids: List<String>): List<TitleTagEntity>
     @Query("SELECT COUNT(*) FROM title_tags") suspend fun checked(): Int
     @Query("SELECT COUNT(*) FROM title_tags WHERE tmdbId > 0") suspend fun matched(): Int
     @Query("SELECT COUNT(*) FROM title_tags WHERE certAge IS NOT NULL") suspend fun graded(): Int

@@ -92,6 +92,8 @@ class VodBrowseState(private val catalog: VodCatalog, val kind: VodKind) {
 
     /** Set by the shell: the on-device copy of the catalog, and which categories it holds completely. */
     var indexed: IndexedTitles? = null
+    /** Adds the optional online tags to each page read from the portal. */
+    var enricher: ((List<VodItem>) -> List<VodItem>)? = null
     var ready: (String) -> Boolean = { false }
     /** The list on screen is read from the device (sorted and filtered there), not from the portal. */
     var usingIndex: Boolean by mutableStateOf(false)
@@ -172,7 +174,7 @@ class VodBrowseState(private val catalog: VodCatalog, val kind: VodKind) {
         } else {
             usingIndex = false; sortUnavailable = sort != BrowseSort.NEWEST
             // The portal's pages, with the rating floor and the defaults applied to each page as it arrives.
-            titles = PagedTitles(keep = { policy.passes(it) && (sc?.titlePasses(it) ?: true) }) { page -> catalog.titles(category.id, page) }
+            titles = PagedTitles(keep = { policy.passes(it) && (sc?.titlePasses(it) ?: true) }) { page -> catalog.titles(category.id, page).let { r -> if (r is CatalogResult.Ok && enricher != null) CatalogResult.Ok(VodPage(r.value.page, enricher!!(r.value.items), r.value.totalItems, r.value.pageSize)) else r } }
         }
     }
 }
