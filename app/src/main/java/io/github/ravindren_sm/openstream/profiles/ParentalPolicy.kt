@@ -12,6 +12,8 @@ data class ProfileInfo(
     val maxAgeLevel: Int = ParentalPolicy.DEFAULT_KIDS_MAX_AGE,
     /** Adults only: also list categories whose names mark adult content. */
     val showAdultCategories: Boolean = false,
+    /** Index into the profile colours (the picker's tile colour). */
+    val colorIndex: Int = 0,
 )
 
 /**

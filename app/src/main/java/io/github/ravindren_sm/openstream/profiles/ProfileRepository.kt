@@ -83,7 +83,7 @@ class ProfileRepository(private val db: OpenStreamDb, private val nowMillis: () 
 
     suspend fun delete(id: Long) = db.profiles().delete(id)
 
-    private fun ProfileEntity.info() = ProfileInfo(id, name, isKids, maxAgeLevel, showAdultCategories)
+    private fun ProfileEntity.info() = ProfileInfo(id, name, isKids, maxAgeLevel, showAdultCategories, colorIndex)
 
     // ---- Kids allow-list ----
 

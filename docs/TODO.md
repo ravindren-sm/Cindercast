@@ -10,11 +10,12 @@ without supervision, so profile enforcement is not needed before the first relea
 adult Home rows, focus and navigation polish, Search, Favorites, then the rest of the spec. The kid-safe rule for real
 runs on the family TV still stands (see Environment notes).
 
-## Family safety (deferred: not needed before release)
-- Profiles with a Kids flag, one household PIN, rating policy, adult categories hidden, Kids profile without Live TV.
-  The data layer is built and tested (slice 1); the picker, enforcement and Settings slices wait. Design in
-  `docs/HOME_AND_PROFILES.md`.
-- Real-portal check of the age labels the catalog really carries, so the rating policy covers every value seen.
+## Family safety (built 2026-11-22; see docs/HOME_AND_PROFILES.md)
+- Check on the real portal with kid-safe choices: a Kids profile's categories and titles (the real catalogue's age labels and category names
+  decide how much a Kids profile sees), and that the ADULTS-named categories are gone for the Family profile.
+- Survey the age labels the real catalogue carries so the rating table covers every value seen.
+- Editing the Kids word list from Settings; PIN prompt for 16+ titles on adult profiles (optional); a PIN option for adult profiles at launch.
+- Kids profile lists use the portal's pages only (no on-device sort); an age and word filter on the on-device copy would restore sorting.
 
 ## Observability and memory (found 2026-11-21: the app records no memory at all)
 - Debug-only health sampler: every 30 s write one line to a file in the app's private storage with Java heap, native

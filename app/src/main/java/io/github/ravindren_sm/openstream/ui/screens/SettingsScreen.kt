@@ -58,6 +58,9 @@ class SettingsModel(
     val applyDefaultsEverywhere: Boolean,
     val defaultsSummary: String,
     val onToggleApplyDefaults: () -> Unit,
+    val profileSummary: String,
+    val onSwitchProfile: () -> Unit,
+    val onManageProfiles: () -> Unit,
 )
 
 private class Row_(val title: String, val value: String, val action: String, val confirm: String? = null, val run: () -> Unit)
@@ -77,6 +80,10 @@ fun SettingsScreen(model: SettingsModel, memory: FocusMemory, modifier: Modifier
         else -> "Not built"
     }
     val sections: List<Pair<String, List<Row_>>> = listOf(
+        "Profile" to listOf(
+            Row_("Watching as", model.profileSummary, "Switch", run = model.onSwitchProfile),
+            Row_("Profiles and household PIN", "Add, edit or delete profiles; set the PIN", "Manage", run = model.onManageProfiles),
+        ),
         "Portal" to listOf(
             Row_("Portal", model.portalStatus, "Change portal…", run = model.onChangePortal),
         ),

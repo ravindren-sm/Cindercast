@@ -47,6 +47,15 @@ import io.github.ravindren_sm.openstream.data.SearchCatalog
 import io.github.ravindren_sm.openstream.data.SearchFilters
 import io.github.ravindren_sm.openstream.data.SearchSources
 import io.github.ravindren_sm.openstream.data.TitleIndexer
+import io.github.ravindren_sm.openstream.data.KidsRules
+import io.github.ravindren_sm.openstream.profiles.CategoryRules
+import io.github.ravindren_sm.openstream.profiles.ParentalPolicy
+import io.github.ravindren_sm.openstream.profiles.PinResult
+import io.github.ravindren_sm.openstream.profiles.ProfileInfo
+import io.github.ravindren_sm.openstream.ui.components.PinDialog
+import io.github.ravindren_sm.openstream.ui.screens.ProfileDraft
+import io.github.ravindren_sm.openstream.ui.screens.ProfilesModel
+import io.github.ravindren_sm.openstream.ui.screens.ProfilesScreen
 import io.github.ravindren_sm.openstream.ui.components.VersionPicker
 import io.github.ravindren_sm.openstream.ui.screens.DETAIL_VERSIONS_ID
 import io.github.ravindren_sm.openstream.ui.screens.SHOW_VERSIONS_ID
@@ -145,7 +154,19 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     // use; history and resume positions belong to it.
     val repo = remember { ProfileRepository(OpenStreamDb.get(appContext)) }
     var profileId by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(Unit) { profileId = withContext(Dispatchers.IO) { repo.ensureDefaultProfile().id } }
+    var profiles by remember { mutableStateOf<List<ProfileInfo>>(emptyList()) }
+    val profilePrefs = remember { appContext.getSharedPreferences("profiles", android.content.Context.MODE_PRIVATE) }
+    // "Who's watching?": shown at launch when there is more than one profile (the choice is then required), or on request.
+    var profileScreen by remember { mutableStateOf<String?>(null) }            // null, "pick" or "manage"
+    var profileScreenRequired by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val list = withContext(Dispatchers.IO) { repo.ensureDefaultProfile(); repo.profiles() }
+        profiles = list
+        if (list.size > 1) { profileScreen = "pick"; profileScreenRequired = true }
+        else profileId = list.first().id
+    }
+    val profile: ProfileInfo? = profiles.firstOrNull { it.id == profileId }
+    val isKids = profile?.isKids == true
     val resumeStore = remember { ProfileResumeStore(PrefsResumeStore(appContext)) { profileId } }
     val recorder = remember { RoomHistoryRecorder(repo, { profileId }, CoroutineScope(SupervisorJob() + Dispatchers.IO)) }
     // Favorites (channels, movies, shows) of the current profile, shared by every screen that shows a heart.
@@ -184,6 +205,68 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     val policyStore = remember { ContentPolicyStore(appContext.getSharedPreferences("search", android.content.Context.MODE_PRIVATE)) }
     var contentPolicy by remember { mutableStateOf(ContentPolicy()) }
     LaunchedEffect(profileId) { if (profileId > 0L) contentPolicy = policyStore.load(profileId) }
+    // A Kids profile's rules sit on top of the rating floor: age label, word list, allowed categories, no Live TV.
+    var kidsAllowed by remember { mutableStateOf<Set<String>>(emptySet()) }
+    LaunchedEffect(profileId, profiles) { kidsAllowed = if (profile?.isKids == true) withContext(Dispatchers.IO) { repo.kidsAllowed(profileId) } else emptySet() }
+    val effectivePolicy = remember(contentPolicy, profile?.id, profile?.isKids, profile?.maxAgeLevel) {
+        if (profile?.isKids == true) contentPolicy.copy(kids = KidsRules(profile.maxAgeLevel)) else contentPolicy
+    }
+    val vodCategoryRule: (io.github.ravindren_sm.openstream.data.VodCategory) -> Boolean = remember(profile, kidsAllowed) {
+        { c -> profile == null || ParentalPolicy.categoryVisible(profile, c.id, io.github.ravindren_sm.openstream.provider.PortalText.decodeEntities(c.title), kidsAllowed) }
+    }
+    // The household PIN: ask for it before an action, or set one first when none exists yet.
+    var pinFlow by remember { mutableStateOf<Triple<String, Boolean, () -> Unit>?>(null) }     // title, choosing a new PIN, what to do afterwards
+    val shellScope = rememberCoroutineScope()
+    fun withPin(title: String, action: () -> Unit) {
+        shellScope.launch { if (!withContext(Dispatchers.IO) { repo.pins.isSet() }) action() else pinFlow = Triple(title, false, action) }
+    }
+    fun choosePin(title: String, action: () -> Unit) { pinFlow = Triple(title, true, action) }
+
+    // ---- profile actions ----
+    var pinIsSet by remember { mutableStateOf(false) }
+    LaunchedEffect(pinFlow == null, profiles) { pinIsSet = withContext(Dispatchers.IO) { repo.pins.isSet() } }
+    fun startAs(p: ProfileInfo) {
+        profileId = p.id
+        profilePrefs.edit().putLong("last_profile", p.id).apply()
+        profileScreen = null; profileScreenRequired = false
+        searchState.query = ""; searchState.phase = SearchPhase.Idle; showDetail = null
+        stack = NavStack.start(Route.HOME)
+    }
+    // Leaving a Kids profile needs the PIN (when one is set); every other switch is free.
+    fun chooseProfile(p: ProfileInfo) { if (profile?.isKids == true && p.id != profileId) withPin("Enter the PIN to switch profile") { startAs(p) } else startAs(p) }
+    var kidsChoices by remember { mutableStateOf<List<io.github.ravindren_sm.openstream.ui.components.Choice>>(emptyList()) }
+    var kidsPickAllowed by remember { mutableStateOf<Set<String>>(emptySet()) }
+    fun saveProfile(d: ProfileDraft) {
+        val before = profiles.firstOrNull { it.id == d.id }
+        val needsPin = (d.isKids && before?.isKids != true) || (d.showAdult && before?.showAdultCategories != true)
+        fun doSave() {
+            shellScope.launch(Dispatchers.IO) {
+                val info = ProfileInfo(d.id, d.name, d.isKids, d.maxAgeLevel, d.showAdult, d.colorIndex)
+                val saved = if (d.id == 0L) repo.create(d.name, d.colorIndex, d.isKids, d.maxAgeLevel, d.showAdult) else { repo.update(info, d.colorIndex); info }
+                // A new Kids profile starts with the categories whose names look kid-friendly; an adult can change them afterwards.
+                if (d.isKids && before?.isKids != true) {
+                    val cats = listOf(VodKind.MOVIES, VodKind.SHOWS).flatMap { k -> (vodCatalog.categories(k) as? CatalogResult.Ok)?.value.orEmpty() }
+                    repo.seedKidsAllowed(saved.id, cats.map { it.id to PortalText.decodeEntities(it.title) })
+                }
+                profiles = repo.profiles()
+                if (saved.id == profileId) kidsAllowed = if (saved.isKids) repo.kidsAllowed(saved.id) else emptySet()
+            }
+        }
+        // Kids profiles and adult categories only mean something with a PIN: set one first if the household has none.
+        if (needsPin) shellScope.launch { if (!withContext(Dispatchers.IO) { repo.pins.isSet() }) choosePin("Choose a PIN to protect Kids profiles") { doSave() } else doSave() } else doSave()
+    }
+    fun deleteProfile(p: ProfileInfo) {
+        shellScope.launch(Dispatchers.IO) {
+            repo.delete(p.id)
+            val rest = repo.profiles(); profiles = rest
+            if (p.id == profileId) withContext(Dispatchers.Main) { rest.firstOrNull()?.let(::startAs) }
+        }
+    }
+    suspend fun verifyPin(pin: String): String? = when (val r = withContext(Dispatchers.IO) { repo.pins.verify(pin) }) {
+        PinResult.Ok, PinResult.NotSet -> null
+        is PinResult.Wrong -> "Wrong PIN. ${r.attemptsLeft} ${if (r.attemptsLeft == 1) "try" else "tries"} left."
+        is PinResult.Locked -> "Too many tries. Wait ${((r.untilMillis - System.currentTimeMillis()) / 1000 + 1).coerceAtLeast(1)} seconds."
+    }
     // Per-profile switches: order search by viewing stats (on by default), and use the saved search defaults beyond search (off by default).
     var orderByStats by remember { mutableStateOf(true) }
     var applyDefaultsEverywhere by remember { mutableStateOf(false) }
@@ -204,7 +287,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     }
     val tileScopeForSearch = rememberCoroutineScope()
     fun recordSearch(text: String) { tileScopeForSearch.launch(Dispatchers.IO) { repo.recordSearch(profileId, text) } }
-    LaunchedEffect(searchState.query, searchState.submitTick, connected, searchState.filters, contentPolicy, orderByStats) {
+    LaunchedEffect(searchState.query, searchState.submitTick, connected, searchState.filters, effectivePolicy, orderByStats) {
         val q = searchState.query.trim()
         if (q.length < SearchRanking.MIN_QUERY) { searchState.phase = SearchPhase.Idle; return@LaunchedEffect }
         if (!connected) { searchState.phase = SearchPhase.Idle; return@LaunchedEffect }
@@ -213,7 +296,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         delay(if (submitted) 0L else if (q.length >= 3) 350L else 800L)
         lastSubmitHandled = searchState.submitTick
         searchState.phase = SearchPhase.Loading
-        val result = withContext(Dispatchers.IO) { searchCatalog.search(q, searchState.filters, searchState.categories, contentPolicy, if (orderByStats) personalization else null) }
+        val result = withContext(Dispatchers.IO) { searchCatalog.search(q, searchState.filters, searchState.categories, effectivePolicy, if (orderByStats) personalization else null) }
         searchState.phase = when (result) {
             is CatalogResult.Ok -> SearchPhase.Done(result.value)
             is CatalogResult.Failed -> SearchPhase.Failed(result.message)
@@ -280,12 +363,13 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     androidx.compose.runtime.SideEffect {
         for (st in listOf(moviesState, showsState)) { st.indexed = indexedTitles; st.ready = { id -> id in indexer.readyCategories } }
     }
-    LaunchedEffect(contentPolicy, moviesState, showsState) { moviesState.applyProfilePolicy(contentPolicy); showsState.applyProfilePolicy(contentPolicy) }
+    LaunchedEffect(effectivePolicy, moviesState, showsState) { moviesState.applyProfilePolicy(effectivePolicy); showsState.applyProfilePolicy(effectivePolicy) }
+    LaunchedEffect(vodCategoryRule, moviesState, showsState) { moviesState.applyCategoryRule(vodCategoryRule); showsState.applyCategoryRule(vodCategoryRule) }
     // The saved search defaults, when this profile asked for them everywhere.
     val defaultScope = if (applyDefaultsEverywhere) searchState.defaultFilters?.takeIf { it.isActive }?.let(::DefaultScope) else null
-    LaunchedEffect(defaultScope?.summary(), moviesState, showsState, liveState) {
+    LaunchedEffect(defaultScope?.summary(), moviesState, showsState, liveState, profile?.showAdultCategories) {
         moviesState.applyScope(defaultScope); showsState.applyScope(defaultScope)
-        liveState.applyGroupFilter(defaultScope?.let { sc -> { g -> sc.groupAllowed(g) } })
+        liveState.applyGroupFilter { g -> (profile?.showAdultCategories == true || !CategoryRules.isAdult(io.github.ravindren_sm.openstream.provider.PortalText.decodeEntities(g.title))) && (defaultScope?.groupAllowed(g) ?: true) }
     }
     val canIndex = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     androidx.compose.runtime.SideEffect {
@@ -302,7 +386,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     LaunchedEffect(searchState.query, favorites.all, channelsWarm, indexer.status.titles / 500, profileId, onSearchRoute) {
         if (!onSearchRoute) return@LaunchedEffect
         delay(120)
-        searchState.suggestions = withContext(Dispatchers.IO) { searchSources.suggestions(profileId, searchState.query) }
+        searchState.suggestions = withContext(Dispatchers.IO) { searchSources.suggestions(profileId, searchState.query, effectivePolicy.kids) }
     }
     // A picker for the versions of a title opened from Search, and which versions the open page has.
     var pickerOpen by remember { mutableStateOf(false) }
@@ -364,7 +448,12 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
             TopNavBar(
                 activeTab = topTab,
                 memory = memory,
-                onSelectTab = { tab -> stack = stack.resetToTab(tab) },
+                onSelectTab = { tab ->
+                    // A Kids profile needs the PIN to reach Settings (where profiles and the PIN live).
+                    if (tab == Route.SETTINGS && isKids) withPin("Enter the PIN to open Settings") { stack = stack.resetToTab(tab) }
+                    else stack = stack.resetToTab(tab)
+                },
+                tabs = if (isKids) Route.TABS.filter { it != Route.LIVE_TV && it != Route.TV_GUIDE } else Route.TABS,
             )
             if (stack.current.route == Route.HOME) {
                 HomeScreen(
@@ -409,6 +498,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                         stack = stack.navigate(Route.VOD_PLAYER, mapOf("play" to "history"), currentFocusId = memory.focusedId)
                     },
                     onDoor = { route -> stack = stack.resetToTab(route) },
+                    liveAllowed = !isKids,
                 )
             } else if (stack.current.route == Route.MOVIES || stack.current.route == Route.SHOWS) {
                 val browse = if (stack.current.route == Route.SHOWS) showsState else moviesState
@@ -516,12 +606,15 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                         applyDefaultsEverywhere = applyDefaultsEverywhere,
                         defaultsSummary = searchState.defaultFilters?.summary()?.ifEmpty { null } ?: "None saved (set them in Search, Save as default)",
                         onToggleApplyDefaults = { applyDefaultsEverywhere = !applyDefaultsEverywhere; policyStore.setFlag(profileId, "apply_defaults", applyDefaultsEverywhere) },
+                        profileSummary = profile?.let { "${it.name} (${if (it.isKids) "Kids" else "Adult"})" } ?: "No profile",
+                        onSwitchProfile = { profileScreen = "pick"; profileScreenRequired = false },
+                        onManageProfiles = { withPin("Enter the PIN to manage profiles") { profileScreen = "manage"; profileScreenRequired = false } },
                         onToggleHideUnrated = { contentPolicy = contentPolicy.copy(hideUnrated = !contentPolicy.hideUnrated).also { policyStore.save(profileId, it) } },
                     ),
                 )
             } else if (stack.current.route == Route.TV_GUIDE) {
                 GuideScreen(
-                    state = guideState, favoriteCount = favorites.channels().size, genres = liveState.allGenres.filter { g -> defaultScope?.groupAllowed(g) ?: true }, loader = guideLoader,
+                    state = guideState, favoriteCount = favorites.channels().size, genres = liveState.allGenres.filter { g -> liveState.genres.any { it.id == g.id } && (defaultScope?.groupAllowed(g) ?: true) }, loader = guideLoader,
                     connected = connected, memory = memory,
                     onChooseGroup = { id, title ->
                         guideState.select(id, title,
@@ -600,6 +693,41 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
             onDismiss = { pickerOpen = false },
         )
     }
+        profileScreen?.let { which ->
+            ProfilesScreen(
+                model = ProfilesModel(
+                    profiles = profiles, currentId = profileId, pinIsSet = pinIsSet,
+                    onClose = if (profileScreenRequired) null else ({ profileScreen = null }),
+                    onChoose = ::chooseProfile, onSave = ::saveProfile, onDelete = ::deleteProfile,
+                    onChangePin = { if (pinIsSet) withPin("Enter the current PIN") { choosePin("Choose a new PIN") {} } else choosePin("Choose a household PIN") {} },
+                    guardManage = { proceed -> withPin("Enter the PIN to manage profiles", proceed) },
+                    kidsChoices = kidsChoices, kidsAllowed = kidsPickAllowed,
+                    onOpenKidsCategories = { p ->
+                        tileScopeForSearch.launch(Dispatchers.IO) {
+                            val cats = listOf(VodKind.MOVIES, VodKind.SHOWS).flatMap { k -> (vodCatalog.categories(k) as? CatalogResult.Ok)?.value.orEmpty() }
+                            kidsChoices = cats.filter { !CategoryRules.isAdult(it.title) }.distinctBy { it.id }.map { io.github.ravindren_sm.openstream.ui.components.Choice(it.id, PortalText.decodeEntities(it.title)) }
+                            kidsPickAllowed = repo.kidsAllowed(p.id)
+                        }
+                    },
+                    onToggleKidsCategory = { p, id ->
+                        tileScopeForSearch.launch(Dispatchers.IO) {
+                            if (id in kidsPickAllowed) repo.disallowKidsCategory(p.id, id)
+                            else repo.allowKidsCategory(p.id, id, kidsChoices.firstOrNull { it.id == id }?.label ?: id)
+                            kidsPickAllowed = repo.kidsAllowed(p.id)
+                            if (p.id == profileId) kidsAllowed = kidsPickAllowed
+                        }
+                    },
+                ),
+                memory = memory, startInManage = which == "manage",
+            )
+        }
+        pinFlow?.let { (title, choosing, action) ->
+            PinDialog(
+                title = title, memory = memory, confirmTwice = choosing,
+                onSubmit = { pin -> if (choosing) { withContext(Dispatchers.IO) { repo.pins.set(pin) }; null } else verifyPin(pin) },
+                onDone = { pinFlow = null; action() }, onCancel = { pinFlow = null },
+            )
+        }
     }
 
     LaunchedEffect(stack.current.route == Route.VOD_PLAYER) { if (stack.current.route != Route.VOD_PLAYER) playOverride = null }
@@ -628,14 +756,14 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     }
 
     // Pinned rows: placeholders at once, then one portal request per row (cached), only while Home is showing and connected.
-    LaunchedEffect(onHome, connected, pins, contentPolicy, defaultScope?.summary()) {
+    LaunchedEffect(onHome, connected, pins, effectivePolicy, defaultScope?.summary()) {
         if (!onHome || !connected) return@LaunchedEffect
         val wanted = HomeRowPlan.titlePins(pins) + listOfNotNull(HomeRowPlan.livePin(pins))
         pinnedRows = wanted.map { PinnedRow(it, null, null, false) }
         wanted.forEachIndexed { i, pin ->
             val row = withContext(Dispatchers.IO) {
                 if (pin.kind == PinKinds.LIVE) homeFeed.channelsOf(pin.categoryId)?.let { PinnedRow(pin, null, it, false) }
-                else homeFeed.titlesOf(pin.categoryId, keep = { contentPolicy.passes(it) && (defaultScope?.titlePasses(it) ?: true) })?.let { PinnedRow(pin, it, null, false) }
+                else homeFeed.titlesOf(pin.categoryId, keep = { effectivePolicy.passes(it) && (defaultScope?.titlePasses(it) ?: true) })?.let { PinnedRow(pin, it, null, false) }
             } ?: PinnedRow(pin, null, null, true)
             pinnedRows = pinnedRows.toMutableList().also { if (i < it.size) it[i] = row }
         }

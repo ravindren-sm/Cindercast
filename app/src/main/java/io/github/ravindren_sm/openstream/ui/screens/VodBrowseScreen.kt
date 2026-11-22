@@ -37,6 +37,7 @@ import io.github.ravindren_sm.openstream.data.CatalogResult
 import io.github.ravindren_sm.openstream.data.LiveCatalog
 import io.github.ravindren_sm.openstream.data.BrowseSort
 import io.github.ravindren_sm.openstream.data.ContentPolicy
+import io.github.ravindren_sm.openstream.data.KidsRules
 import io.github.ravindren_sm.openstream.data.DefaultScope
 import io.github.ravindren_sm.openstream.provider.VodPage
 import io.github.ravindren_sm.openstream.data.IndexedTitles
@@ -121,7 +122,23 @@ class VodBrowseState(private val catalog: VodCatalog, val kind: VodKind) {
     fun changeSort(newSort: BrowseSort) { sort = newSort; reload(); gridState.requestScrollToItem(0) }
     fun changeMinRating(value: Double?) { minRating = value; reload(); gridState.requestScrollToItem(0) }
 
-    private fun visible(all: List<VodCategory>) = scope?.takeIf { it.active }?.let { sc -> all.filter(sc::categoryAllowed) } ?: all
+    /** A Kids profile's own rules, and the profile's rule for which categories are listed (adult categories, a Kids allow-list). */
+    private var kids: KidsRules? = null
+    val isKidsList: Boolean get() = kids != null
+    private var categoryRule: (VodCategory) -> Boolean = { true }
+
+    private fun visible(all: List<VodCategory>): List<VodCategory> {
+        val allowed = all.filter(categoryRule)
+        return scope?.takeIf { it.active }?.let { sc -> allowed.filter(sc::categoryAllowed) } ?: allowed
+    }
+
+    /** Sets which categories the profile may see (called when the profile changes); the list is rebuilt from the first category. */
+    fun applyCategoryRule(rule: (VodCategory) -> Boolean) {
+        categoryRule = rule
+        if (!categoriesLoaded) return
+        categories = visible(allCategories)
+        select(0, resetScroll = true)
+    }
 
     /** Applies (or, with null, removes) the saved search defaults to this list: fewer categories, and a filter on each title. */
     fun applyScope(newScope: DefaultScope?) {
@@ -132,7 +149,7 @@ class VodBrowseState(private val catalog: VodCatalog, val kind: VodKind) {
     }
 
     /** Takes the profile's default rating floor (called when Settings changes it and when the screen starts). */
-    fun applyProfilePolicy(policy: ContentPolicy) { minRating = policy.minRating; hideUnrated = policy.hideUnrated; if (categoriesLoaded) reload() }
+    fun applyProfilePolicy(policy: ContentPolicy) { minRating = policy.minRating; hideUnrated = policy.hideUnrated; kids = policy.kids; if (categoriesLoaded) reload() }
 
     /** Drops the loaded pages (memory is tight while a video plays); the list is rebuilt, from its first page, when the tab is shown again. */
     fun release() { if (categoriesLoaded) { reload(); gridState.requestScrollToItem(0) } }
@@ -140,10 +157,10 @@ class VodBrowseState(private val catalog: VodCatalog, val kind: VodKind) {
     /** Builds the list for the selected category: from the device copy when a sort, a rating floor or a default needs it and it is complete, else from the portal. */
     private fun reload() {
         val category = categories.getOrNull(selected) ?: run { titles = PagedTitles { CatalogResult.Ok(VodPage(1, emptyList(), 0, 14)) }; return }
-        val policy = ContentPolicy(minRating, hideUnrated)
+        val policy = ContentPolicy(minRating, hideUnrated, kids)
         val sc = scope?.takeIf { it.active }
         val local = indexed
-        val haveCopy = local != null && ready(category.id)
+        val haveCopy = local != null && kids == null && ready(category.id)        // the device copy has no age or word filter, so a Kids profile reads the portal's pages
         val genres = sc?.indexGenres
         val deviceCanDoIt = sc == null || genres != null                      // the subtitle wording check needs the portal's own pages
         if (haveCopy && deviceCanDoIt && (sort != BrowseSort.NEWEST || policy.active || sc != null)) {
@@ -262,7 +279,8 @@ private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMem
     }
 
     Row(Modifier.padding(bottom = Spacing.S1), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.S2)) {
-        Text(paged.total?.let { "%,d titles".format(it) } ?: " ", style = Tokens.Body, color = Tokens.TextSecondary)
+        // A Kids list is filtered on the device, so the portal's total would overstate it: count what has passed so far.
+        Text(if (state.isKidsList) "%,d%s titles".format(paged.items.size, if (paged.exhausted) "" else "+") else (paged.total?.let { "%,d titles".format(it) } ?: " "), style = Tokens.Body, color = Tokens.TextSecondary)
         OsFocusable(id = BROWSE_SORT_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = { onOpenPicker(1) }) { _ ->
             Text("Sort: ${state.sort.label}", style = Tokens.Body, color = if (state.sort != BrowseSort.NEWEST) Tokens.AccentPrimary else Tokens.TextPrimary, maxLines = 1,
                 modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1))

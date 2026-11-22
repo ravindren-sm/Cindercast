@@ -39,6 +39,7 @@ fun TopNavBar(
     memory: FocusMemory,
     onSelectTab: (Route) -> Unit,
     modifier: Modifier = Modifier,
+    tabs: List<Route> = Route.TABS,
 ) {
     Row(
         modifier
@@ -49,7 +50,7 @@ fun TopNavBar(
         horizontalArrangement = Arrangement.spacedBy(Spacing.S1),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Route.TABS.forEach { tab ->
+        tabs.forEach { tab ->
             OsFocusable(
                 id = tabFocusId(tab),
                 memory = memory,

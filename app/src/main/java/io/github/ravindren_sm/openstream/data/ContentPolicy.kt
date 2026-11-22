@@ -7,15 +7,18 @@ import io.github.ravindren_sm.openstream.provider.VodItem
  * What a profile never wants to see: titles rated below [minRating] (the portal's IMDb value, else its Kinopoisk value).
  * Titles with no rating are shown unless [hideUnrated] is set. Applies to movies and shows in lists, search and Home rows.
  */
-data class ContentPolicy(val minRating: Double? = null, val hideUnrated: Boolean = false) {
+data class ContentPolicy(val minRating: Double? = null, val hideUnrated: Boolean = false, val kids: KidsRules? = null) {
     val active get() = minRating != null
+    /** A Kids profile's own rules (age label and word list), applied on top of the rating floor everywhere titles are listed. */
+    val isKids get() = kids != null
+    fun passesAudience(item: VodItem): Boolean = kids?.allows(item) ?: true
 
     fun passes(rating: Double?): Boolean {
         val min = minRating ?: return true
         return if (rating == null) !hideUnrated else rating >= min
     }
 
-    fun passes(item: VodItem): Boolean = passes(item.shownRating?.value)
+    fun passes(item: VodItem): Boolean = passesAudience(item) && passes(item.shownRating?.value)
 
     fun summary(): String = if (minRating == null) "Show everything"
     else "Hide below ${"%.0f".format(minRating)}" + if (hideUnrated) " and unrated" else ""

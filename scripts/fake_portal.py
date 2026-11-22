@@ -73,9 +73,12 @@ def vod_item(cat, n, host):
     name = f"Tom &amp; Jerry {n}" if n % 7 == 0 else f"{'Show' if is_series else 'Movie'} {n} (c{cat})"
     if n % 5 == 0 and n % 7 != 0:
         name += " [Eng Sub]"
+    if n % 17 == 0:
+        name = f"Naked Truth {n}"                       # a flagged word with a G label: a Kids profile must still hide it
+    age = "G" if n % 7 == 0 or n % 17 == 0 else ("PG" if n % 11 == 0 else ("" if n % 13 == 0 else ("PG-13" if n % 2 else "R")))
     return {
             "id": f"{cat}-{n}", "name": name, "year": str(1990 + n % 35), "rating_imdb": rating, "rating_kinopoisk": "0",
-            "rating_mpaa": "PG-13" if n % 2 else "R", "genres_str": ["Drama, Thriller", "Comedy", "Comedy, Family", "Action"][n % 4],
+            "rating_mpaa": age, "genres_str": ["Drama, Thriller", "Comedy", "Comedy, Family", "Action"][n % 4],
             "description": "An invented story used only to test the layout of the detail page. " * 4,
             "actors": "Actor One, Actor Two, Actor Three", "director": "Director Name",
             "screenshot_uri": f"http://{host}/poster/{n}.png", "cmd": f"/media/{cat}-{n}.mpg",

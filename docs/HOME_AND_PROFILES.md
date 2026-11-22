@@ -3,10 +3,24 @@
 Decided with the owner on 2026-11-21 after reading the AI Studio prototype's Home source and checking each row against
 the real portal. Children live in the household, so this comes before more features.
 
-## Status (2026-11-21)
-Slice 1 (data layer) and the Continue watching part of slices 4 and 5 are built. The owner has deprioritised the rest of
-the profile and Kids work: the children will not use the app unsupervised before release. Adult Home, favorites and
-navigation come first; slices 2, 3 and 6 are parked.
+## Status (2026-11-22)
+Built and checked on the Fire TV against the fake portal (a throwaway side-by-side install, so the real app's data and PIN were not touched):
+- **Profile picker and management.** "Who's watching?" appears at launch when there is more than one profile; Settings has Switch and Manage.
+  Create, edit (name, colour, Adult or Kids, highest age label, adult categories, the categories a Kids profile may open) and delete.
+- **Household PIN.** Four digits on a D-pad pad (the remote's number keys also work), salted hash, five wrong tries start a lock. Asked for:
+  opening Settings from a Kids profile, switching away from a Kids profile, opening Manage profiles. Creating the first Kids profile (or turning on
+  adult categories) asks the household to choose a PIN first.
+- **Kids rules** (`KidsRules`, `TextFilter`, tested): a title needs a known age label at or under the profile's ceiling (default G and PG; the
+  edit form offers G only, G and PG, or up to PG-13); a listed word in the name, description or genres hides it even with a good label (whole words
+  only, so "Essex" is fine); seasons and episodes are checked for words only. Kids see only the categories an adult ticked (suggested ones, by name,
+  are added when the profile is made), no Live TV, TV Guide or Live door, no channel results or suggestions in Search, and a count of titles that
+  passed (not the portal's total). Kids lists read the portal's pages rather than the on-device copy, which has no age or word filter, so a Kids
+  profile has only the newest-first order.
+- **Adult categories** (names with ADULT, XXX, 18+ and so on) are now hidden from every profile, in Movies, Shows, Live TV groups and the guide,
+  unless the adult profile's "Adult categories" is turned on in its edit form.
+Not built: PIN prompts on R-rated titles for adults (the policy code exists, no screen asks yet); editing the word list (the default list is in
+`KidsRules.kt`); per-profile PIN for adult profiles at launch (anyone can choose an adult profile in the picker); the age labels the real catalogue
+carries have not been surveyed (a title with a label the table does not know is hidden from Kids, which errs safe).
 
 ## Decisions
 - **Home layout:** the AI Studio rows and order for adults; a simpler big-tile Home for Kids profiles; a "doors and an

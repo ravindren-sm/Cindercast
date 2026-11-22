@@ -79,6 +79,8 @@ fun HomeScreen(
     memory: FocusMemory,
     onResume: (ContinueTile) -> Unit,
     onDoor: (Route) -> Unit,
+    /** False for a Kids profile: no Live TV door. */
+    liveAllowed: Boolean = true,
     onTileAction: (ContinueTile, TileAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -158,7 +160,7 @@ fun HomeScreen(
             }
             Text("Browse", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), modifier = Modifier.fillMaxWidth()) {
-                DOORS.forEachIndexed { i, (route, label) ->
+                DOORS.filter { liveAllowed || it.first != Route.LIVE_TV }.forEachIndexed { i, (route, label) ->
                     OsFocusable(id = doorFocusId(i), memory = memory, variant = FocusVariant.CARD, modifier = Modifier.weight(1f), onSelect = { onDoor(route) }) { _ ->
                         Box(Modifier.fillMaxWidth().height(if (empty) 160.dp else 100.dp).background(Tokens.Surface1), contentAlignment = Alignment.Center) {
                             Text(label, style = Tokens.TitleMedium, color = Tokens.TextPrimary)

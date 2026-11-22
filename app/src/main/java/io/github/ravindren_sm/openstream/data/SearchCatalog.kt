@@ -103,9 +103,9 @@ class SearchCatalog(private val session: PortalSession, private val maxPages: In
             }
         }
         // The profile's rating floor applies unless the viewer chose a rating filter for this search.
-        val kept = titles.filter { FilterRules.passes(it, filters, categoryHint = it.id in hinted) && (filters.minRating != null || policy.passes(it)) }
+        val kept = titles.filter { FilterRules.passes(it, filters, categoryHint = it.id in hinted) && policy.passesAudience(it) && (filters.minRating != null || policy.passes(it)) }
         val ranked = SearchRanking.rank(kept, q, personal)
-        val (channels, failed) = if (filters.isActive) emptyList<LiveChannel>() to false else findChannels(q)
+        val (channels, failed) = if (filters.isActive || policy.isKids) emptyList<LiveChannel>() to false else findChannels(q)
         val movies = TitleMerge.group(ranked.filter { !it.isSeries })
         val shows = TitleMerge.group(ranked.filter { it.isSeries })
         SearchHooks.event("titles=${titles.size} kept=${kept.size} movies=${movies.size} shows=${shows.size} categories=${targets.size} channels=${channels.size} channelsFailed=$failed")
