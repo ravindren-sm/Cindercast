@@ -174,7 +174,7 @@ data class ViewingStatEntity(val profileId: Long, val kind: String, val key: Str
  * was found (kept so the title is not asked about again). [certAge] is the minimum age of the certification chosen, [flagged]
  * says a genre or keyword made it unsuitable for Kids.
  */
-@Entity(tableName = "title_tags", primaryKeys = ["kind", "id"])
+@Entity(tableName = "title_tags", primaryKeys = ["kind", "id"], indices = [androidx.room.Index("imdbId")])
 data class TitleTagEntity(
     val kind: String,
     val id: String,

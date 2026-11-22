@@ -18,7 +18,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PinnedCategoryEntity::class, KidsAllowedCategoryEntity::class, RecentSearchEntity::class,
         CatalogTitleEntity::class, IndexProgressEntity::class, ViewingStatEntity::class, TitleTagEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class OpenStreamDb : RoomDatabase() {
@@ -81,6 +81,13 @@ abstract class OpenStreamDb : RoomDatabase() {
         }
 
         /** Version 7: a tag keeps the IMDb id, and the optional second source's IMDb score and Rotten Tomatoes percentage. */
+        /** An index on imdbId: storing the IMDb scores updates one row per id, which scanned the whole table each time (about 14 rows/s on the stick). */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_title_tags_imdbId` ON `title_tags` (`imdbId`)")
+            }
+        }
+
         val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE title_tags ADD COLUMN imdbId TEXT")
@@ -92,7 +99,7 @@ abstract class OpenStreamDb : RoomDatabase() {
 
         fun get(context: Context): OpenStreamDb = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, OpenStreamDb::class.java, "openstream.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build().also { instance = it }
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8).build().also { instance = it }
         }
 
         /** An in-memory database for tests. */
