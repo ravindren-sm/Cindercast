@@ -15,7 +15,8 @@ Then install a side-by-side debug build so the real app's saved settings are not
 
 What it serves: handshake, get_profile, watchdog, live genres (30) and channels (14 per page),
 create_link (points at this server's /stream/ endpoint) and, if --stream-file is given, that file
-as video/mp4 at /stream/<anything> (byte ranges supported, so seeking works). Also VOD: 9 categories
+as video/mp4 at /stream/<anything> (byte ranges supported, so seeking works). Also VOD shows: 3 seasons,
+16 episodes each (2 pages), 1 or 2 files per episode. Also VOD: 9 categories
 (movies and series, one with an HTML entity in its title), 26 to 49 titles each with ratings (every 4th
 unrated), metadata and a generated poster at /poster/<n>.png.
 
@@ -81,6 +82,25 @@ def vod_page(cat, page, host):
             "is_series": "1" if is_series else "0", "is_movie": "1",
         })
     return {"total_items": str(total), "max_page_items": PAGE, "data": data}
+
+
+def vod_children(show, season, episode, page):
+    """Show levels: 3 seasons; 16 episodes per season (2 pages); files per episode. Season 1 episodes have a single
+    file (they play straight away); other seasons have two (the version chooser appears)."""
+    if season == "0":
+        data = [{"id": f"{show}-s{k}", "name": f"Season {k}", "is_season": "1", "season_number": str(k)} for k in (1, 2, 3)]
+        return {"total_items": "3", "max_page_items": PAGE, "data": data}
+    if episode == "0":
+        k = season.rsplit("-s", 1)[-1]
+        first, last = (page - 1) * PAGE + 1, min(page * PAGE, 16)
+        data = [{"id": f"{season}-e{n}", "name": f"S{int(k):02d} E{n:02d} &#124; Episode {n}", "is_episode": "1", "series_files": []}
+                for n in range(first, last + 1)]
+        return {"total_items": "16", "max_page_items": PAGE, "data": data}
+    files = [{"id": f"{episode}-f1", "name": "English / Excellent quality (1080)", "is_file": "1", "cmd": f"/media/{episode}-en.mpg"},
+             {"id": f"{episode}-f2", "name": "Hindi / Good quality (720)", "is_file": "1", "cmd": f"/media/{episode}-hi.mpg"}]
+    if "-s1-" in episode:
+        files = files[:1]
+    return {"total_items": str(len(files)), "max_page_items": PAGE, "data": files}
 
 
 def poster_png(n, w=200, h=300):
@@ -171,7 +191,7 @@ class H(BaseHTTPRequestHandler):
         t, a = q.get("type", ""), q.get("action", "")
         line = f"{t}/{a}"
         if a == "get_ordered_list":
-            line += f" genre={q.get('genre')} category={q.get('category')} p={q.get('p')}"
+            line += f" genre={q.get('genre')} category={q.get('category')} show={q.get('movie_id')} season={q.get('season_id')} episode={q.get('episode_id')} p={q.get('p')}"
         log(line)
         js = None
         if (t, a) == ("stb", "handshake"):
@@ -189,7 +209,10 @@ class H(BaseHTTPRequestHandler):
             js = VOD_CATEGORIES
         elif (t, a) == ("vod", "get_ordered_list"):
             host = self.headers.get("Host", f"localhost:{ARGS.port}")
-            js = vod_page(q.get("category", "*"), int(q.get("p", "1") or "1"), host)
+            if q.get("movie_id", "0") != "0":
+                js = vod_children(q["movie_id"], q.get("season_id", "0"), q.get("episode_id", "0"), int(q.get("p", "1") or "1"))
+            else:
+                js = vod_page(q.get("category", "*"), int(q.get("p", "1") or "1"), host)
         elif (t, a) == ("vod", "create_link"):
             host = self.headers.get("Host", f"localhost:{ARGS.port}")
             js = {"cmd": f"http://{host}/stream/vod.mp4?token=faketoken", "id": "1"}

@@ -54,10 +54,60 @@ class VodCatalog(private val session: PortalSession) {
         return if (result.ok && p != null) CatalogResult.Ok(p) else CatalogResult.Failed(NO_TITLES)
     }
 
+    // ---- shows: seasons, episodes, files (the portal's four levels) ----
+
+    /** All seasons of [show]. A show has a handful, so every page is read (at most [MAX_CHILD_PAGES]). */
+    fun seasons(show: VodItem): CatalogResult<List<VodItem>> = allChildren(show.id, "0", "0", NO_SEASONS)
+
+    /** One 1-based page of the episodes of [season] (a season can have dozens: the screen pages them). */
+    fun episodes(show: VodItem, season: VodItem, page: Int): CatalogResult<VodPage> = childPage(show.id, season.id, "0", page, NO_EPISODES)
+
+    /** The files of one episode: one entry per language and quality. */
+    fun files(show: VodItem, season: VodItem, episode: VodItem): CatalogResult<List<VodItem>> = allChildren(show.id, season.id, episode.id, NO_FILES)
+
+    private fun childPage(movieId: String, seasonId: String, episodeId: String, page: Int, failure: String): CatalogResult<VodPage> {
+        var parsed: VodPage? = null
+        val result = session.withSession { m ->
+            m.call { c -> val (r, p) = c.vodChildPage(movieId, seasonId, episodeId, page); parsed = p; r }
+        } ?: return CatalogResult.Failed(LiveCatalog.NOT_CONNECTED)
+        val p = parsed
+        return if (result.ok && p != null) CatalogResult.Ok(p) else CatalogResult.Failed(failure)
+    }
+
+    private fun allChildren(movieId: String, seasonId: String, episodeId: String, failure: String): CatalogResult<List<VodItem>> {
+        val all = mutableListOf<VodItem>()
+        for (page in 1..MAX_CHILD_PAGES) {
+            when (val r = childPage(movieId, seasonId, episodeId, page, failure)) {
+                is CatalogResult.Failed -> return if (all.isEmpty()) r else CatalogResult.Ok(all)   // keep what was read
+                is CatalogResult.Ok -> {
+                    val known = all.mapTo(HashSet()) { it.id }
+                    all += r.value.items.filter { it.id !in known }
+                    if (!r.value.hasMore(all.size)) break
+                }
+            }
+        }
+        return CatalogResult.Ok(all)
+    }
+
     companion object {
         const val NO_CATEGORIES = "The portal did not return the categories."
         const val NO_TITLES = "The portal did not return the titles."
+        const val NO_SEASONS = "The portal did not return the seasons."
+        const val NO_EPISODES = "The portal did not return the episodes."
+        const val NO_FILES = "The portal did not return a playable file for this episode."
+        private const val MAX_CHILD_PAGES = 10
     }
+}
+
+/** What the player should play: the file, how to title it, and the key its resume position is stored under. */
+class PlayTarget(val file: VodItem, val title: String, val resumeKey: String) {
+    override fun toString() = "PlayTarget(title=$title)"
+}
+
+/** Resume keys: a movie by its id; an episode by show, season and episode, so each remembers its own position. */
+object ResumeKeys {
+    fun movie(id: String) = id
+    fun episode(showId: String, seasonId: String, episodeId: String) = "$showId/$seasonId/$episodeId"
 }
 
 /** Resolves a movie (or an episode's file) to a stream address with the portal's VOD create_link. */

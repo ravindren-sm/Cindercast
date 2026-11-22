@@ -6,6 +6,7 @@ import io.github.ravindren_sm.openstream.data.LivePlayback
 import io.github.ravindren_sm.openstream.data.PagedTitles
 import io.github.ravindren_sm.openstream.data.PortalSession
 import io.github.ravindren_sm.openstream.data.PosterUrl
+import io.github.ravindren_sm.openstream.data.ResumeKeys
 import io.github.ravindren_sm.openstream.data.ResumePolicy
 import io.github.ravindren_sm.openstream.data.SessionStatus
 import io.github.ravindren_sm.openstream.data.StreamLink
@@ -52,6 +53,32 @@ class VodCatalogTest {
         return """{"js":{"total_items":"35","max_page_items":14,"data":[$data]}}"""
     }
 
+    private val childRequests = CopyOnWriteArrayList<String>()
+
+    private fun param(q: String, name: String) = Regex("[?&]$name=([^&]*)").find(q)?.groupValues?.get(1)
+
+    /** Show children: 3 seasons; 16 episodes per season (pages of 14); 2 files per episode. */
+    private fun childResponse(q: String): MockResponse {
+        childRequests += q
+        val show = param(q, "movie_id")!!
+        if (show == "bad") return MockResponse().setResponseCode(500)
+        val season = param(q, "season_id") ?: "0"
+        val episode = param(q, "episode_id") ?: "0"
+        val page = param(q, "p")?.toInt() ?: 1
+        return when {
+            season == "0" -> ok("""{"js":{"total_items":"3","max_page_items":14,"data":[
+                {"id":"s1","name":"Season 1","is_season":"1"},{"id":"s2","name":"Season 2","is_season":"1"},{"id":"s3","name":"Season 3","is_season":"1"}]}}""")
+            episode == "0" -> {
+                val from = (page - 1) * 14 + 1; val to = minOf(page * 14, 16)
+                val data = (from..to).joinToString(",") { """{"id":"$season-e$it","name":"S0 E$it &#124; Episode $it","is_episode":"1"}""" }
+                ok("""{"js":{"total_items":"16","max_page_items":14,"data":[$data]}}""")
+            }
+            else -> ok("""{"js":{"total_items":"2","max_page_items":14,"data":[
+                {"id":"f1","name":"English / Excellent quality (1080)","is_file":"1","cmd":"/media/$episode-en.mpg"},
+                {"id":"f2","name":"Hindi / Good quality (720)","is_file":"1","cmd":"/media/$episode-hi.mpg"}]}}""")
+        }
+    }
+
     @Before fun setUp() {
         server = MockWebServer().apply {
             dispatcher = object : Dispatcher() {
@@ -62,6 +89,7 @@ class VodCatalogTest {
                         "get_profile" in q -> ok("""{"js":{"status":0}}""")
                         "get_categories" in q -> ok("""{"js":[{"id":"*","title":"All"},{"id":"10","title":"ENGLISH MOVIES 4K"},{"id":"20","title":"HULU &#124; ENGLISH SERIES"},{"id":"30","title":"HINDI MOVIES"},{"id":"40","title":"HINDI WEB SERIES"}]}""")
                         "action=create_link" in q -> { linkRequests += q; ok("""{"js":{"cmd":"http://stream.invalid/vod/1.m3u8?token=abc","id":"1"}}""") }
+                        "get_ordered_list" in q && param(q, "movie_id").let { it != null && it != "0" } -> childResponse(q)
                         "get_ordered_list" in q -> {
                             listRequests += q
                             val page = Regex("[?&]p=(\\d+)").find(q)?.groupValues?.get(1)?.toInt() ?: 1
@@ -156,6 +184,51 @@ class VodCatalogTest {
         assertEquals(LiveCatalog.NOT_CONNECTED, (catalog.titles("10", 1) as CatalogResult.Failed).message)
         assertEquals(LivePlayback.NO_ADDRESS, (VodPlayback(session).resolve(noCmd) as StreamLink.Failed).message)
         assertEquals(LiveCatalog.NOT_CONNECTED, (VodPlayback(session).resolve(VodItem("1", "One", false, false, false, "/m", emptyList())) as StreamLink.Failed).message)
+    }
+
+    // ---- shows: seasons, episodes, files ----
+
+    private fun show(id: String = "show1") = VodItem(id, "A Show", true, false, false, null, emptyList())
+    private fun child(id: String) = VodItem(id, id, false, false, false, null, emptyList())
+
+    @Test fun `seasons come back in the portal's order`() {
+        connect()
+        val seasons = (catalog.seasons(show()) as CatalogResult.Ok).value
+        assertEquals(listOf("s1", "s2", "s3"), seasons.map { it.id })
+        assertTrue(childRequests.single().let { "movie_id=show1" in it && "season_id=0" in it })
+    }
+
+    @Test fun `episodes of a season page 14 at a time and carry the season id`() {
+        connect()
+        val paged = PagedTitles { page -> catalog.episodes(show(), child("s2"), page) }
+        paged.loadNext(); assertEquals(14, paged.items.size); assertEquals(16, paged.total)
+        paged.loadNext(); assertEquals(16, paged.items.size); assertTrue(paged.exhausted)
+        assertTrue(childRequests.all { "movie_id=show1" in it && "season_id=s2" in it && "episode_id=0" in it })
+        assertEquals("S0 E1 | Episode 1".replace("|", "&#124;"), paged.items[0].name)   // decoding is the UI's job
+    }
+
+    @Test fun `an episode lists its files, and a file plays through create_link`() {
+        connect()
+        val files = (catalog.files(show(), child("s2"), child("s2-e3")) as CatalogResult.Ok).value
+        assertEquals(listOf("English / Excellent quality (1080)", "Hindi / Good quality (720)"), files.map { it.name })
+        assertTrue(childRequests.single().let { "season_id=s2" in it && "episode_id=s2-e3" in it })
+        val link = VodPlayback(session).resolve(files[1]) as StreamLink.Ok
+        assertEquals("http://stream.invalid/vod/1.m3u8?token=abc", link.url)
+        assertTrue(linkRequests.single().contains("cmd="))
+    }
+
+    @Test fun `a portal error on the seasons gives fixed text, and no session says not connected`() {
+        assertEquals(LiveCatalog.NOT_CONNECTED, (catalog.seasons(show()) as CatalogResult.Failed).message)
+        connect()
+        assertEquals(VodCatalog.NO_SEASONS, (catalog.seasons(show("bad")) as CatalogResult.Failed).message)
+        assertEquals(VodCatalog.NO_EPISODES, (catalog.episodes(show("bad"), child("s1"), 1) as CatalogResult.Failed).message)
+        assertEquals(VodCatalog.NO_FILES, (catalog.files(show("bad"), child("s1"), child("e1")) as CatalogResult.Failed).message)
+    }
+
+    @Test fun `each episode keeps its own resume position`() {
+        assertEquals("show1/s2/e3", ResumeKeys.episode("show1", "s2", "e3"))
+        assertTrue(ResumeKeys.episode("show1", "s2", "e3") != ResumeKeys.episode("show1", "s2", "e4"))
+        assertEquals("m1", ResumeKeys.movie("m1"))
     }
 
     // ---- pure rules ----

@@ -35,7 +35,7 @@ Milestone column: where the work is planned (M3 live, M4 VOD, M5 everything else
 | 5 | Movies browser | Partial | Done: category sidebar (163 real categories), 5-column poster grid, 14-per-page paging, rating badge (IMDb, else Kinopoisk labelled), real data. Missing: minimum-rating filter, genre filter, sort bar (added, year, rating), year on cards, parental lock badge, skeleton cards, Rotten Tomatoes. | M4 / M5 |
 | 6 | Movie detail | Partial | Done: poster, title, year, age, genres, synopsis, director, cast, rating, Play with initial focus, resume on play. Missing: hero backdrop, original title, runtime, Rotten Tomatoes and audience badges, explicit Resume button, Favorites button, PIN gate. | M4 / M5 |
 | 7 | Shows browser | Partial | Same as Movies (same screen, show categories). Same gaps. | M4 / M5 |
-| 8 | Show detail | In progress | Being built now: season chips, episode list, file/language chooser, play episode. Missing after that: Resume, Favorites, rating badges beyond the portal's. | M4 |
+| 8 | Show detail | Partial | Done: poster, title, year, age, rating (IMDb else Kinopoisk), genres, synopsis, Play (first episode of the season), season chips, paged episode list with real season and episode names, version chooser when an episode has several files (language and quality), per-episode resume with a "Resume m:ss" label, Back to the episode just watched. Missing: explicit Resume button on the show, Favorites, Rotten Tomatoes badges, next-episode prompt. | M4 |
 | 9 | VOD player | Partial | Done: bar with position and length, pause, 10 s seek, saved position and resume. Missing: accelerating seek (30 s, 60 s when held), Continue Watching feed, next-episode prompt, Language and Subtitles overlay. | M4 |
 | 10 | Search | Not started | D-pad keyboard and grouped results (live, movies, shows). Needs a check of the portal's server-side search. | M5 |
 | 11 | Favorites | Not started | Local store for channels, movies and shows, plus the screen and the add/remove buttons. | M5 |
@@ -65,8 +65,9 @@ Milestone column: where the work is planned (M3 live, M4 VOD, M5 everything else
 
 ## Where this leaves us
 
-Built and checked: setup, live TV (browse, play, zap), movies (browse, detail, play, seek, resume) and the shows tab,
-on real data.
-Next in order: show detail (now), then the rest of M4 (Language and Subtitles overlay, next-episode prompt, accelerating
+Built and checked: setup, live TV (browse, play, zap), movies (browse, detail, play, seek, resume) and shows (browse, detail,
+seasons, episodes, versions, resume). Movies and the shows browser were checked on the real portal; the show page and
+episode playback were checked against the fake portal only.
+Next in order: the rest of M4 (Language and Subtitles overlay, next-episode prompt, accelerating
 seek, filters and sort), the remaining M3 live items (bracket keys, stream readout, info banner, mini list, sort,
 badges), then M5 (Home, Search, Favorites, Settings, PIN gate, themes, transitions, EPG, ratings enrichment).

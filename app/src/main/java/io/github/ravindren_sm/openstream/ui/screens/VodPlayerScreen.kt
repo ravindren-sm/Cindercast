@@ -45,6 +45,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.Text
+import io.github.ravindren_sm.openstream.data.PlayTarget
 import io.github.ravindren_sm.openstream.data.PlaybackMessages
 import io.github.ravindren_sm.openstream.data.ResumePolicy
 import io.github.ravindren_sm.openstream.data.ResumeStore
@@ -52,7 +53,6 @@ import io.github.ravindren_sm.openstream.data.StreamLink
 import io.github.ravindren_sm.openstream.data.TimeText
 import io.github.ravindren_sm.openstream.data.VodPlayback
 import io.github.ravindren_sm.openstream.provider.PortalText
-import io.github.ravindren_sm.openstream.provider.VodItem
 import io.github.ravindren_sm.openstream.ui.components.FocusVariant
 import io.github.ravindren_sm.openstream.ui.components.OsFocusable
 import io.github.ravindren_sm.openstream.ui.focus.FocusMemory
@@ -80,7 +80,7 @@ private const val BIG_SEEK_MILLIS = 30_000L
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun VodPlayerScreen(
-    item: VodItem?,
+    target: PlayTarget?,
     playback: VodPlayback,
     resume: ResumeStore,
     memory: FocusMemory,
@@ -98,7 +98,7 @@ fun VodPlayerScreen(
     var duration by remember { mutableLongStateOf(0L) }
     var notice: String? by remember { mutableStateOf(null) }
     var resumeApplied by remember { mutableStateOf(false) }
-    val id = item?.id
+    val id = target?.resumeKey
 
     fun knownDuration(): Long = player.duration.takeIf { it > 0 } ?: 0L
 
@@ -144,12 +144,12 @@ fun VodPlayerScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(id, attempt) {
-        if (item == null) { phase = VodPhase.Failed("This title is not available."); return@LaunchedEffect }
+    LaunchedEffect(id, attempt) {   // id is the resume key
+        if (target == null) { phase = VodPhase.Failed("This title is not available."); return@LaunchedEffect }
         phase = VodPhase.Resolving
         resumeApplied = false
         player.stop()
-        when (val link = withContext(Dispatchers.IO) { playback.resolve(item) }) {
+        when (val link = withContext(Dispatchers.IO) { playback.resolve(target.file) }) {
             is StreamLink.Failed -> phase = VodPhase.Failed(link.message)
             is StreamLink.Ok -> {
                 player.setMediaItem(MediaItem.fromUri(link.url))
@@ -221,9 +221,9 @@ fun VodPlayerScreen(
             },
         )
 
-        if (overlayVisible && item != null && phase is VodPhase.Playing) {
+        if (overlayVisible && target != null && phase is VodPhase.Playing) {
             Text(
-                PortalText.decodeEntities(item.name), style = Tokens.TitleMedium, color = Tokens.TextPrimary, maxLines = 1,
+                PortalText.decodeEntities(target.title), style = Tokens.TitleMedium, color = Tokens.TextPrimary, maxLines = 1,
                 modifier = Modifier.align(Alignment.TopStart).padding(Spacing.SafeHorizontal, Spacing.SafeVertical)
                     .background(Tokens.BgCanvas.copy(alpha = 0.7f)).padding(Spacing.S2),
             )

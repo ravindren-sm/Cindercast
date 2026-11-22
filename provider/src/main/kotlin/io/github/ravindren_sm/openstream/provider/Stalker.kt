@@ -383,6 +383,19 @@ class StalkerClient(
         return r to parsed
     }
 
+    /**
+     * One page (1-based) of a show's children, parsed with its total: seasons ([seasonId] "0"), a season's episodes
+     * ([episodeId] "0"), or an episode's files. Summary: counts only.
+     */
+    fun vodChildPage(movieId: String, seasonId: String = "0", episodeId: String = "0", page: Int = 1): Pair<StalkerResult, VodPage?> {
+        var parsed: VodPage? = null
+        val r = call(StalkerRequests.vodChildren(ctx(), movieId, seasonId, episodeId, page)) { js ->
+            parsed = VodCatalogParser.page(js, page)
+            listOf("${StalkerRequests.levelName(seasonId, episodeId)} page $page: ${parsed?.items?.size ?: "?"} of ${parsed?.totalItems ?: "?"}")
+        }
+        return r to parsed
+    }
+
     /** Seasons, episodes or files of a VOD title (by level), parsed; summary counts kinds safely. */
     fun vodChildren(movieId: String, seasonId: String = "0", episodeId: String = "0"): Pair<StalkerResult, List<VodItem>> {
         var parsed: List<VodItem> = emptyList()
