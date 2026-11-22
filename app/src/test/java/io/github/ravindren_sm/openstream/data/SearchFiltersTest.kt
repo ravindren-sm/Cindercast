@@ -96,4 +96,9 @@ class SearchFiltersTest {
         assertEquals(f, SearchFilters.decode(f.encode()))
         assertEquals("subs=1", f.encode())
     }
+
+    @Test fun theGenrePickerListsGenresAlphabetically() {
+        assertEquals(SearchFilters.GENRES.sortedBy { it.lowercase() }, SearchFilters.GENRES)
+        assertEquals("Action", SearchFilters.GENRES.first())
+    }
 }

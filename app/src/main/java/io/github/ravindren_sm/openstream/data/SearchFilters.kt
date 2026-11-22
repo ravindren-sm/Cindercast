@@ -43,7 +43,8 @@ data class SearchFilters(
             "English", "Hindi", "Tamil", "Telugu", "Malayalam", "Kannada", "Bengali", "Punjabi", "Marathi", "Gujarati", "Urdu",
             "Arabic", "Spanish", "French", "German", "Italian", "Turkish", "Korean", "Japanese", "Chinese", "Russian", "Portuguese", "Persian", "Thai",
         )
-        val GENRES = listOf("Comedy", "Drama", "Action", "Animation", "Family", "Documentary", "Thriller", "Horror", "Romance", "Sci-Fi", "Crime", "Adventure", "Fantasy", "Mystery")
+        /** The genres offered in the picker, in alphabetical order. */
+        val GENRES = listOf("Comedy", "Drama", "Action", "Animation", "Family", "Documentary", "Thriller", "Horror", "Romance", "Sci-Fi", "Crime", "Adventure", "Fantasy", "Mystery").sortedBy { it.lowercase() }
         val RATING_STEPS = listOf(5.0, 6.0, 7.0, 8.0)
         val ROTTEN_STEPS = listOf(60, 75, 90)
 
