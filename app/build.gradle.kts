@@ -7,6 +7,8 @@ plugins {
     // Kotlin sources are silently skipped and the APK has no MainActivity.
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    // Room's annotation processor.
+    alias(libs.plugins.ksp)
 }
 
 // Emit Java 17 bytecode to match compileOptions below. A toolchain is not used,
@@ -80,7 +82,17 @@ dependencies {
     implementation(libs.media3.ui)
     implementation(libs.media3.datasource.okhttp)
 
+    // Profiles, favorites and watch history. Logic stays in plain Kotlin; Room is only the storage layer.
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
+
     testImplementation(libs.junit4)
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.okhttp.mockwebserver)   // local fake portal; tests never touch the provider
+}
+
+// Room exports its database structure as JSON so schema changes are visible in review and migrations can be tested.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }

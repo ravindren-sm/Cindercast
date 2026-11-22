@@ -21,6 +21,8 @@ junit = "5.12.2"
 junit4 = "4.13.2"                 # local unit tests in :app (Android Gradle plugin runs JUnit 4)
 okhttp = "4.12.0"                # HTTP client for :provider (JVM and Android); added for Step 2
 media3 = "1.6.1"                 # Media3 ExoPlayer for the debug player (HLS)
+room = "2.7.1"                   # profiles, favorites, history (owner chose Room, 2026-11-21)
+ksp = "2.1.20-2.0.1"             # Room's annotation processor; must match the Kotlin version
 
 [libraries]
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
@@ -43,9 +45,13 @@ compose-ui = { group = "androidx.compose.ui", name = "ui" }
 compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
 tv-foundation = { group = "androidx.tv", name = "tv-foundation", version.ref = "tvFoundation" }
 tv-material = { group = "androidx.tv", name = "tv-material", version.ref = "tvMaterial" }
+room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
