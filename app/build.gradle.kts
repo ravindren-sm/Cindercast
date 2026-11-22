@@ -77,6 +77,7 @@ dependencies {
     // Provider protocol (shared with the Mac probe) and the player.
     implementation(project(":provider"))
     implementation(libs.okhttp)
+    implementation(libs.kotlinx.serialization.json)   // reads the online tag service's answers
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.exoplayer.hls)
     implementation(libs.media3.ui)

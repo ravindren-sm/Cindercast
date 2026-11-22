@@ -48,6 +48,13 @@ import io.github.ravindren_sm.openstream.data.SearchFilters
 import io.github.ravindren_sm.openstream.data.SearchSources
 import io.github.ravindren_sm.openstream.data.TitleIndexer
 import io.github.ravindren_sm.openstream.data.KidsRules
+import io.github.ravindren_sm.openstream.data.KidsTags
+import io.github.ravindren_sm.openstream.data.tmdb.TagStorage
+import io.github.ravindren_sm.openstream.data.tmdb.TaggerCounts
+import io.github.ravindren_sm.openstream.data.tmdb.TitleTagger
+import io.github.ravindren_sm.openstream.data.tmdb.TmdbClient
+import io.github.ravindren_sm.openstream.data.tmdb.TmdbKeyStore
+import io.github.ravindren_sm.openstream.ui.components.TextEntryDialog
 import io.github.ravindren_sm.openstream.profiles.CategoryRules
 import io.github.ravindren_sm.openstream.profiles.ParentalPolicy
 import io.github.ravindren_sm.openstream.profiles.PinResult
@@ -205,11 +212,38 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     val policyStore = remember { ContentPolicyStore(appContext.getSharedPreferences("search", android.content.Context.MODE_PRIVATE)) }
     var contentPolicy by remember { mutableStateOf(ContentPolicy()) }
     LaunchedEffect(profileId) { if (profileId > 0L) contentPolicy = policyStore.load(profileId) }
+    // Optional online tags (themoviedb.org): the viewer's own key, sealed on the device; a background crawl that fills in age certifications.
+    val tagPrefs = remember { appContext.getSharedPreferences("search", android.content.Context.MODE_PRIVATE) }
+    val tagKeyStore = remember { TmdbKeyStore(java.io.File(appContext.filesDir, "tag-key.bin"), io.github.ravindren_sm.openstream.data.AndroidKeystoreKey.box()) }
+    var tagKey by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) { tagKey = withContext(Dispatchers.IO) { tagKeyStore.load() } }
+    var tagTick by remember { mutableIntStateOf(0) }
+    var tagKeyDialog by remember { mutableStateOf(false) }
+    val tagger = remember(tagKey) {
+        val client = tagKey?.let { TmdbClient(it) }
+        val tags = db.titleTags()
+        TitleTagger(
+            storage = object : TagStorage {
+                override suspend fun nextUntagged(limit: Int) = tags.untagged(limit)
+                override suspend fun save(tag: io.github.ravindren_sm.openstream.profiles.db.TitleTagEntity) = tags.put(tag)
+                override suspend fun counts() = TaggerCounts(tags.checked(), tags.matched(), tags.graded())
+            },
+            api = { client }, enabled = { tagPrefs.getBoolean("tagging_on", false) }, setEnabled = { tagPrefs.edit().putBoolean("tagging_on", it).apply() },
+        )
+    }
+    LaunchedEffect(tagger, tagTick) { withContext(Dispatchers.IO) { tagger.refreshStatus(tagKey != null) } }
+    var kidsTags by remember { mutableStateOf(KidsTags.NONE) }
+    LaunchedEffect(profileId, profiles, tagger.status.counts.checked / 200) {
+        kidsTags = if (profile?.isKids == true) withContext(Dispatchers.IO) {
+            val rows = db.titleTags().kidsView()
+            KidsTags(rows.filter { it.certAge != null }.associate { it.id to it.certAge!! }, rows.filter { it.flagged }.mapTo(HashSet()) { it.id })
+        } else KidsTags.NONE
+    }
     // A Kids profile's rules sit on top of the rating floor: age label, word list, allowed categories, no Live TV.
     var kidsAllowed by remember { mutableStateOf<Set<String>>(emptySet()) }
     LaunchedEffect(profileId, profiles) { kidsAllowed = if (profile?.isKids == true) withContext(Dispatchers.IO) { repo.kidsAllowed(profileId) } else emptySet() }
-    val effectivePolicy = remember(contentPolicy, profile?.id, profile?.isKids, profile?.maxAgeLevel) {
-        if (profile?.isKids == true) contentPolicy.copy(kids = KidsRules(profile.maxAgeLevel)) else contentPolicy
+    val effectivePolicy = remember(contentPolicy, profile?.id, profile?.isKids, profile?.maxAgeLevel, kidsTags) {
+        if (profile?.isKids == true) contentPolicy.copy(kids = KidsRules(profile.maxAgeLevel, tags = kidsTags)) else contentPolicy
     }
     val vodCategoryRule: (io.github.ravindren_sm.openstream.data.VodCategory) -> Boolean = remember(profile, kidsAllowed) {
         { c -> profile == null || ParentalPolicy.categoryVisible(profile, c.id, io.github.ravindren_sm.openstream.provider.PortalText.decodeEntities(c.title), kidsAllowed) }
@@ -376,6 +410,9 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         canIndex.set(connected && stack.current.route !in setOf(Route.LIVE_PLAYER, Route.VOD_PLAYER, Route.SETUP) && searchState.phase !is SearchPhase.Loading)
         searchState.index = indexer.status
     }
+    val canTag = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+    androidx.compose.runtime.SideEffect { canTag.set(stack.current.route !in setOf(Route.LIVE_PLAYER, Route.VOD_PLAYER, Route.SETUP)) }
+    LaunchedEffect(tagger, tagTick) { if (tagKey != null && tagPrefs.getBoolean("tagging_on", false)) withContext(Dispatchers.IO) { tagger.run { canTag.get() } } }
     // While the title index is building keep this window awake, or the screensaver would stop the crawl (the app releases its
     // portal session when it is not in front). A flag on this app's own window: no device setting changes.
     val rootView = androidx.compose.ui.platform.LocalView.current
@@ -609,6 +646,10 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                         profileSummary = profile?.let { "${it.name} (${if (it.isKids) "Kids" else "Adult"})" } ?: "No profile",
                         onSwitchProfile = { profileScreen = "pick"; profileScreenRequired = false },
                         onManageProfiles = { withPin("Enter the PIN to manage profiles") { profileScreen = "manage"; profileScreenRequired = false } },
+                        tagStatus = tagger.status,
+                        onSetTagKey = { tagKeyDialog = true },
+                        onToggleTagging = { tagPrefs.edit().putBoolean("tagging_on", !tagPrefs.getBoolean("tagging_on", false)).apply(); tagTick++ },
+                        onClearTags = { shellScope.launch(Dispatchers.IO) { tagPrefs.edit().putBoolean("tagging_on", false).apply(); tagKeyStore.clear(); db.titleTags().clear(); tagKey = null; tagTick++ } },
                         onToggleHideUnrated = { contentPolicy = contentPolicy.copy(hideUnrated = !contentPolicy.hideUnrated).also { policyStore.save(profileId, it) } },
                     ),
                 )
@@ -693,6 +734,13 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
             onDismiss = { pickerOpen = false },
         )
     }
+        if (tagKeyDialog) {
+            TextEntryDialog(
+                title = "Online tag service key", label = "Key", memory = memory,
+                note = "Paste your free key from themoviedb.org (Settings, API). The app then sends only title names and years to that site, one title at a time, and keeps what comes back on this device. The key is stored sealed and never shown again.",
+                onSave = { k -> tagKeyDialog = false; shellScope.launch(Dispatchers.IO) { tagKeyStore.save(k); tagKey = k; tagTick++ } }, onCancel = { tagKeyDialog = false },
+            )
+        }
         profileScreen?.let { which ->
             ProfilesScreen(
                 model = ProfilesModel(

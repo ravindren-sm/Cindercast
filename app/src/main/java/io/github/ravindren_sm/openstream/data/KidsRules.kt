@@ -47,21 +47,34 @@ class TextFilter(words: Collection<String> = DEFAULT_WORDS) {
  * and no listed word in the name, description or genres. Seasons and episodes carry no age label of their own, so for them
  * only the words are checked: the show above them already passed.
  */
-class KidsRules(val maxAge: Int, val words: TextFilter = TextFilter()) {
+class KidsRules(val maxAge: Int, val words: TextFilter = TextFilter(), val tags: KidsTags = KidsTags.NONE) {
     fun allows(item: VodItem): Boolean {
         if (words.blocksAny(item.name, item.description, item.genres)) return false
         if (item.isSeason || item.isEpisode || item.isFile) return true
-        val level = AgeLevels.levelOf(item.age) ?: return false
+        if (tags.isFlagged(item.id)) return false
+        val level = AgeLevels.levelOf(item.age) ?: tags.levelOf(item.id) ?: return false     // the portal's label, else the online tag service's
         return level <= maxAge
     }
 
     /** For rows that hold only a name and an age label (the on-device title index). */
-    fun allows(name: String, age: String?, genres: String?): Boolean {
+    fun allows(name: String, age: String?, genres: String?, id: String? = null): Boolean {
         if (words.blocksAny(name, genres)) return false
-        val level = AgeLevels.levelOf(age) ?: return false
+        if (id != null && tags.isFlagged(id)) return false
+        val level = AgeLevels.levelOf(age) ?: id?.let { tags.levelOf(it) } ?: return false
         return level <= maxAge
     }
 
     /** For text alone (a channel name, a category name, an episode title). */
     fun allowsText(text: String?): Boolean = !words.blocks(text)
 }
+
+/**
+ * What the optional online tag service added about titles, for a Kids profile: an age level for titles the portal gave no label,
+ * and titles whose genres or keywords made them unsuitable. Empty when no key was ever used.
+ */
+class KidsTags(private val levels: Map<String, Int>, private val flagged: Set<String>) {
+    fun levelOf(id: String): Int? = levels[id]
+    fun isFlagged(id: String): Boolean = id in flagged
+    companion object { val NONE = KidsTags(emptyMap(), emptySet()) }
+}
+

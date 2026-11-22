@@ -168,3 +168,27 @@ data class IndexProgressEntity(
     indices = [Index("profileId", "kind")],
 )
 data class ViewingStatEntity(val profileId: Long, val kind: String, val key: String, val label: String, val count: Int, val lastAt: Long)
+
+/**
+ * What the optional online tag service said about one portal title. [tmdbId] is 0 when it was looked up and no confident match
+ * was found (kept so the title is not asked about again). [certAge] is the minimum age of the certification chosen, [flagged]
+ * says a genre or keyword made it unsuitable for Kids.
+ */
+@Entity(tableName = "title_tags", primaryKeys = ["kind", "id"])
+data class TitleTagEntity(
+    val kind: String,
+    val id: String,
+    val tmdbId: Long,
+    val certLabel: String?,
+    val certAge: Int?,
+    val genres: String?,
+    val language: String?,
+    val rating: Double?,
+    val keywords: String?,
+    val flagged: Boolean,
+    val taggedAt: Long,
+)
+
+/** The part of a tag a Kids profile needs. */
+data class KidsTagRow(val id: String, val certAge: Int?, val flagged: Boolean)
+

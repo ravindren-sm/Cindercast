@@ -16,9 +16,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     entities = [
         ProfileEntity::class, HouseholdEntity::class, FavoriteEntity::class, HistoryEntity::class,
         PinnedCategoryEntity::class, KidsAllowedCategoryEntity::class, RecentSearchEntity::class,
-        CatalogTitleEntity::class, IndexProgressEntity::class, ViewingStatEntity::class,
+        CatalogTitleEntity::class, IndexProgressEntity::class, ViewingStatEntity::class, TitleTagEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class OpenStreamDb : RoomDatabase() {
@@ -31,6 +31,7 @@ abstract class OpenStreamDb : RoomDatabase() {
     abstract fun recentSearches(): RecentSearchDao
     abstract fun catalogIndex(): CatalogIndexDao
     abstract fun viewingStats(): ViewingStatDao
+    abstract fun titleTags(): TitleTagDao
 
     companion object {
         @Volatile private var instance: OpenStreamDb? = null
@@ -72,9 +73,16 @@ abstract class OpenStreamDb : RoomDatabase() {
             }
         }
 
+        /** Version 6: what the optional online tag service said about each title (age certification, genres, keywords). */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `title_tags` (`kind` TEXT NOT NULL, `id` TEXT NOT NULL, `tmdbId` INTEGER NOT NULL, `certLabel` TEXT, `certAge` INTEGER, `genres` TEXT, `language` TEXT, `rating` REAL, `keywords` TEXT, `flagged` INTEGER NOT NULL, `taggedAt` INTEGER NOT NULL, PRIMARY KEY(`kind`, `id`))")
+            }
+        }
+
         fun get(context: Context): OpenStreamDb = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, OpenStreamDb::class.java, "openstream.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { instance = it }
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { instance = it }
         }
 
         /** An in-memory database for tests. */

@@ -61,6 +61,10 @@ class SettingsModel(
     val profileSummary: String,
     val onSwitchProfile: () -> Unit,
     val onManageProfiles: () -> Unit,
+    val tagStatus: io.github.ravindren_sm.openstream.data.tmdb.TaggerStatus,
+    val onSetTagKey: () -> Unit,
+    val onToggleTagging: () -> Unit,
+    val onClearTags: () -> Unit,
 )
 
 private class Row_(val title: String, val value: String, val action: String, val confirm: String? = null, val run: () -> Unit)
@@ -108,6 +112,12 @@ fun SettingsScreen(model: SettingsModel, memory: FocusMemory, modifier: Modifier
             Row_("Play the next episode automatically", if (model.autoPlayNext) "On" else "Off", if (model.autoPlayNext) "Turn off" else "Turn on", run = model.onToggleAutoPlay),
             Row_("Continue watching and watched", "Kept on this device", "Clear", "Clear Continue watching and the watched list?", model.onClearHistory),
             Row_("Favorites", "Channels, movies and shows", "Clear", "Remove all favorites?", model.onClearFavorites),
+        ),
+        "Online tags (optional)" to listOf(
+            Row_("Tag service key (themoviedb.org)", if (model.tagStatus.hasKey) "Saved on this device" else "Not set", if (model.tagStatus.hasKey) "Replace…" else "Set key…", run = model.onSetTagKey),
+            Row_("What is sent", "Title names and years, with your key. Nothing else.", "", run = {}),
+            Row_("Checking titles", tagSummary(model.tagStatus), if (!model.tagStatus.hasKey) "" else if (model.tagStatus.running) "Pause" else "Start", run = if (model.tagStatus.hasKey) model.onToggleTagging else ({})),
+            Row_("Tags on this device", "%,d checked · %,d matched · %,d with an age certification".format(model.tagStatus.counts.checked, model.tagStatus.counts.matched, model.tagStatus.counts.graded), "Remove key and tags", "Remove the key and every tag? Titles keep the portal's own labels.", model.onClearTags),
         ),
         "Memory" to listOf(
             Row_("Poster cache", "${model.posterCacheMb} MB in use", "Clear", run = model.onClearPosterCache),
@@ -157,3 +167,11 @@ fun SettingsScreen(model: SettingsModel, memory: FocusMemory, modifier: Modifier
         }
     }
 }
+
+private fun tagSummary(s: io.github.ravindren_sm.openstream.data.tmdb.TaggerStatus): String = when {
+    !s.hasKey -> "Needs a key first"
+    s.message != null -> s.message
+    s.running -> "Running while the app is open and idle (%,d checked)".format(s.counts.checked)
+    else -> "Not running"
+}
+

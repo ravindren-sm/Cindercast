@@ -56,6 +56,7 @@ runs on the family TV still stands (see Environment notes).
 - Reminders for a future programme are out of scope until the guide screen exists.
 
 ## Ratings and filters follow-ups
+- Online tags (themoviedb.org) are built (docs/ONLINE_TAGS.md); enter a key in Settings and watch the first real run (match rate, speed), then use the tags for adult filters and a second source.
 - Rotten Tomatoes (and real IMDb scores, since the portal's IMDb value is usually 0): an optional outside ratings service
   with a key entered by the owner, looked up per result and cached on the device. Needs the owner's decision: it sends title
   names to that service.

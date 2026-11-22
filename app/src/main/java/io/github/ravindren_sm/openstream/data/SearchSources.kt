@@ -32,6 +32,6 @@ class SearchSources(
         val esc = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         val rows: List<CatalogTitleEntity> = index.match("$esc%", "% $esc%", 60)
         // Whole-name starts first, so the 60-row cut does not hide them behind word matches.
-        return rows.filter { kids == null || kids.allows(it.name, it.age, it.genres) }.sortedBy { if (it.nameKey.startsWith(q)) 0 else 1 }.map { it.name }
+        return rows.filter { kids == null || kids.allows(it.name, it.age, it.genres, it.id) }.sortedBy { if (it.nameKey.startsWith(q)) 0 else 1 }.map { it.name }
     }
 }

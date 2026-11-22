@@ -133,3 +133,18 @@ interface ViewingStatDao {
     suspend fun top(profileId: Long, kind: String, limit: Int): List<ViewingStatEntity>
     @Query("DELETE FROM viewing_stats WHERE profileId = :profileId") suspend fun clear(profileId: Long)
 }
+
+@Dao
+interface TitleTagDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun put(tag: TitleTagEntity)
+    /** The next titles with no tag row: those the portal gave no age label first (they gain most), newest first. */
+    @Query("""SELECT c.* FROM catalog_titles c LEFT JOIN title_tags t ON t.kind = c.kind AND t.id = c.id
+        WHERE t.id IS NULL ORDER BY (c.age IS NULL) DESC, c.ord ASC LIMIT :limit""")
+    suspend fun untagged(limit: Int): List<CatalogTitleEntity>
+    @Query("SELECT COUNT(*) FROM title_tags") suspend fun checked(): Int
+    @Query("SELECT COUNT(*) FROM title_tags WHERE tmdbId > 0") suspend fun matched(): Int
+    @Query("SELECT COUNT(*) FROM title_tags WHERE certAge IS NOT NULL") suspend fun graded(): Int
+    @Query("SELECT id, certAge, flagged FROM title_tags WHERE certAge IS NOT NULL OR flagged = 1") suspend fun kidsView(): List<KidsTagRow>
+    @Query("DELETE FROM title_tags") suspend fun clear()
+}
+
