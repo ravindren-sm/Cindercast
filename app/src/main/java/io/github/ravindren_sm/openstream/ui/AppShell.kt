@@ -700,6 +700,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                     onClose = if (profileScreenRequired) null else ({ profileScreen = null }),
                     onChoose = ::chooseProfile, onSave = ::saveProfile, onDelete = ::deleteProfile,
                     onChangePin = { if (pinIsSet) withPin("Enter the current PIN") { choosePin("Choose a new PIN") {} } else choosePin("Choose a household PIN") {} },
+                    onRemovePin = { withPin("Enter the PIN to remove it") { shellScope.launch(Dispatchers.IO) { repo.pins.clear(); pinIsSet = false } } },
                     guardManage = { proceed -> withPin("Enter the PIN to manage profiles", proceed) },
                     kidsChoices = kidsChoices, kidsAllowed = kidsPickAllowed,
                     onOpenKidsCategories = { p ->

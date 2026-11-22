@@ -26,13 +26,13 @@ object AgeLevels {
 
     private val EXACT = mapOf(
         "G" to 0, "U" to 0, "ALL" to 0, "TV-G" to 0, "TV-Y" to 0, "TV-Y7" to 7, "PG" to 8, "TV-PG" to 8,
-        "PG-13" to 13, "TV-14" to 14, "R" to 17, "NC-17" to 18, "TV-MA" to 18, "A" to 18, "X" to 18, "ADULT" to 18, "ADULTS" to 18,
+        "PG-13" to 13, "TV-14" to 14, "R" to 17, "NC-17" to 18, "UA" to 12, "U/A" to 12, "M" to 15, "TP" to 0, "TV-MA" to 18, "A" to 18, "X" to 18, "ADULT" to 18, "ADULTS" to 18,
     )
     private val UNKNOWN = setOf("", "NR", "UNRATED", "NOT RATED", "N/A", "NA", "-", "?")
     private val DIGITS = Regex("(\\d{1,2})")
 
     fun levelOf(label: String?): Int? {
-        val n = label?.trim()?.uppercase()?.replace(Regex("\\s+"), " ") ?: return null
+        val n = label?.trim()?.uppercase()?.replace(Regex("\\s*\\(.*?\\)"), "")?.replace(Regex("\\s+"), " ")?.trim() ?: return null
         if (n in UNKNOWN) return null
         EXACT[n]?.let { return it }
         // "U/A 13+", "16+", "12A", "R18": the number is the minimum age.

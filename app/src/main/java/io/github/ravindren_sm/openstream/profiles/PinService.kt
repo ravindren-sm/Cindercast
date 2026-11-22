@@ -19,6 +19,8 @@ class PinRecord(
 interface PinStore {
     suspend fun load(): PinRecord?
     suspend fun save(record: PinRecord)
+    /** Forgets the PIN altogether (the household then has none). */
+    suspend fun clear()
 }
 
 sealed interface PinResult {
@@ -65,6 +67,9 @@ class PinService(
         store.save(record.copyWith(failures = failures, lockedUntil = lock))
         return if (lock > 0) PinResult.Locked(lock) else PinResult.Wrong(MAX_FREE_ATTEMPTS - failures)
     }
+
+    /** Removes the PIN. The caller has already checked it with [verify]; a household with none asks for no PIN. */
+    suspend fun clear() = store.clear()
 
     /** Replaces the PIN if [old] is right. */
     suspend fun change(old: String, new: String): PinResult {

@@ -13,6 +13,7 @@ class PinServiceTest {
         var record: PinRecord? = null
         override suspend fun load() = record
         override suspend fun save(record: PinRecord) { this.record = record }
+        override suspend fun clear() { record = null }
     }
 
     private var now = 1_000_000L
@@ -90,5 +91,13 @@ class PinServiceTest {
         assertTrue(pins.change("2468", "1357") is PinResult.Ok)
         assertTrue(pins.verify("1357") is PinResult.Ok)
         assertTrue(pins.verify("2468") is PinResult.Wrong)
+    }
+
+    @Test fun `clearing the PIN leaves the household without one`() = runBlocking {
+        pins.set("1234")
+        assertTrue(pins.isSet())
+        pins.clear()
+        assertFalse(pins.isSet())
+        assertTrue(pins.verify("1234") is PinResult.NotSet)
     }
 }

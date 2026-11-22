@@ -40,6 +40,8 @@ class RoomPinStore(private val db: OpenStreamDb) : PinStore {
             HouseholdEntity(1, record.algorithm, record.iterations, record.salt, record.hash, record.failures, record.lockedUntil),
         )
     }
+
+    override suspend fun clear() { db.household().put(HouseholdEntity(1, null, 0, null, null, 0, 0)) }
 }
 
 /**

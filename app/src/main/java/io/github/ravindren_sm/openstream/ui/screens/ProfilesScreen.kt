@@ -61,6 +61,8 @@ class ProfilesModel(
     val onSave: (ProfileDraft) -> Unit,
     val onDelete: (ProfileInfo) -> Unit,
     val onChangePin: () -> Unit,
+    /** Removing the PIN is offered only while no Kids profile exists (a Kids profile is only locked by the PIN). */
+    val onRemovePin: () -> Unit,
     /** Runs the given step once the shell has checked the PIN (when one is set): managing profiles is for adults. */
     val guardManage: (proceed: () -> Unit) -> Unit,
     /** The VOD categories that can be allowed for Kids (adult ones left out), and the ones allowed for the profile being edited. */
@@ -123,6 +125,7 @@ fun ProfilesScreen(model: ProfilesModel, memory: FocusMemory, startInManage: Boo
                 ActionButton(ADD_ID, "Add a profile", memory) { editing = null; mode = Mode.EDIT }
                 Row(Modifier.padding(top = Spacing.S2), horizontalArrangement = Arrangement.spacedBy(Spacing.S3)) {
                     ActionButton("profile-pin", if (model.pinIsSet) "Change the household PIN" else "Set a household PIN", memory) { model.onChangePin() }
+                    if (model.pinIsSet && model.profiles.none { it.isKids }) ActionButton("profile-pin-remove", "Remove the PIN", memory) { model.onRemovePin() }
                     ActionButton(CLOSE_ID, "Done", memory) { back() }
                 }
                 Text("The PIN protects Settings, profile changes and adult categories. Kids profiles need it to leave.", style = Tokens.Body, color = Tokens.TextSecondary)

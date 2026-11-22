@@ -18,6 +18,13 @@ Built and checked on the Fire TV against the fake portal (a throwaway side-by-si
   profile has only the newest-first order.
 - **Adult categories** (names with ADULT, XXX, 18+ and so on) are now hidden from every profile, in Movies, Shows, Live TV groups and the guide,
   unless the adult profile's "Adult categories" is turned on in its edit form.
+- **Checked on the real portal (2026-11-22)** with a temporary Kids profile and PIN, both removed afterwards: the suggested categories were
+  KIDS MOVIES, KIDS MOVIES 4K, KIDS MOVIES | CAM, KIDS HINDI COLLECTION and KIDS TV SHOW; the KIDS MOVIES list showed only family titles (22+
+  loaded, more as it scrolls); KIDS MOVIES | CAM had just 2 labelled titles. A "Remove the PIN" button (offered only while no Kids profile exists) was added.
+- **Age labels on the real catalogue** (104,571 titles in the on-device index; counts only were read): 71 percent have no label at all, R 11 percent,
+  PG-13 6 percent, PG 3 percent, 16+ 2 percent, 12+ 1.5 percent, G 1.4 percent; the rest are many spellings (U/A 16+, UA16+, TV-MA, TV-14, 6+, 0+, NR, ...).
+  The table now also reads UA, U/A (as 12), M (15), TP (0) and ignores bracketed country notes. Because most titles carry no label, a Kids profile
+  sees mostly the labelled titles of the categories an adult ticked; of 899 titles listed as Animation or Family, 134 (15 percent) have no label.
 Not built: PIN prompts on R-rated titles for adults (the policy code exists, no screen asks yet); editing the word list (the default list is in
 `KidsRules.kt`); per-profile PIN for adult profiles at launch (anyone can choose an adult profile in the picker); the age labels the real catalogue
 carries have not been surveyed (a title with a label the table does not know is hidden from Kids, which errs safe).
