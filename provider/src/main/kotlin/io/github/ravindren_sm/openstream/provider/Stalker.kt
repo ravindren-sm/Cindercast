@@ -224,6 +224,8 @@ class VodItem(
     val posterUri: String? = null,
     /** The online tag service's score (0 to 10), when the viewer turned that on and the title was matched. Shown only if the portal sent none. */
     val tmdbRating: Double? = null,
+    /** Rotten Tomatoes percentage (0 to 100) from the optional second source. */
+    val rottenScore: Int? = null,
 ) {
     /**
      * The rating to show: the portal's IMDb value if it sent one, else its Kinopoisk value, labelled as that and
@@ -236,11 +238,11 @@ class VodItem(
      * This entry with what the online tag service added: its score, and its genres and age label where the portal gave none.
      * The portal's own values always win; only gaps are filled.
      */
-    fun withTags(rating: Double?, tagGenres: String?, ageLabel: String?) = VodItem(
+    fun withTags(rating: Double?, tagGenres: String?, ageLabel: String?, imdbScore: Double? = null, rotten: Int? = null) = VodItem(
         id = id, name = name, isSeries = isSeries, isSeason = isSeason, isEpisode = isEpisode, cmd = cmd, episodeNumbers = episodeNumbers,
         isFile = isFile, fileCmds = fileCmds, year = year, description = description, actors = actors, director = director,
-        genres = genres ?: tagGenres, imdbRating = imdbRating, kinopoiskRating = kinopoiskRating, age = age ?: ageLabel, posterUri = posterUri,
-        tmdbRating = tmdbRating ?: rating,
+        genres = genres ?: tagGenres, imdbRating = imdbRating ?: imdbScore, kinopoiskRating = kinopoiskRating, age = age ?: ageLabel, posterUri = posterUri,
+        tmdbRating = tmdbRating ?: rating, rottenScore = rottenScore ?: rotten,
     )
 
     override fun toString() = "VodItem(id=$id, name=$name, series=$isSeries, season=$isSeason, episode=$isEpisode, file=$isFile, inlineFiles=${fileCmds.size})"

@@ -22,7 +22,7 @@ data class TmdbCandidate(val id: Long, val title: String, val originalTitle: Str
 /** What the tag service knows about one title. [certifications] maps a country code to the label shown there ("US" to "PG-13"). */
 data class TmdbDetails(
     val id: Long, val series: Boolean, val certifications: Map<String, String>, val genres: List<String>,
-    val language: String?, val rating: Double?, val keywords: List<String>,
+    val language: String?, val rating: Double?, val keywords: List<String>, val imdbId: String? = null,
 )
 
 /** Reads the service's JSON answers. Tolerant: a missing or odd field is skipped, never an exception. */
@@ -69,6 +69,7 @@ object TmdbParser {
         return TmdbDetails(
             id, series, certs, o["genres"].arr().mapNotNull { (it as? JsonObject)?.get("name").str() },
             o["original_language"].str(), (o["vote_average"] as? JsonPrimitive)?.doubleOrNull?.takeIf { it > 0 }, keywords,
+            (o["imdb_id"].str() ?: ((o["external_ids"] as? JsonObject)?.get("imdb_id")).str())?.takeIf { it.startsWith("tt") },
         )
     }
 }

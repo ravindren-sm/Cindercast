@@ -65,6 +65,10 @@ class SettingsModel(
     val onSetTagKey: () -> Unit,
     val onToggleTagging: () -> Unit,
     val onClearTags: () -> Unit,
+    val scoreStatus: io.github.ravindren_sm.openstream.data.omdb.OmdbStatus,
+    val onSetScoreKey: () -> Unit,
+    val onToggleScoring: () -> Unit,
+    val onClearScores: () -> Unit,
 )
 
 private class Row_(val title: String, val value: String, val action: String, val confirm: String? = null, val run: () -> Unit)
@@ -119,6 +123,12 @@ fun SettingsScreen(model: SettingsModel, memory: FocusMemory, modifier: Modifier
             Row_("Checking titles", tagSummary(model.tagStatus), if (!model.tagStatus.hasKey) "" else if (model.tagStatus.running) "Pause" else "Start", run = if (model.tagStatus.hasKey) model.onToggleTagging else ({})),
             Row_("Tags on this device", "%,d checked · %,d matched · %,d with an age certification".format(model.tagStatus.counts.checked, model.tagStatus.counts.matched, model.tagStatus.counts.graded), "Remove key and tags", "Remove the key and every tag? Titles keep the portal's own labels.", model.onClearTags),
         ),
+        "IMDb and Rotten Tomatoes scores (optional)" to listOf(
+            Row_("OMDb key (omdbapi.com)", if (model.scoreStatus.hasKey) "Saved on this device" else "Not set", if (model.scoreStatus.hasKey) "Replace…" else "Set key…", run = model.onSetScoreKey),
+            Row_("What is sent", "An IMDb id, with your key. Nothing else. Needs the tags above first.", "", run = {}),
+            Row_("Reading scores", scoreSummary(model.scoreStatus), if (!model.scoreStatus.hasKey) "" else if (model.scoreStatus.running) "Pause" else "Start", run = if (model.scoreStatus.hasKey) model.onToggleScoring else ({})),
+            Row_("Scores on this device", "%,d read of %,d titles with an IMDb id".format(model.scoreStatus.scored, model.scoreStatus.withId), "Remove key and scores", "Remove the OMDb key and every score read from it?", model.onClearScores),
+        ),
         "Memory" to listOf(
             Row_("Poster cache", "${model.posterCacheMb} MB in use", "Clear", run = model.onClearPosterCache),
         ),
@@ -172,6 +182,13 @@ private fun tagSummary(s: io.github.ravindren_sm.openstream.data.tmdb.TaggerStat
     !s.hasKey -> "Needs a key first"
     s.message != null -> s.message
     s.running -> "Running while the app is open and idle (%,d checked)".format(s.counts.checked)
+    else -> "Not running"
+}
+
+private fun scoreSummary(s: io.github.ravindren_sm.openstream.data.omdb.OmdbStatus): String = when {
+    !s.hasKey -> "Needs a key first"
+    s.message != null -> s.message
+    s.running -> "Running while the app is open and idle (%,d read)".format(s.scored)
     else -> "Not running"
 }
 

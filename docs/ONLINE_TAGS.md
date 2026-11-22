@@ -20,6 +20,18 @@ themoviedb.org (TMDB) service about each title and keeps what it says on the dev
 - **Use:** a Kids profile now takes the TMDB certification when the portal has none, and hides a title whose tag is flagged. Adult profiles are unchanged.
 - **Remove:** Settings, "Remove key and tags" deletes the key and every tag.
 
+## Second source: OMDb (IMDb score and Rotten Tomatoes), added 2026-11-22
+- Optional, its own key (Settings, "IMDb and Rotten Tomatoes scores (optional)"), stored sealed in `files/score-key.bin`. Sends only an IMDb id and the key.
+- The IMDb id comes from the first source (TMDB gives it for most titles); the tag crawl now stores it, and once every title has a row it asks for the id of
+  rows made earlier (one request each). The OMDb crawl then reads, for every title with an id: the real IMDb score, the Rotten Tomatoes percentage, and the
+  Rated label (which fills the age label only where TMDB had none).
+- **Limits:** the free key allows about 1,000 titles a day; when the day's allowance is used up the crawl waits 30 minutes and tries again, so a free key
+  works through the list over weeks and a paid key (about 100,000 a day, a few dollars a month as of writing; check omdbapi.com) finishes in a day or two.
+  The scores stay on the device if the paid plan is cancelled, and the free key still covers new titles and slow refreshes.
+- **Use:** the real IMDb score takes the portal's IMDb slot (badge with a star, rating floor, Best rated order, SQL join); Rotten Tomatoes shows on the movie
+  page and drives the Search "Rotten Tomatoes" filter (60, 70, 80, 90 percent and above).
+- Tested with a fake service only (`OmdbTest`).
+
 ## First real run (2026-11-22)
 Key entered through the Settings box; the crawl started on the real service. First 300 titles (newest first, no portal label): 61 percent matched, 33 percent got a
 certification (51 percent of movies, 13 percent of shows); labels were mostly Indian (U/A 16+, 16, U/A 13+) plus some TV-14, PG, R. One worker did 2 titles a second;

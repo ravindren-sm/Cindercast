@@ -44,7 +44,7 @@ class TmdbClient(
 
     override fun details(id: Long, series: Boolean): TmdbResult<TmdbDetails?> {
         val url = "$baseUrl/${if (series) "tv" else "movie"}/$id".toHttpUrl().newBuilder()
-            .addQueryParameter("append_to_response", if (series) "content_ratings,keywords" else "release_dates,keywords").addQueryParameter("language", "en-US")
+            .addQueryParameter("append_to_response", if (series) "content_ratings,keywords,external_ids" else "release_dates,keywords,external_ids").addQueryParameter("language", "en-US")
             .apply { if (!bearer) addQueryParameter("api_key", key) }.build()
         return get(url) { TmdbParser.details(it, series) }
     }
