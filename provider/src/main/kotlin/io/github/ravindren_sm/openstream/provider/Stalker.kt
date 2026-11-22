@@ -176,6 +176,19 @@ class VodItem(
     val isFile: Boolean = false,
     /** cmd values of files listed inline in an episode's `series_files`, if any. Never printed. */
     val fileCmds: List<String> = emptyList(),
+    // Catalog metadata (text is raw from the portal; the UI decodes entities). Labels, not identifying data.
+    val year: String? = null,
+    val description: String? = null,
+    val actors: String? = null,
+    val director: String? = null,
+    val genres: String? = null,
+    /** The portal's own IMDb rating, null if absent or zero (hide the badge). */
+    val imdbRating: Double? = null,
+    val kinopoiskRating: Double? = null,
+    /** MPAA rating or age restriction as sent ("PG-13", "16+"), if any. */
+    val age: String? = null,
+    /** Poster address as sent: absolute, or a path on the portal host. Resolved by the app. */
+    val posterUri: String? = null,
 ) {
     override fun toString() = "VodItem(id=$id, name=$name, series=$isSeries, season=$isSeason, episode=$isEpisode, file=$isFile, inlineFiles=${fileCmds.size})"
 
@@ -183,6 +196,10 @@ class VodItem(
     val playableCmd: String? get() = cmd ?: fileCmds.firstOrNull()
 
     companion object {
+        /** A non-blank text field, or null. */
+        private fun text(o: JsonObject, key: String): String? =
+            (o[key] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() && it != "0" }
+
         private fun flag(o: JsonObject, key: String): Boolean =
             (o[key] as? JsonPrimitive)?.contentOrNull?.lowercase() in setOf("1", "true")
 
@@ -206,6 +223,15 @@ class VodItem(
                     fileCmds = (o["series_files"] as? JsonArray)?.mapNotNull { f ->
                         ((f as? JsonObject)?.get("cmd") as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
                     }.orEmpty(),
+                    year = text(o, "year"),
+                    description = text(o, "description"),
+                    actors = text(o, "actors"),
+                    director = text(o, "director"),
+                    genres = text(o, "genres_str"),
+                    imdbRating = PortalText.rating(text(o, "rating_imdb")),
+                    kinopoiskRating = PortalText.rating(text(o, "rating_kinopoisk")),
+                    age = text(o, "rating_mpaa") ?: text(o, "age"),
+                    posterUri = text(o, "screenshot_uri") ?: text(o, "pic"),
                 )
             }
         }
@@ -333,6 +359,16 @@ class StalkerClient(
         val r = call(StalkerRequests.vodPage(ctx(), type, category, page)) { js ->
             parsed = VodItem.listFrom(js)
             vodPageSummary(type, page, js)
+        }
+        return r to parsed
+    }
+
+    /** One page (1-based) of VOD titles in [category] ("*" = all), parsed with its total. Summary: counts only. */
+    fun vodTitles(category: String, page: Int): Pair<StalkerResult, VodPage?> {
+        var parsed: VodPage? = null
+        val r = call(StalkerRequests.vodPage(ctx(), "vod", category, page)) { js ->
+            parsed = VodCatalogParser.page(js, page)
+            listOf("vod page $page: ${parsed?.items?.size ?: "?"} of ${parsed?.totalItems ?: "?"}")
         }
         return r to parsed
     }

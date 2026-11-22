@@ -10,12 +10,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import io.github.ravindren_sm.openstream.data.LiveCatalog
 import io.github.ravindren_sm.openstream.data.LivePlayback
 import io.github.ravindren_sm.openstream.data.PortalSession
+import io.github.ravindren_sm.openstream.data.PrefsResumeStore
 import io.github.ravindren_sm.openstream.data.SessionStatus
+import io.github.ravindren_sm.openstream.data.VodCatalog
+import io.github.ravindren_sm.openstream.data.VodKind
+import io.github.ravindren_sm.openstream.data.VodPlayback
 import io.github.ravindren_sm.openstream.data.SettingsStore
 import io.github.ravindren_sm.openstream.nav.NavStack
 import io.github.ravindren_sm.openstream.nav.Route
@@ -25,6 +30,11 @@ import io.github.ravindren_sm.openstream.ui.focus.FocusMemory
 import io.github.ravindren_sm.openstream.ui.screens.LiveBrowseState
 import io.github.ravindren_sm.openstream.ui.screens.LivePlayerScreen
 import io.github.ravindren_sm.openstream.ui.screens.LiveTvScreen
+import io.github.ravindren_sm.openstream.ui.screens.MovieDetailScreen
+import io.github.ravindren_sm.openstream.ui.screens.VodBrowseScreen
+import io.github.ravindren_sm.openstream.ui.screens.VodBrowseState
+import io.github.ravindren_sm.openstream.ui.screens.VodPlayerScreen
+import io.github.ravindren_sm.openstream.ui.screens.titleFocusId
 import io.github.ravindren_sm.openstream.ui.screens.PlaceholderScreen
 import io.github.ravindren_sm.openstream.ui.screens.SessionStatusLine
 import io.github.ravindren_sm.openstream.ui.screens.SetupScreen
@@ -52,6 +62,16 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     var portalEpoch by remember { mutableIntStateOf(0) }
     val liveState = remember(portalEpoch) { LiveBrowseState(LiveCatalog(session)) }
     val livePlayback = remember(portalEpoch) { LivePlayback(session) }
+    // Movies and Shows get the same treatment, plus the portal address (poster paths are relative to it) and
+    // the resume positions, which live on the device.
+    var portalUrl by remember { mutableStateOf((loaded as? SettingsStore.Loaded.Found)?.settings?.portalUrl.orEmpty()) }
+    val vodCatalog = remember(portalEpoch) { VodCatalog(session) }
+    val moviesState = remember(portalEpoch) { VodBrowseState(vodCatalog, VodKind.MOVIES) }
+    val showsState = remember(portalEpoch) { VodBrowseState(vodCatalog, VodKind.SHOWS) }
+    val vodPlayback = remember(portalEpoch) { VodPlayback(session) }
+    val appContext = LocalContext.current
+    val resumeStore = remember { PrefsResumeStore(appContext) }
+    val connected = session.status.let { it is SessionStatus.Ready || it is SessionStatus.Degraded }
     // A portal already saved: hand it to the session (it connects while the app is in the foreground).
     LaunchedEffect(Unit) { (loaded as? SettingsStore.Loaded.Found)?.let { session.configure(it.settings) } }
 
@@ -69,7 +89,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 store = store,
                 memory = memory,
                 notice = notice,
-                onSaved = { settings -> session.configure(settings); portalEpoch++; stack = NavStack.start(Route.HOME) },
+                onSaved = { settings -> session.configure(settings); portalUrl = settings.portalUrl; portalEpoch++; stack = NavStack.start(Route.HOME) },
                 onSkip = { stack = NavStack.start(Route.HOME) },
             )
         } else if (stack.current.route == Route.LIVE_PLAYER) {
@@ -83,6 +103,10 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                     liveState.channelListState.requestScrollToItem(maxOf(i - 3, 0))
                 },
             )
+        } else if (stack.current.route == Route.VOD_PLAYER) {
+            val browse = if (stack.current.params["kind"] == VodKind.SHOWS.name) showsState else moviesState
+            val index = stack.current.params["item"]?.toIntOrNull() ?: -1
+            VodPlayerScreen(item = browse.titles.items.getOrNull(index), playback = vodPlayback, resume = resumeStore, memory = memory)
         } else {
             TopNavBar(
                 activeTab = topTab,
@@ -90,10 +114,27 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 onSelectTab = { tab -> stack = stack.resetToTab(tab) },
             )
             SessionStatusLine(session.status)
-            if (stack.current.route == Route.LIVE_TV) {
+            if (stack.current.route == Route.MOVIES || stack.current.route == Route.SHOWS) {
+                val browse = if (stack.current.route == Route.SHOWS) showsState else moviesState
+                VodBrowseScreen(
+                    state = browse, connected = connected, portalUrl = portalUrl, memory = memory,
+                    onOpen = { index, item ->
+                        // The portal keeps shows among the movies: the title's own flag decides which page opens.
+                        val route = if (item.isSeries) Route.SHOW_DETAIL else Route.MOVIE_DETAIL
+                        stack = stack.navigate(route, mapOf("item" to "$index", "kind" to browse.kind.name), currentFocusId = titleFocusId(index))
+                    },
+                )
+            } else if (stack.current.route == Route.MOVIE_DETAIL) {
+                val browse = if (stack.current.params["kind"] == VodKind.SHOWS.name) showsState else moviesState
+                val index = stack.current.params["item"]?.toIntOrNull() ?: -1
+                MovieDetailScreen(
+                    item = browse.titles.items.getOrNull(index), portalUrl = portalUrl, memory = memory,
+                    onPlay = { stack = stack.navigate(Route.VOD_PLAYER, stack.current.params, currentFocusId = memory.focusedId) },
+                )
+            } else if (stack.current.route == Route.LIVE_TV) {
                 LiveTvScreen(
                     state = liveState,
-                    connected = session.status.let { it is SessionStatus.Ready || it is SessionStatus.Degraded },
+                    connected = connected,
                     memory = memory,
                     onOpenChannel = { index, _ ->
                         stack = stack.navigate(Route.LIVE_PLAYER, mapOf("item" to "$index"), currentFocusId = memory.focusedId)

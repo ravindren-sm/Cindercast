@@ -1,13 +1,15 @@
-// Generates the local test stream used with scripts/fake_portal.py (--stream-file): a 30 s, 1280x720,
+// Generates the local test stream used with scripts/fake_portal.py (--stream-file): a 30 s (or the length given as the second argument), 1280x720,
 // 30 fps H.264 MP4, video only, a moving bar over a colour that changes every second. Invented content.
-//   swiftc -O scripts/make_test_video.swift -o /tmp/make_test_video && /tmp/make_test_video test.mp4
+//   swiftc -O scripts/make_test_video.swift -o /tmp/make_test_video && /tmp/make_test_video test.mp4 150
 // No ffmpeg needed: AVFoundation ships with macOS.
 import AVFoundation
 import CoreVideo
 
 let out = URL(fileURLWithPath: CommandLine.arguments[1])
 try? FileManager.default.removeItem(at: out)
-let w = 1280, h = 720, fps = 30, seconds = 30
+// Optional second argument: length in seconds (default 30).
+let seconds = CommandLine.arguments.count > 2 ? (Int(CommandLine.arguments[2]) ?? 30) : 30
+let w = 1280, h = 720, fps = 30
 
 let writer = try AVAssetWriter(outputURL: out, fileType: .mp4)
 writer.shouldOptimizeForNetworkUse = true          // moov first, so it can start playing while downloading

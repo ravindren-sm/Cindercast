@@ -71,7 +71,7 @@ const val PLAYER_RETRY_ID = "player-retry"
 
 /** The player's own HTTP identity and client, with the debug hooks attached (none in release). */
 @androidx.annotation.OptIn(UnstableApi::class)
-internal fun createLivePlayer(context: Context): ExoPlayer {
+internal fun createStreamPlayer(context: Context): ExoPlayer {
     val client = OkHttpClient.Builder()
         .apply { PlayerHooks.networkInterceptors.forEach { addNetworkInterceptor(it) } }
         .build()
@@ -118,7 +118,7 @@ fun LivePlayerScreen(
     var zapped by remember { mutableStateOf(false) }
     var typed by remember { mutableStateOf("") }
     var notice: String? by remember { mutableStateOf(null) }
-    val player = remember { createLivePlayer(context) }
+    val player = remember { createStreamPlayer(context) }
     var phase: Phase by remember { mutableStateOf(Phase.Resolving) }
     var buffering by remember { mutableStateOf(false) }
     var attempt by remember { mutableIntStateOf(0) }
