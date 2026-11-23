@@ -36,6 +36,10 @@ import io.github.ravindren_sm.openstream.ui.screens.homePinFocusId
 import io.github.ravindren_sm.openstream.ui.components.PosterLoader
 import io.github.ravindren_sm.openstream.ui.screens.SettingsModel
 import io.github.ravindren_sm.openstream.ui.screens.SettingsScreen
+import io.github.ravindren_sm.openstream.ui.screens.DETAIL_PLAY_ID
+import io.github.ravindren_sm.openstream.ui.screens.SHOW_PLAY_ID
+import io.github.ravindren_sm.openstream.ui.focus.enterAt
+import androidx.compose.ui.focus.FocusDirection
 import io.github.ravindren_sm.openstream.data.NextEpisodeFinder
 import io.github.ravindren_sm.openstream.provider.PortalText
 import io.github.ravindren_sm.openstream.ui.screens.FAVORITES_GROUP
@@ -602,6 +606,8 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                     favorite = movie?.let(favorites::isVod) ?: false,
                     onToggleFavorite = { movie?.let(favorites::toggleVod) },
                     onPlay = { stack = stack.navigate(Route.VOD_PLAYER, stack.current.params, currentFocusId = memory.focusedId) },
+                    // Down from the tab bar comes back to Play, not to whichever button sits under the tab.
+                    modifier = Modifier.enterAt(memory, setOf(FocusDirection.Down)) { DETAIL_PLAY_ID },
                 )
             } else if (stack.current.route == Route.SHOW_DETAIL) {
                 val detail = showDetail
@@ -617,6 +623,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                             detail.playTarget = target
                             stack = stack.navigate(Route.VOD_PLAYER, mapOf("play" to "episode"), currentFocusId = returnFocusId)
                         },
+                        modifier = Modifier.enterAt(memory, setOf(FocusDirection.Down)) { SHOW_PLAY_ID },
                     )
                 }
             } else if (stack.current.route == Route.FAVORITES) {

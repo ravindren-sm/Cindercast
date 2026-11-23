@@ -58,6 +58,7 @@ import io.github.ravindren_sm.openstream.ui.components.OsFocusable
 import io.github.ravindren_sm.openstream.ui.components.onMenuKey
 import io.github.ravindren_sm.openstream.ui.components.Poster
 import io.github.ravindren_sm.openstream.ui.focus.FocusMemory
+import io.github.ravindren_sm.openstream.ui.focus.enterAt
 import io.github.ravindren_sm.openstream.ui.theme.Radii
 import io.github.ravindren_sm.openstream.ui.theme.Spacing
 import io.github.ravindren_sm.openstream.ui.theme.Tokens
@@ -229,20 +230,30 @@ fun VodBrowseScreen(
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
-    var picker by remember { mutableIntStateOf(0) }       // 0 none, 1 sort, 2 rating floor, 3 genre, 4 earliest year, 5 language
-    LaunchedEffect(connected) {
+    var picker by remember(state) { mutableIntStateOf(0) }       // 0 none, 1 sort, 2 rating floor, 3 genre, 4 earliest year, 5 language
+    // Keyed on the state too: Movies and Shows share this call site, so going straight from one tab to the other keeps the
+    // composable and only swaps [state]; keyed on [connected] alone, Shows would never load its categories.
+    LaunchedEffect(connected, state) {
         if (connected && !state.categoriesLoaded) withContext(Dispatchers.IO) { state.loadCategories() }
     }
 
     Box(modifier.fillMaxSize()) {
     Row(
-        Modifier.fillMaxSize().padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.S2),
+        Modifier.fillMaxSize()
+            // Down from the tab bar lands on the category being browsed, whichever tab it came from (geometry alone picks
+            // the category rail under Movies but the Sort button under Shows).
+            .enterAt(memory, setOf(androidx.compose.ui.focus.FocusDirection.Down)) { categoryFocusId(state.selected) }
+            .padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.S2),
         horizontalArrangement = Arrangement.spacedBy(Spacing.S4),
     ) {
         Column(Modifier.width(440.dp).fillMaxHeight()) {
             when {
                 state.categoriesLoaded && state.categories.isEmpty() -> Message("No categories.")
-                state.categoriesLoaded -> LazyColumn(state = state.categoryListState, verticalArrangement = Arrangement.spacedBy(Spacing.S1)) {
+                // Left from the grid comes back to the category being browsed, not to whichever row is level with the card.
+                state.categoriesLoaded -> LazyColumn(
+                    state = state.categoryListState, verticalArrangement = Arrangement.spacedBy(Spacing.S1),
+                    modifier = Modifier.enterAt(memory) { categoryFocusId(state.selected) },
+                ) {
                     itemsIndexed(state.categories, key = { _, c -> c.id }) { index, category ->
                         OsFocusable(
                             id = categoryFocusId(index), memory = memory, variant = FocusVariant.ROW,
@@ -365,8 +376,10 @@ private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMem
             paged.items.isEmpty() && paged.error == null && !paged.exhausted -> Message("Loading titles…")
             paged.items.isEmpty() && paged.error == null -> Message("No titles in this category.")
             paged.items.isEmpty() -> RetryText(paged.error!!, memory) { scope.launch { withContext(Dispatchers.IO) { paged.loadNext() } } }
+            // Right from the category rail enters the grid at its first visible title, not at the card level with the row.
             else -> LazyVerticalGrid(
                 columns = GridCells.Fixed(COLUMNS), state = gridState,
+                modifier = Modifier.enterAt(memory) { titleFocusId(gridState.firstVisibleItemIndex) },
                 horizontalArrangement = Arrangement.spacedBy(Spacing.S2), verticalArrangement = Arrangement.spacedBy(Spacing.S2),
             ) {
                 itemsIndexed(paged.items, key = { _, t -> t.id }) { index, item ->

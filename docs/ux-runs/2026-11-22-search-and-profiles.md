@@ -62,14 +62,38 @@ end on the Play button. Kid-safe search terms only.
 | 12 | blocker | Profiles: Up from Family moved focus to the hidden tab bar behind the layer (remote seemed dead) | Stay in the layer | Profiles crawl | Fixed for every overlay (pickers, PIN, menus) |
 | 13 | major | Back from Profiles focused the Home tab | The Manage row | Settings | Fixed |
 | 14 | major | Continue-watching tile clipped at the left when focused | Fully visible | Home | Fixed (screenshot checked) |
-| 15 | minor | Up from the first Home tile goes to the Live TV tab, not Home | Home tab | Home | Open |
-| 16 | minor | "Use default" sits right under Language after Clear filters | Less easy to hit by accident | Search | Open |
+| 15 | minor | Up from the first Home tile goes to the Live TV tab, not Home | Home tab | Home | Fixed 2026-11-23 (checked on the TV) |
+| 16 | minor | "Use default" sits right under Language after Clear filters | Less easy to hit by accident | Search | Fixed 2026-11-23: Clear filters, Save and Use default send focus to the search box (checked on the TV) |
 | 17 | major | Left on any Settings row jumped to the Home tab | Stay | Settings crawl | Fixed |
-| 18 | minor | Up from the top Settings row goes to the Favorites tab, not Settings | The Settings tab | Settings | Open |
+| 18 | minor | Up from the top Settings row goes to the Favorites tab, not Settings | The Settings tab | Settings | Fixed 2026-11-23 (Up into the tab bar always lands on the current tab) |
 
 ## Crawls run
 
 - Home: 3 findings, all "Down returns to the first button" (accepted).
 - Profiles (manage): before 4 findings (focus lost, 3 unreached); after 1 accepted (Down from Add goes to the PIN button).
-- Settings: 11 "Left jumps to the tab bar" findings (fixed); rows 12-19 not reached because the press budget ran out (rerun with --max-presses 400).
-- Not yet crawled: Movies, Shows, detail pages, Live TV, TV Guide, Favorites, the players.
+- Settings: 11 "Left jumps to the tab bar" findings (fixed). Rerun 2026-11-23 with 400 presses: all 25 rows reached, 0 findings.
+
+## Second round, 2026-11-23 (crawls of the remaining screens)
+
+Debug build, same TV; StbEmu and TiviMate not running; the owner OK'd waking the stick. The crawler never presses Select.
+Favorites was empty on this profile, so a kid-safe film and a kids channel were added for the crawl and removed afterwards;
+the search filters were cleared for one check and are back to the saved defaults.
+
+| # | Severity | What happened | Expected | Screen | Status |
+|---|---|---|---|---|---|
+| 19 | major | Shows stayed on "Loading categories…" when opened straight from Movies (the two tabs share one screen and the load ran only when the connection changed) | Categories load | Shows | Fixed (checked on the TV) |
+| 20 | major | Left from the poster grid went to the category level with the card, not the one being browsed; Right from a category entered the grid at the card level with it | The browsed category; the first visible title | Movies, Shows | Fixed (checked on the TV) |
+| 21 | major | Same as 20 between the channel groups and the channel list | The group being watched; the first visible channel | Live TV | Fixed (checked on the TV) |
+| 22 | minor | Down from the tab bar landed on whatever sat under the tab (the Sort button under Shows, Add to favorites on a show page) | The browsed category / Play | Movies, Shows, Live TV, detail pages | Fixed (checked on the TV) |
+| 23 | major | Up from the first guide row skipped the Group button and went to a tab | Group button | TV Guide | Fixed (checked on the TV) |
+| 24 | minor | Up from a season went to Add to favorites; Left/Right could leave the season row | Play; stay on the row | Show page | Fixed (checked on the TV) |
+| 25 | minor | Once, after picking a suggestion, focus stayed on the search box (the result row was not drawn yet) | The first result | Search | Fixed: retries for up to a second (checked on the TV) |
+
+Crawls: Movies (300 presses), Shows (150), movie page, show page, Live TV (150), TV Guide (60), Favorites, Settings (400).
+Remaining findings are the intended ones: Left from a grid or list returns to the selected category or group rather than
+the one level with it, and Down from the tab bar lands on the selected category, so Down-then-Up is not always a round trip.
+One "focus-lost" in the first Movies crawl did not reproduce by hand (a dump taken mid-animation).
+During cleanup a mistyped key sequence started the kids channel for a few seconds (stopped with Back). Lesson kept: one key at
+a time when Select is involved.
+
+Not yet covered: playback and the players, Profiles edit, and journeys 4 to 10 of the test plan.

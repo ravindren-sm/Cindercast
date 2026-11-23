@@ -25,6 +25,7 @@ import androidx.tv.material3.Text
 import io.github.ravindren_sm.openstream.nav.Route
 import io.github.ravindren_sm.openstream.nav.tabFocusId
 import io.github.ravindren_sm.openstream.ui.focus.FocusMemory
+import io.github.ravindren_sm.openstream.ui.focus.keepHorizontalFocus
 import io.github.ravindren_sm.openstream.ui.theme.Spacing
 import io.github.ravindren_sm.openstream.ui.theme.Tokens
 
@@ -44,6 +45,10 @@ fun TopNavBar(
     Row(
         modifier
             .fillMaxWidth()
+            // Up from the page lands on the current tab, not on whichever tab sits nearest above the focused element
+            // (the first Home tile is under Live TV, the top Settings row is centred under Favorites). Left and Right
+            // stop at the ends of the bar.
+            .keepHorizontalFocus(memory, activeTab?.let(::tabFocusId))
             // Each tab has S2 of inner padding, so shrink the bar's margin by that much to line the
             // tab text up with the page content at the safe-area edge.
             .padding(horizontal = Spacing.SafeHorizontal - Spacing.S2, vertical = Spacing.S2),

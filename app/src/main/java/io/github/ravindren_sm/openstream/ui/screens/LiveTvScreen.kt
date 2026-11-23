@@ -35,6 +35,7 @@ import io.github.ravindren_sm.openstream.ui.components.HEART
 import io.github.ravindren_sm.openstream.ui.components.OsFocusable
 import io.github.ravindren_sm.openstream.ui.components.onMenuKey
 import io.github.ravindren_sm.openstream.ui.focus.FocusMemory
+import io.github.ravindren_sm.openstream.ui.focus.enterAt
 import io.github.ravindren_sm.openstream.ui.theme.Spacing
 import io.github.ravindren_sm.openstream.ui.theme.Tokens
 import kotlinx.coroutines.Dispatchers
@@ -123,13 +124,18 @@ fun LiveTvScreen(
     }
 
     Row(
-        modifier.fillMaxSize().padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.S2),
+        modifier.fillMaxSize()
+            // Down from the tab bar lands on the group being watched.
+            .enterAt(memory, setOf(androidx.compose.ui.focus.FocusDirection.Down)) { genreFocusId(state.selected) }
+            .padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.S2),
         horizontalArrangement = Arrangement.spacedBy(Spacing.S4),
     ) {
         // ---- genre rail ----
         Column(Modifier.width(440.dp).fillMaxHeight()) {
             when {
-                state.genresLoaded -> LazyColumn(state = state.genreListState, verticalArrangement = Arrangement.spacedBy(Spacing.S1)) {
+                // Left from a channel comes back to the group being watched, not to whichever group is level with the channel.
+                state.genresLoaded -> LazyColumn(state = state.genreListState, verticalArrangement = Arrangement.spacedBy(Spacing.S1),
+                    modifier = Modifier.enterAt(memory) { genreFocusId(state.selected) }) {
                     itemsIndexed(state.genres, key = { _, g -> g.id }) { index, genre ->
                         OsFocusable(
                             id = genreFocusId(index), memory = memory, variant = FocusVariant.ROW,
@@ -195,7 +201,9 @@ private fun ChannelList(
         } else if (paged.items.isEmpty() && paged.error == null) {
             Message("No channels in this group.")
         } else {
-            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(Spacing.S1)) {
+            // Right from the group rail enters the channel list at its first visible channel.
+            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(Spacing.S1),
+                modifier = Modifier.enterAt(memory) { channelFocusId(listState.firstVisibleItemIndex) }) {
                 itemsIndexed(paged.items, key = { _, c -> c.id }) { index, channel ->
                     OsFocusable(
                         id = channelFocusId(index), memory = memory, variant = FocusVariant.ROW,

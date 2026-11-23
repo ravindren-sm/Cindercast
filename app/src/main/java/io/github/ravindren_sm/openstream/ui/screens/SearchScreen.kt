@@ -133,10 +133,17 @@ fun SearchScreen(
         val done = state.phase as? SearchPhase.Done ?: return@LaunchedEffect
         if (!state.focusResultsWhenDone) return@LaunchedEffect
         state.focusResultsWhenDone = false
-        delay(150)
         val r = done.results
         val target = when { r.movies.isNotEmpty() -> searchMovieFocusId(0); r.shows.isNotEmpty() -> searchShowFocusId(0); r.channels.isNotEmpty() -> searchChannelFocusId(0); else -> SEARCH_INPUT_ID }
-        if (!memory.tryFocus(target)) memory.tryFocus(SEARCH_INPUT_ID)
+        // The result row may take a few frames to appear (seen on the TV: focus stayed on the box), so keep asking for up to
+        // a second, and stop if the viewer has already moved focus themselves.
+        repeat(10) {
+            delay(100)
+            val here = memory.focusedId
+            if (here != SEARCH_INPUT_ID && here?.startsWith("nav-") != true) return@LaunchedEffect
+            if (memory.tryFocus(target) && memory.focusedId == target) return@LaunchedEffect
+        }
+        memory.tryFocus(SEARCH_INPUT_ID)
     }
     Box(modifier.fillMaxSize()) {
     Column(
@@ -307,9 +314,11 @@ private fun FilterBar(
     val f = state.filters
     val titles = state.categories.associate { it.id to it.title }
     // Save, Use default and Clear disappear once they have done their job; without this focus would fall to the tab bar.
+    // Focus goes to the search box (the next thing the viewer does is search), not to Language: after Clear filters the
+    // only button left is "Use default", directly under Language, so Down then Select there put the filters straight back.
     var refocus by remember { mutableIntStateOf(0) }
     LaunchedEffect(refocus) {
-        if (refocus > 0) { delay(200); memory.tryFocus(chipId(FilterPicker.LANGUAGE)) }
+        if (refocus > 0) { delay(200); memory.tryFocusFirst(SEARCH_INPUT_ID, chipId(FilterPicker.LANGUAGE)) }
     }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.S1)) {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.S1)) {

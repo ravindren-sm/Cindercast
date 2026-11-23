@@ -88,3 +88,19 @@ fun androidx.compose.ui.Modifier.trapFocus(): androidx.compose.ui.Modifier = thi
         }
     })
     .focusGroup()
+
+/**
+ * For a list beside another one (a category rail next to a poster grid): coming in from the side with Left or Right (or the
+ * given [directions]) lands
+ * on [target] (the selected category, the first visible card) instead of on the element level with where focus came from.
+ * If that element is not composed (scrolled out of view), the usual geometric choice applies.
+ */
+fun androidx.compose.ui.Modifier.enterAt(
+    memory: FocusMemory,
+    directions: Set<androidx.compose.ui.focus.FocusDirection> = setOf(androidx.compose.ui.focus.FocusDirection.Left, androidx.compose.ui.focus.FocusDirection.Right),
+    target: () -> String,
+): androidx.compose.ui.Modifier = this
+    .then(androidx.compose.ui.Modifier.focusProperties {
+        onEnter = { if (requestedFocusDirection in directions) memory.tryFocus(target()) }
+    })
+    .focusGroup()

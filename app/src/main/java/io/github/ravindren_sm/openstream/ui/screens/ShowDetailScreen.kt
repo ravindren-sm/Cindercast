@@ -2,6 +2,7 @@ package io.github.ravindren_sm.openstream.ui.screens
 
 import androidx.activity.compose.BackHandler
 import io.github.ravindren_sm.openstream.ui.focus.trapFocus
+import io.github.ravindren_sm.openstream.ui.focus.keepHorizontalFocus
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -191,7 +192,8 @@ fun ShowDetailScreen(
                     show.genres?.let { Text(PortalText.decodeEntities(it), style = Tokens.Body, color = Tokens.TextSecondary, maxLines = 1) }
                 }
                 show.description?.let { Text(PortalText.decodeEntities(it), style = Tokens.Body, color = Tokens.TextPrimary, maxLines = 3) }
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), verticalAlignment = Alignment.CenterVertically) {
+                // Up from the seasons comes back to Play, not to the button nearest the middle of the (wide) season tab.
+                Row(Modifier.keepHorizontalFocus(memory, SHOW_PLAY_ID), horizontalArrangement = Arrangement.spacedBy(Spacing.S3), verticalAlignment = Alignment.CenterVertically) {
                     OsFocusable(id = SHOW_PLAY_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = {
                         state.episodes.items.firstOrNull()?.let { playEpisode(0, it) } ?: run { notice = "Episodes are still loading." }
                     }) { _ ->
@@ -215,7 +217,9 @@ fun ShowDetailScreen(
                     !state.seasonsLoaded -> Text(if (connected) "Loading seasons…" else "Waiting for the portal connection…", style = Tokens.BodyLarge, color = Tokens.TextSecondary)
                     state.seasons.isEmpty() -> Text("No seasons.", style = Tokens.BodyLarge, color = Tokens.TextSecondary)
                     else -> {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S1), modifier = Modifier.padding(top = Spacing.S1)) {
+                        // Left/Right stay on the season row; coming down from Play or up from the episodes lands on the season shown.
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S1),
+                            modifier = Modifier.padding(top = Spacing.S1).keepHorizontalFocus(memory, seasonFocusId(state.selectedSeason))) {
                             itemsIndexed(state.seasons, key = { _, s -> s.id }) { index, season ->
                                 OsFocusable(id = seasonFocusId(index), memory = memory, variant = FocusVariant.TAB, onSelect = { state.selectSeason(index) }) { _ ->
                                     Text(

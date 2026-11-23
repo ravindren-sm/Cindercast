@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
@@ -138,7 +139,10 @@ private fun GuideRow(index: Int, channel: LiveChannel, loader: GuideLoader, nowS
         val r = withContext(Dispatchers.IO) { loader.load(channel) }
         if (r == null) failed = true else programmes = r
     }
-    OsFocusable(id = guideRowFocusId(index), memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth(), onSelect = onSelect) { _ ->
+    // Up from the first row goes to the Group button; geometry alone would skip it (it is narrow and off to the side of
+    // the full-width row) and land on a tab.
+    val upToGroup = if (index == 0) Modifier.focusProperties { up = memory.requesterFor(GUIDE_GROUP_ID) } else Modifier
+    OsFocusable(id = guideRowFocusId(index), memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth().then(upToGroup), onSelect = onSelect) { _ ->
         Row(Modifier.fillMaxWidth().height(96.dp).padding(horizontal = Spacing.S2), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.width(340.dp)) {
                 Text(channel.number, style = Tokens.Mono, color = Tokens.TextSecondary, maxLines = 1)

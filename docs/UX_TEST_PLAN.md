@@ -63,4 +63,10 @@ Found on the TV on 2026-11-23 (run log: `docs/ux-runs/2026-11-22-search-and-prof
 picking a suggestion; results the portal matched on hidden fields; Up from the box skipped the row above; Down into a card row
 landed mid-row; exact titles ranked late; Down on the bottom row moved sideways to a taller card; Left/Right left rows; Up from
 Profiles moved focus behind the layer; Back from Profiles and from Home's buttons lost the opener. All fixed and re-checked on
-the TV. Left on Settings rows jumped to the tab bar (fixed). Open (minor): Up from the first Home tile or the top Settings row goes to the tab nearest the middle, not the current one; "Use default" sits right under Language.
+the TV. Left on Settings rows jumped to the tab bar (fixed). The three minor items left open (Up into the tab bar picking the wrong tab, twice; "Use default" under Language) were fixed on 2026-11-23.
+
+Crawls of the remaining screens on 2026-11-23 (same run log, second round): Shows did not load when opened from Movies;
+side moves between a category or group list and its grid or channel list landed level with the source instead of on the
+selected category or first visible item (Movies, Shows, Live TV); Down from the tab bar landed on whatever was below the tab;
+Up from the first guide row skipped the Group button; season row and show-page Play; a timing miss when focusing the first
+search result. All fixed and checked on the TV. Not yet covered: the players, Profiles edit, journeys 4 to 10.
