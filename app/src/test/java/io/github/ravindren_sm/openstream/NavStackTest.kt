@@ -88,7 +88,7 @@ class NavStackTest {
 
     @Test fun `only top-level routes are tabs and tabs match the prototype order`() {
         assertEquals(
-            listOf("Home", "Live TV", "TV Guide", "Movies", "Shows", "Search", "Favorites", "Settings"),
+            listOf("Home", "Live TV", "TV Guide", "Sports", "Movies", "Shows", "Search", "Favorites", "Settings"),
             Route.TABS.map { it.label },
         )
         assertFailsWith<IllegalArgumentException> { NavStack.start().resetToTab(Route.MOVIE_DETAIL) }

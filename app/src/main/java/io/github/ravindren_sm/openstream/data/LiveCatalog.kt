@@ -41,6 +41,16 @@ class LiveCatalog(private val session: PortalSession) {
         return if (result.ok && p != null) CatalogResult.Ok(p) else CatalogResult.Failed(NO_CHANNELS)
     }
 
+    /** One 1-based page of channels whose name matches [query] (the portal's own name search). */
+    fun search(query: String, page: Int): CatalogResult<LiveChannelPage> {
+        var parsed: LiveChannelPage? = null
+        val result = session.withSession { m ->
+            m.call { c -> val (r, p) = c.channelsSearch(query, page); parsed = p; r }
+        } ?: return CatalogResult.Failed(NOT_CONNECTED)
+        val p = parsed
+        return if (result.ok && p != null) CatalogResult.Ok(p) else CatalogResult.Failed(NO_CHANNELS)
+    }
+
     companion object {
         const val ALL_ID = "*"
         const val ALL_TITLE = "All channels"

@@ -30,10 +30,16 @@ class GuideLoader(private val session: PortalSession, private val ttlMillis: Lon
     fun load(channel: LiveChannel): List<EpgProgramme>? {
         cache[channel.id]?.let { if (nowMillis() - it.at < ttlMillis) return it.programmes }
         var parsed: List<EpgProgramme>? = null
-        val result = session.withSession { m -> m.call { c -> val (r, p) = c.epgProgrammes(channel.id, 4); parsed = p; r } } ?: return null
+        val result = session.withSession { m -> m.call { c -> val (r, p) = c.epgProgrammes(channel.id, PROGRAMMES); parsed = p; r } } ?: return null
         if (!result.ok) return null
         val list = parsed.orEmpty()
         cache[channel.id] = Entry(list, nowMillis())
         return list
     }
 }
+
+/**
+ * Programmes asked for per channel: enough to reach the evening (the NFL search looks for tonight's game), at the same one
+ * request per channel as a shorter list.
+ */
+private const val PROGRAMMES = 10

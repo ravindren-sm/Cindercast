@@ -25,6 +25,7 @@ fun initialFocusId(route: Route): String = when (route) {
     Route.HOME -> continueFocusId(0)
     Route.SEARCH -> SEARCH_INPUT_ID
     Route.TV_GUIDE -> guideRowFocusId(0)
+    Route.SPORTS -> sportsRailFocusId(0)
     Route.SETTINGS -> settingFocusId(0)
     Route.LIVE_TV -> genreFocusId(0)
     Route.LIVE_PLAYER, Route.VOD_PLAYER -> PLAYER_SURFACE_ID

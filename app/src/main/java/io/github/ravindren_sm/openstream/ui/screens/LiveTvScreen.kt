@@ -39,6 +39,10 @@ import io.github.ravindren_sm.openstream.ui.focus.enterAt
 import io.github.ravindren_sm.openstream.ui.theme.Spacing
 import io.github.ravindren_sm.openstream.ui.theme.Tokens
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableLongStateOf
+import io.github.ravindren_sm.openstream.data.GuideLoader
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -114,6 +118,8 @@ fun LiveTvScreen(
     /** The group shown as a row on Home; Menu on a group in the rail pins it (one at a time) or unpins it. */
     pinnedGenreId: String? = null,
     onTogglePinGenre: (LiveGenre) -> Unit = {},
+    /** When set, each channel row also shows what is on now and next (read from the portal as rows appear). */
+    guide: GuideLoader? = null,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -164,7 +170,7 @@ fun LiveTvScreen(
 
         // ---- channel list ----
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            if (state.genresLoaded) ChannelList(state, memory, onOpenChannel, isFavorite, onToggleFavorite)
+            if (state.genresLoaded) ChannelList(state, memory, onOpenChannel, isFavorite, onToggleFavorite, guide)
         }
     }
 }
@@ -172,8 +178,10 @@ fun LiveTvScreen(
 @Composable
 private fun ChannelList(
     state: LiveBrowseState, memory: FocusMemory, onOpenChannel: (Int, LiveChannel) -> Unit,
-    isFavorite: (LiveChannel) -> Boolean, onToggleFavorite: (LiveChannel) -> Unit,
+    isFavorite: (LiveChannel) -> Boolean, onToggleFavorite: (LiveChannel) -> Unit, guide: GuideLoader?,
 ) {
+    var nowSec by remember { mutableLongStateOf(System.currentTimeMillis() / 1000) }
+    LaunchedEffect(Unit) { while (true) { delay(30_000); nowSec = System.currentTimeMillis() / 1000 } }
     val paged = state.channels
     val listState = state.channelListState
     val scope = rememberCoroutineScope()
@@ -212,8 +220,14 @@ private fun ChannelList(
                     ) { _ ->
                         Row(Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1 + 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(channel.number, style = Tokens.Mono, color = Tokens.TextSecondary, maxLines = 1, modifier = Modifier.width(96.dp))
-                            Text(channel.name, style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
-                            if (isFavorite(channel)) Text("  $HEART", style = Tokens.BodyLarge, color = Tokens.StatusError)
+                            Column(Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(channel.name, style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                                    if (isFavorite(channel)) Text("  $HEART", style = Tokens.BodyLarge, color = Tokens.StatusError)
+                                }
+                                // What the channel is showing, so it does not have to be opened to find out.
+                                if (guide != null) NowNextLine(channel, guide, nowSec)
+                            }
                         }
                     }
                 }

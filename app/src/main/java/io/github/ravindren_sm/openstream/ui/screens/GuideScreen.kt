@@ -32,6 +32,7 @@ import io.github.ravindren_sm.openstream.data.GuideLoader
 import io.github.ravindren_sm.openstream.data.GuideLogic
 import io.github.ravindren_sm.openstream.data.LiveCatalog
 import io.github.ravindren_sm.openstream.data.PagedChannels
+import io.github.ravindren_sm.openstream.data.SportsLogic
 import io.github.ravindren_sm.openstream.provider.EpgProgramme
 import io.github.ravindren_sm.openstream.provider.LiveChannel
 import io.github.ravindren_sm.openstream.provider.LiveGenre
@@ -61,7 +62,7 @@ class GuideState {
     fun select(id: String, title: String, newChannels: PagedChannels) { groupId = id; groupTitle = title; channels = newChannels }
 }
 
-private fun timeText(context: android.content.Context, sec: Long) = android.text.format.DateFormat.getTimeFormat(context).format(java.util.Date(sec * 1000))
+internal fun timeText(context: android.content.Context, sec: Long) = android.text.format.DateFormat.getTimeFormat(context).format(java.util.Date(sec * 1000))
 
 /**
  * TV Guide: what is on now and next for each channel of a group (or the favorites). The portal gives a guide one channel
@@ -111,7 +112,10 @@ fun GuideScreen(
                 paged.items.isEmpty() -> Text("No channels in this group.", style = Tokens.BodyLarge, color = Tokens.TextSecondary)
                 else -> LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(Spacing.S1), modifier = Modifier.fillMaxSize()) {
                     itemsIndexed(paged.items, key = { _, c -> c.id }) { i, channel ->
-                        GuideRow(i, channel, loader, nowSec, context, memory) { onOpenChannel(paged.items, i) }
+                        // Up from the first row goes to the Group button; geometry alone would skip it (it is narrow and off to
+                        // the side of the full-width row) and land on a tab.
+                        val upToGroup = if (i == 0) Modifier.focusProperties { up = memory.requesterFor(GUIDE_GROUP_ID) } else Modifier
+                        ChannelGuideRow(guideRowFocusId(i), channel, loader, nowSec, memory, upToGroup) { onOpenChannel(paged.items, i) }
                     }
                 }
             }
@@ -130,8 +134,42 @@ fun GuideScreen(
     }
 }
 
+/**
+ * One line under a channel name in lists (Live TV): what is on now with the time left, then what is next. Asks the portal
+ * for the channel's short guide when the row first appears; [loader] keeps it for ten minutes, so scrolling back is free.
+ * Shows nothing until the guide arrives, and nothing for a channel without one, so rows never jump in height.
+ */
 @Composable
-private fun GuideRow(index: Int, channel: LiveChannel, loader: GuideLoader, nowSec: Long, context: android.content.Context, memory: FocusMemory, onSelect: () -> Unit) {
+fun NowNextLine(channel: LiveChannel, loader: GuideLoader, nowSec: Long, modifier: Modifier = Modifier) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var programmes: List<EpgProgramme>? by remember(channel.id) { mutableStateOf(null) }
+    LaunchedEffect(channel.id) {
+        // A short pause first, so rows flicked past while scrolling do not each send a request.
+        delay(250)
+        programmes = withContext(Dispatchers.IO) { loader.load(channel) }
+    }
+    // Filler entries ("No details available") say nothing: treat them as no guide.
+    val nn = programmes?.filterNot { SportsLogic.isPlaceholder(it.name, channel.name) }?.let { GuideLogic.nowAndNext(it, nowSec) }
+    val text = when {
+        nn == null -> " "
+        nn.now != null -> {
+            val left = ((nn.now.stopSec - nowSec) / 60).coerceAtLeast(1)
+            "Now: ${PortalText.decodeEntities(nn.now.name)} · ${if (left >= 60) "${left / 60} h ${left % 60} min" else "$left min"} left" +
+                (nn.next?.let { " · Next ${timeText(context, it.startSec)}: ${PortalText.decodeEntities(it.name)}" } ?: "")
+        }
+        nn.next != null -> "Next ${timeText(context, nn.next.startSec)}: ${PortalText.decodeEntities(nn.next.name)}"
+        else -> " "
+    }
+    Text(text, style = Tokens.Body, color = Tokens.TextSecondary, maxLines = 1, modifier = modifier)
+}
+
+/**
+ * One channel with what is on now (title, times, progress) and next. Asks the portal for the channel's short guide when the
+ * row first appears (kept by [loader] for ten minutes). Used by the TV Guide and the Sports tab.
+ */
+@Composable
+fun ChannelGuideRow(id: String, channel: LiveChannel, loader: GuideLoader, nowSec: Long, memory: FocusMemory, modifier: Modifier = Modifier, onSelect: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     // null = still asking; an empty list = the channel has no guide; failed = the portal could not be asked.
     var programmes: List<EpgProgramme>? by remember(channel.id) { mutableStateOf(null) }
     var failed by remember(channel.id) { mutableStateOf(false) }
@@ -139,10 +177,7 @@ private fun GuideRow(index: Int, channel: LiveChannel, loader: GuideLoader, nowS
         val r = withContext(Dispatchers.IO) { loader.load(channel) }
         if (r == null) failed = true else programmes = r
     }
-    // Up from the first row goes to the Group button; geometry alone would skip it (it is narrow and off to the side of
-    // the full-width row) and land on a tab.
-    val upToGroup = if (index == 0) Modifier.focusProperties { up = memory.requesterFor(GUIDE_GROUP_ID) } else Modifier
-    OsFocusable(id = guideRowFocusId(index), memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth().then(upToGroup), onSelect = onSelect) { _ ->
+    OsFocusable(id = id, memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth().then(modifier), onSelect = onSelect) { _ ->
         Row(Modifier.fillMaxWidth().height(96.dp).padding(horizontal = Spacing.S2), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.width(340.dp)) {
                 Text(channel.number, style = Tokens.Mono, color = Tokens.TextSecondary, maxLines = 1)
@@ -152,8 +187,9 @@ private fun GuideRow(index: Int, channel: LiveChannel, loader: GuideLoader, nowS
             when {
                 list == null -> Text(if (failed) "Guide unavailable" else "…", style = Tokens.Body, color = Tokens.TextSecondary)
                 else -> {
-                    val nn = GuideLogic.nowAndNext(list, nowSec)
-                    if (nn.now == null && nn.next == null) Text("No guide data", style = Tokens.Body, color = Tokens.TextSecondary)
+                    // Filler entries ("No details available", common on event channels) say nothing: treat them as no guide.
+                    val nn = GuideLogic.nowAndNext(list.filterNot { SportsLogic.isPlaceholder(it.name, channel.name) }, nowSec)
+                    if (nn.now == null && nn.next == null) Text("No details in the guide", style = Tokens.Body, color = Tokens.TextSecondary)
                     else {
                         Column(Modifier.weight(1f).padding(end = Spacing.S3), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             nn.now?.let { p ->

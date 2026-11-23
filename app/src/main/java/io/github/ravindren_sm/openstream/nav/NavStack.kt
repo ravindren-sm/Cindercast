@@ -6,6 +6,7 @@ enum class Route(val path: String, val label: String, val isTab: Boolean = false
     LIVE_TV("/live-tv", "Live TV", isTab = true),
     LIVE_PLAYER("/live-tv/player", "Live player"),
     TV_GUIDE("/tv-guide", "TV Guide", isTab = true),
+    SPORTS("/sports", "Sports", isTab = true),
     MOVIES("/movies", "Movies", isTab = true),
     MOVIE_DETAIL("/movies/:id", "Movie"),
     SHOWS("/shows", "Shows", isTab = true),

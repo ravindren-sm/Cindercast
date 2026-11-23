@@ -70,3 +70,10 @@ side moves between a category or group list and its grid or channel list landed 
 selected category or first visible item (Movies, Shows, Live TV); Down from the tab bar landed on whatever was below the tab;
 Up from the first guide row skipped the Group button; season row and show-page Play; a timing miss when focusing the first
 search result. All fixed and checked on the TV. Not yet covered: the players, Profiles edit, journeys 4 to 10.
+
+2026-11-23, Sports tab and now/next on Live TV (run log: `docs/ux-runs/2026-11-23-sports-and-live-guide.md`): guide filler
+shown as programmes, NFL team channels listed with nothing on, new games pushed off-screen above the results, and on-demand
+categories opened with focus on the wrong category; all fixed and checked on the TV. Open: ESPN's Monday Night Football not
+found; Select latency right after scrolling Live TV not measured. Add a charter: **Find tonight's NFL game** (Sports, NFL, the
+game is listed with its channel and start time; Select plays it).
+

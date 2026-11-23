@@ -45,6 +45,11 @@ import io.github.ravindren_sm.openstream.provider.PortalText
 import io.github.ravindren_sm.openstream.ui.screens.FAVORITES_GROUP
 import io.github.ravindren_sm.openstream.ui.screens.GUIDE_GROUP_ID
 import io.github.ravindren_sm.openstream.ui.screens.GuideScreen
+import io.github.ravindren_sm.openstream.ui.screens.SportsScreen
+import io.github.ravindren_sm.openstream.ui.screens.categoryFocusId
+import io.github.ravindren_sm.openstream.ui.screens.SportsState
+import io.github.ravindren_sm.openstream.ui.screens.sportsEntries
+import io.github.ravindren_sm.openstream.ui.screens.sportsRowFocusId
 import io.github.ravindren_sm.openstream.ui.screens.GuideState
 import io.github.ravindren_sm.openstream.ui.screens.guideRowFocusId
 import io.github.ravindren_sm.openstream.data.SearchCatalog
@@ -152,6 +157,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     // TV Guide: which channels it lists, and the per-channel guide cache.
     val liveCatalog = remember(portalEpoch) { LiveCatalog(session) }
     val guideLoader = remember(portalEpoch) { GuideLoader(session) }
+    val sportsState = remember(portalEpoch) { SportsState(liveCatalog, guideLoader) }
     val guideState = remember(portalEpoch) { GuideState() }
     // Movies and Shows get the same treatment, plus the portal address (poster paths are relative to it) and
     // the resume positions, which live on the device.
@@ -491,7 +497,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 onChannelChanged = { i ->
                     // Back should land on the channel being watched, with its row on screen.
                     if (fromFavorites) {
-                        stack = stack.withPreviousFocus(when (from) { "home" -> homeFavChannelFocusId(i); "search" -> searchChannelFocusId(i); "guide" -> guideRowFocusId(i); "homepin" -> homePinFocusId(stack.current.params["row"]?.toIntOrNull() ?: 0, i); else -> favChannelFocusId(i) })
+                        stack = stack.withPreviousFocus(when (from) { "home" -> homeFavChannelFocusId(i); "search" -> searchChannelFocusId(i); "guide" -> guideRowFocusId(i); "sports" -> sportsRowFocusId(i); "homepin" -> homePinFocusId(stack.current.params["row"]?.toIntOrNull() ?: 0, i); else -> favChannelFocusId(i) })
                     } else {
                         stack = stack.withPreviousFocus(channelFocusId(i))
                         liveState.channelListState.requestScrollToItem(maxOf(i - 3, 0))
@@ -523,7 +529,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                     if (tab == Route.SETTINGS && isKids) withPin("Enter the PIN to open Settings") { stack = stack.resetToTab(tab) }
                     else stack = stack.resetToTab(tab)
                 },
-                tabs = if (isKids) Route.TABS.filter { it != Route.LIVE_TV && it != Route.TV_GUIDE } else Route.TABS,
+                tabs = if (isKids) Route.TABS.filter { it != Route.LIVE_TV && it != Route.TV_GUIDE && it != Route.SPORTS } else Route.TABS,
             )
             if (stack.current.route == Route.HOME) {
                 HomeScreen(
@@ -699,6 +705,36 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                         onToggleHideUnrated = { contentPolicy = contentPolicy.copy(hideUnrated = !contentPolicy.hideUnrated).also { policyStore.save(profileId, it) } },
                     ),
                 )
+            } else if (stack.current.route == Route.SPORTS) {
+                // The groups the viewer may see (the same set the TV Guide offers), and the movie and show categories.
+                val visibleGenres = liveState.allGenres.filter { g -> liveState.genres.any { it.id == g.id } && (defaultScope?.groupAllowed(g) ?: true) }
+                LaunchedEffect(connected) {
+                    if (!connected) return@LaunchedEffect
+                    withContext(Dispatchers.IO) {
+                        if (!liveState.genresLoaded) liveState.loadGenres()
+                        if (!moviesState.categoriesLoaded) moviesState.loadCategories()
+                        if (!showsState.categoriesLoaded) showsState.loadCategories()
+                    }
+                }
+                val entries = remember(visibleGenres, moviesState.categories, showsState.categories) { sportsEntries(visibleGenres, moviesState.categories, showsState.categories) }
+                SportsScreen(
+                    state = sportsState, entries = entries, allGenres = visibleGenres,
+                    loading = !liveState.genresLoaded || !moviesState.categoriesLoaded || !showsState.categoriesLoaded,
+                    loader = guideLoader, connected = connected, memory = memory,
+                    onOpenChannel = { list, i ->
+                        favPlayer = PagedChannels.fixed(list)
+                        stack = stack.navigate(Route.LIVE_PLAYER, mapOf("item" to "$i", "src" to "fav", "from" to "sports"), currentFocusId = memory.focusedId)
+                    },
+                    onOpenOnDemand = { e ->
+                        val browse = if (e.kind == VodKind.SHOWS) showsState else moviesState
+                        val index = browse.categories.indexOfFirst { it.id == e.category.id }
+                        if (index >= 0) {
+                            browse.select(index)
+                            browse.categoryListState.requestScrollToItem(maxOf(index - 3, 0))
+                            stack = stack.navigate(if (e.kind == VodKind.SHOWS) Route.SHOWS else Route.MOVIES, emptyMap(), currentFocusId = memory.focusedId)
+                        }
+                    },
+                )
             } else if (stack.current.route == Route.TV_GUIDE) {
                 GuideScreen(
                     state = guideState, favoriteCount = favorites.channels().size, genres = liveState.allGenres.filter { g -> liveState.genres.any { it.id == g.id } && (defaultScope?.groupAllowed(g) ?: true) }, loader = guideLoader,
@@ -751,6 +787,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                     isFavorite = favorites::isChannel, onToggleFavorite = favorites::toggleChannel,
                     pinnedGenreId = pins.firstOrNull { it.kind == PinKinds.LIVE }?.categoryId,
                     onTogglePinGenre = { g -> togglePin(PinKinds.LIVE, g.id, g.title) },
+                    guide = guideLoader,
                     onOpenChannel = { index, _ ->
                         stack = stack.navigate(Route.LIVE_PLAYER, mapOf("item" to "$index"), currentFocusId = memory.focusedId)
                     },
@@ -870,7 +907,9 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     LaunchedEffect(stack, homeReady) {
         if (!homeReady) return@LaunchedEffect
         androidx.compose.runtime.withFrameNanos { }   // let the new screen compose and attach
-        memory.tryFocusFirst(stack.restoreFocusId, initialFocusId(stack.current.route), if (onHome) recentFocusId(0) else null, if (onHome) homeFavChannelFocusId(0) else null, if (onHome) doorFocusId(0) else null,
+        // Movies and Shows open on the category being shown (Sports can open them on any category).
+        val browseFocus = when (stack.current.route) { Route.MOVIES -> categoryFocusId(moviesState.selected); Route.SHOWS -> categoryFocusId(showsState.selected); else -> null }
+        memory.tryFocusFirst(stack.restoreFocusId, browseFocus, initialFocusId(stack.current.route), if (onHome) recentFocusId(0) else null, if (onHome) homeFavChannelFocusId(0) else null, if (onHome) doorFocusId(0) else null,
             *(if (stack.current.route == Route.FAVORITES) FAVORITES_INITIAL_IDS else emptyArray()), if (stack.current.route == Route.TV_GUIDE) GUIDE_GROUP_ID else null, topTab?.let(::tabFocusId))
     }
 }
