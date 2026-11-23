@@ -64,10 +64,12 @@ end on the Play button. Kid-safe search terms only.
 | 14 | major | Continue-watching tile clipped at the left when focused | Fully visible | Home | Fixed (screenshot checked) |
 | 15 | minor | Up from the first Home tile goes to the Live TV tab, not Home | Home tab | Home | Open |
 | 16 | minor | "Use default" sits right under Language after Clear filters | Less easy to hit by accident | Search | Open |
+| 17 | major | Left on any Settings row jumped to the Home tab | Stay | Settings crawl | Fixed |
+| 18 | minor | Up from the top Settings row goes to the Favorites tab, not Settings | The Settings tab | Settings | Open |
 
 ## Crawls run
 
 - Home: 3 findings, all "Down returns to the first button" (accepted).
 - Profiles (manage): before 4 findings (focus lost, 3 unreached); after 1 accepted (Down from Add goes to the PIN button).
-- Settings: see the run summary in docs/UX_TEST_PLAN.md.
+- Settings: 11 "Left jumps to the tab bar" findings (fixed); rows 12-19 not reached because the press budget ran out (rerun with --max-presses 400).
 - Not yet crawled: Movies, Shows, detail pages, Live TV, TV Guide, Favorites, the players.

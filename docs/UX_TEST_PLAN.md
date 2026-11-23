@@ -63,4 +63,4 @@ Found on the TV on 2026-11-23 (run log: `docs/ux-runs/2026-11-22-search-and-prof
 picking a suggestion; results the portal matched on hidden fields; Up from the box skipped the row above; Down into a card row
 landed mid-row; exact titles ranked late; Down on the bottom row moved sideways to a taller card; Left/Right left rows; Up from
 Profiles moved focus behind the layer; Back from Profiles and from Home's buttons lost the opener. All fixed and re-checked on
-the TV. Open (minor): Up from the first Home tile goes to the Live TV tab; "Use default" sits right under Language.
+the TV. Left on Settings rows jumped to the tab bar (fixed). Open (minor): Up from the first Home tile or the top Settings row goes to the tab nearest the middle, not the current one; "Use default" sits right under Language.

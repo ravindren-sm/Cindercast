@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import io.github.ravindren_sm.openstream.ui.focus.keepHorizontalFocus
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -143,7 +144,7 @@ fun SettingsScreen(model: SettingsModel, memory: FocusMemory, modifier: Modifier
     )
     Box(modifier.fillMaxSize()) {
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.S2),
+            Modifier.fillMaxSize().keepHorizontalFocus().verticalScroll(rememberScrollState()).padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.S2),   // Left/Right on a row stay put (they used to jump to the tab bar)
             verticalArrangement = Arrangement.spacedBy(Spacing.S1),
         ) {
             Text("Settings", style = Tokens.TitleLarge, color = Tokens.TextPrimary)
