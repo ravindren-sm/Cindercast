@@ -33,6 +33,19 @@ class SearchRankingTest {
         assertEquals(listOf("2", "3", "1"), SearchRanking.matchChannelsFromServer(found, "cartoon").map { it.id })
     }
 
+    @Test fun theExactTitleComesBeforeLongerNamesStartingTheSame() {
+        val ranked = SearchRanking.rank(listOf(v("1", "Frozen Kiss"), v("2", "Frozen Sasquatch"), v("3", "Frozen (Hindi)"), v("4", "Frozen")), "frozen")
+        assertEquals(listOf("3", "4", "1", "2"), ranked.map { it.id })
+    }
+
+    @Test fun onlyTitlesWithAVisibleReasonCountAsMatches() {
+        val cast = VodItem(id = "3", name = "Big", isSeries = false, isSeason = false, isEpisode = false, cmd = "c", episodeNumbers = emptyList(), actors = "Tom Hanks")
+        assertTrue(SearchRanking.explains(v("1", "Ramayana: Rise of a Legend"), "ramay"))
+        assertTrue(SearchRanking.explains(v("1", "Ramayana: Rise of a Legend"), "rise  RAMAYANA"))   // words in any order
+        assertTrue(SearchRanking.explains(cast, "hanks"))                                          // found in the cast
+        assertTrue(!SearchRanking.explains(v("2", "Behind Her Eyes"), "ramay"))                   // matched on a field the portal did not send
+    }
+
     @Test fun aSingleLetterFindsNoChannels() {
         assertTrue(SearchRanking.matchChannels(listOf(ch("1", "5", "A News")), "a").isEmpty())
     }

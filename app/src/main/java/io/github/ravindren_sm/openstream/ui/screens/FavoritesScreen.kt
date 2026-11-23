@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import io.github.ravindren_sm.openstream.ui.focus.keepHorizontalFocus
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
 import io.github.ravindren_sm.openstream.data.PosterUrl
@@ -89,7 +90,7 @@ fun FavoritesScreen(
         }
         if (channels.isNotEmpty()) {
             Text("Channels", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
+            LazyRow(modifier = Modifier.keepHorizontalFocus(memory, favChannelFocusId(0)), horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
                 itemsIndexed(channels, key = { _, f -> f.refId }) { i, f ->
                     ChannelCard(favChannelFocusId(i), f.number.orEmpty(), f.name, memory, { onOpenChannel(i) }, Modifier.onMenuKey { remove(f, i, ::favChannelFocusId) })
                 }
@@ -119,7 +120,7 @@ private fun TitleRow(
 ) {
     if (items.isEmpty()) return
     Text(heading, style = Tokens.TitleMedium, color = Tokens.TextPrimary)
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
+    LazyRow(modifier = Modifier.keepHorizontalFocus(memory, idOf(0)), horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
         itemsIndexed(items, key = { _, f -> f.refId }) { i, f ->
             OsFocusable(id = idOf(i), memory = memory, variant = FocusVariant.CARD, onSelect = { onOpen(f) }, modifier = Modifier.width(190.dp).onMenuKey { onRemove(f, i) }) { _ ->
                 Column(Modifier.background(Tokens.Surface1)) {

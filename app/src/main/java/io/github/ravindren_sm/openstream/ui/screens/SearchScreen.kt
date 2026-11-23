@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import io.github.ravindren_sm.openstream.ui.focus.keepHorizontalFocus
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
@@ -83,6 +84,8 @@ class SearchState {
      */
     var shown: SearchResults? by mutableStateOf(null)
     var shownKey: String? by mutableStateOf(null)
+    /** Set when a suggestion was picked: the rows under focus go away, so focus moves to the first result once it arrives. */
+    var focusResultsWhenDone by mutableStateOf(false)
 }
 
 /** How many type-ahead suggestions are listed; fixed so the results below never jump when a search finishes. */
@@ -126,6 +129,15 @@ fun SearchScreen(
             if (memory.focusedId?.startsWith("nav-") != false) memory.tryFocus(SEARCH_INPUT_ID) else return@LaunchedEffect
         }
     }
+    LaunchedEffect(state.phase) {
+        val done = state.phase as? SearchPhase.Done ?: return@LaunchedEffect
+        if (!state.focusResultsWhenDone) return@LaunchedEffect
+        state.focusResultsWhenDone = false
+        delay(150)
+        val r = done.results
+        val target = when { r.movies.isNotEmpty() -> searchMovieFocusId(0); r.shows.isNotEmpty() -> searchShowFocusId(0); r.channels.isNotEmpty() -> searchChannelFocusId(0); else -> SEARCH_INPUT_ID }
+        if (!memory.tryFocus(target)) memory.tryFocus(SEARCH_INPUT_ID)
+    }
     Box(modifier.fillMaxSize()) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.S2),
@@ -133,8 +145,17 @@ fun SearchScreen(
     ) {
         // Filters sit above the box so Down from the box goes straight to suggestions and results.
         FilterBar(state, memory, onOpen = { picker = it }, onChange = onFiltersChange, onSaveDefault = onSaveDefaultFilters)
+        // Up from the box goes to the first button of the filter row just above it (the second row when it is shown).
+        val saved = state.defaultFilters
+        val f = state.filters
+        val upTarget = when {
+            f.isActive && saved != f -> "search-filter-save"
+            saved != null && saved != f -> "search-filter-usedefault"
+            f.isActive -> "search-filter-clear"
+            else -> "search-filter-language"
+        }
         OsTextField(
-            id = SEARCH_INPUT_ID, memory = memory, value = state.query, onValueChange = { state.query = it },
+            id = SEARCH_INPUT_ID, memory = memory, value = state.query, onValueChange = { state.query = it }, upId = upTarget,
             label = "Search", hint = "Movies, shows and channels. Back closes the keyboard; then Down reaches the results.", imeAction = ImeAction.Done,
             onDone = { state.submitTick++ },
         )
@@ -142,7 +163,10 @@ fun SearchScreen(
             Text(if (state.query.isBlank()) "Recent searches" else "Suggestions", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.S1)) {
                 state.suggestions.take(SUGGESTION_ROWS).forEachIndexed { i, sug ->
-                    OsFocusable(id = searchSuggestionFocusId(i), memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth(), onSelect = { onPickSuggestion(sug) }) { _ ->
+                    OsFocusable(id = searchSuggestionFocusId(i), memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth(), onSelect = {
+                        // The suggestion rows change under focus once the search runs; hold focus on the box, then move to the results.
+                        state.focusResultsWhenDone = true; memory.tryFocus(SEARCH_INPUT_ID); onPickSuggestion(sug)
+                    }) { _ ->
                         Row(Modifier.fillMaxWidth().padding(horizontal = Spacing.S2, vertical = Spacing.S1), verticalAlignment = Alignment.CenterVertically) {
                             Text(PortalText.decodeEntities(sug.text), style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 1, modifier = Modifier.weight(1f))
                             Text(sug.source.label, style = Tokens.Body, color = Tokens.TextSecondary)
@@ -218,25 +242,25 @@ private fun Results(
     r.note?.let { Text(it, style = Tokens.Body, color = Tokens.StatusWarning) }
     if (r.channels.isNotEmpty()) {
         Text("Channels", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
+        LazyRow(modifier = Modifier.keepHorizontalFocus(memory, searchChannelFocusId(0)), horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
             itemsIndexed(r.channels, key = { _, c -> c.id }) { i, c ->
                 ChannelCard(searchChannelFocusId(i), c.number, c.name + if (isFavoriteChannel(c)) "  $HEART" else "", memory, { onOpenChannel(i) })
             }
         }
     }
     if (r.channelsFailed) Text("Channels could not be searched.", style = Tokens.Body, color = Tokens.StatusWarning)
-    PosterRow("Movies", r.movies, ::searchMovieFocusId, portalUrl, memory, isFavoriteVod, onOpenMovie)
-    PosterRow("Shows", r.shows, ::searchShowFocusId, portalUrl, memory, isFavoriteVod, onOpenShow)
+    PosterRow("Movies", r.movies, ::searchMovieFocusId, query, portalUrl, memory, isFavoriteVod, onOpenMovie)
+    PosterRow("Shows", r.shows, ::searchShowFocusId, query, portalUrl, memory, isFavoriteVod, onOpenShow)
 }
 
 @Composable
 private fun PosterRow(
-    heading: String, items: List<TitleGroup>, idOf: (Int) -> String, portalUrl: String, memory: FocusMemory,
+    heading: String, items: List<TitleGroup>, idOf: (Int) -> String, query: String, portalUrl: String, memory: FocusMemory,
     isFavorite: (VodItem) -> Boolean, onOpen: (TitleGroup) -> Unit,
 ) {
     if (items.isEmpty()) return
     Text(heading, style = Tokens.TitleMedium, color = Tokens.TextPrimary)
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
+    LazyRow(modifier = Modifier.keepHorizontalFocus(memory, idOf(0)), horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
         itemsIndexed(items, key = { _, g -> g.best.id }) { i, g ->
             val v = g.best
             OsFocusable(id = idOf(i), memory = memory, variant = FocusVariant.CARD, onSelect = { onOpen(g) }, modifier = Modifier.width(190.dp)) { _ ->
@@ -249,6 +273,11 @@ private fun PosterRow(
                             modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.S1).background(Tokens.BgCanvas.copy(alpha = 0.85f), androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).padding(horizontal = Spacing.S1, vertical = 2.dp))
                     }
                     Text(PortalText.decodeEntities(v.name), style = Tokens.Body, color = Tokens.TextPrimary, maxLines = 1, modifier = Modifier.padding(Spacing.S1))
+                    // Say why a title whose name lacks the text was found (for example a cast member's name).
+                    // The line is always there (blank when the name shows the match) so every card in the row has the same
+                    // height; a taller card would count as "below" its neighbours and catch Down on the bottom row.
+                    Text(io.github.ravindren_sm.openstream.data.SearchRanking.matchReason(v, query)?.let { "Found in: $it" } ?: " ",
+                        style = Tokens.Body, color = Tokens.TextSecondary, maxLines = 1, modifier = Modifier.padding(start = Spacing.S1, end = Spacing.S1, bottom = Spacing.S1))
                 }
             }
         }

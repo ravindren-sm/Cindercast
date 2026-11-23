@@ -26,18 +26,39 @@ object SearchRanking {
     /** The text as the viewer would compare it: HTML entities decoded, lower case, spaces collapsed. */
     fun normalize(text: String): String = PortalText.decodeEntities(text).lowercase().trim().replace(Regex("\\s+"), " ")
 
-    /** Titles that start with the query first, then those containing it, then the rest (the portal matched them on other fields). Order within a group is kept. */
+    /** The exact title first, then titles that start with the query, then those containing it, then the rest (the portal matched them on other fields). Order within a group is kept. */
     fun rank(items: List<VodItem>, query: String, personal: Personalization? = null): List<VodItem> {
         val q = normalize(query)
         fun group(item: VodItem): Int {
             val name = normalize(item.name)
-            return when { name.startsWith(q) -> 0; q in name -> 1; else -> 2 }
+            // The exact title (ignoring a trailing "(Hindi)" or "[4K]" style tag) before longer names that start the same.
+            val bare = name.replace(Regex("\\s*[(\\[][^)\\]]*[)\\]]\\s*$"), "").trim()
+            return when { name == q || bare == q -> 0; name.startsWith(q) -> 1; q in name -> 2; else -> 3 }
         }
         // Relevance first (starts with, contains, other); inside each group what the viewer watches comes first; then the portal's order.
         val scores = if (personal == null || personal.isEmpty) null else items.associateWith { personal.score(it) }
         return items.withIndex()
             .sortedWith(compareBy({ group(it.value) }, { -(scores?.get(it.value) ?: 0.0) }, { it.index }))
             .map { it.value }
+    }
+
+    /**
+     * Whether the viewer can see why [item] matched [query]: every word of the query appears in its name, cast, director or
+     * description. The portal also matches fields it does not send, which put unrelated titles among the results.
+     */
+    fun explains(item: VodItem, query: String): Boolean {
+        val words = normalize(query).split(' ').filter { it.isNotEmpty() }
+        if (words.isEmpty()) return true
+        val text = listOfNotNull(item.name, item.actors, item.director, item.description).joinToString(" ") { normalize(it) }
+        return words.all { it in text }
+    }
+
+    /** Where the query was found when it is not in the name ("Cast", "Director", "Description"), or null when the name shows it. */
+    fun matchReason(item: VodItem, query: String): String? {
+        val words = normalize(query).split(' ').filter { it.isNotEmpty() }
+        fun has(t: String?) = t != null && normalize(t).let { n -> words.any { it in n } }
+        if (words.isEmpty() || words.all { it in normalize(item.name) }) return null
+        return when { has(item.actors) -> "Cast"; has(item.director) -> "Director"; has(item.description) -> "Description"; else -> null }
     }
 
     /** Channels the portal found for [query]: its order is kept, but names starting with the text come first and the list is capped. */
@@ -142,7 +163,7 @@ class SearchCatalog(private val session: PortalSession, private val maxPages: In
             }
         }
         // The profile's rating floor applies unless the viewer chose a rating filter for this search.
-        val enriched = enrich(titles)
+        val enriched = enrich(titles).filter { SearchRanking.explains(it, q) }
         val kept = enriched.filter { FilterRules.passes(it, filters, categoryHint = it.id in hinted) && policy.passesAudience(it) && (filters.minRating != null || policy.passes(it)) }
         val ranked = SearchRanking.rank(kept, q, personal)
         val (channels, failed) = if (filters.isActive || policy.isKids) emptyList<LiveChannel>() to false else findChannels(q)

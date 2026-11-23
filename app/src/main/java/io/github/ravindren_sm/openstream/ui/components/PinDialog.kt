@@ -1,6 +1,7 @@
 package io.github.ravindren_sm.openstream.ui.components
 
 import androidx.activity.compose.BackHandler
+import io.github.ravindren_sm.openstream.ui.focus.trapFocus
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,7 +65,7 @@ fun PinDialog(
     }
     fun add(d: Char) { if (busy || entry.length >= 4) return; entry += d; if (entry.length == 4) submit(entry) }
 
-    Box(Modifier.fillMaxSize().background(Tokens.BgCanvas.copy(alpha = 0.92f)), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().trapFocus().background(Tokens.BgCanvas.copy(alpha = 0.92f)), contentAlignment = Alignment.Center) {
         Column(
             Modifier.width(520.dp).background(Tokens.Surface1).padding(Spacing.S3).onPreviewKeyEvent { e ->
                 if (e.type == KeyEventType.KeyDown) {

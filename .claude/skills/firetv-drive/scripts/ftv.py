@@ -41,7 +41,7 @@ KEYS = {
     "back": "BACK", "home": "HOME", "menu": "MENU",
     "playpause": "MEDIA_PLAY_PAUSE", "play": "MEDIA_PLAY", "pause": "MEDIA_PAUSE",
     "ff": "MEDIA_FAST_FORWARD", "rew": "MEDIA_REWIND",
-    "del": "DEL", "enter": "ENTER",
+    "del": "DEL", "enter": "ENTER", "wakeup": "WAKEUP",
 }
 DIRECTIONS = ["up", "down", "left", "right"]
 OPPOSITE = {"up": "down", "down": "up", "left": "right", "right": "left"}
@@ -80,7 +80,12 @@ def foreground():
     """(package, activity) of the window that has input focus, or (None, None)."""
     out = adb("shell", "dumpsys", "window")
     m = re.search(r"mCurrentFocus=Window\{\S+ \S+ ([^/\s}]+)(?:/([^\s}]+))?", out)
-    return (m.group(1), m.group(2)) if m else (None, None)
+    if m:
+        return (m.group(1), m.group(2))
+    # No focused window: the screen is asleep (screensaver off, TV standby) or a window is changing.
+    if "mWakefulness=Asleep" in adb("shell", "dumpsys", "power"):
+        return ("asleep", None)
+    return (None, None)
 
 
 def guard(expect):
@@ -89,6 +94,8 @@ def guard(expect):
     if not expect:
         raise SystemExit("Refusing to send keys: name the app with --expect <package> (or FTV_APP), or --expect any.")
     pkg, _ = foreground()
+    if pkg == "asleep" and expect != "any":
+        raise SystemExit("Refusing to send keys: the TV is asleep. Wake it with `ftv.py key wakeup --expect any` (ask first if someone may be using it).")
     if expect != "any" and pkg != expect:
         raise SystemExit(f"Refusing to send keys: foreground is {pkg!r}, expected {expect!r}.")
     return pkg
@@ -241,12 +248,32 @@ def crawl(app, settle, max_presses, dirs, exclude_prefixes):
                     q.append(v)
         return None
 
+    def toward(a, b):
+        """The D-pad direction from node a toward node b (the larger of the two centre offsets)."""
+        ax, ay = (a["bounds"][0] + a["bounds"][2]) / 2, (a["bounds"][1] + a["bounds"][3]) / 2
+        bx, by = (b["bounds"][0] + b["bounds"][2]) / 2, (b["bounds"][1] + b["bounds"][3]) / 2
+        if abs(by - ay) >= abs(bx - ax):
+            return "down" if by > ay else "up"
+        return "right" if bx > ax else "left"
+
     def goto(target):
         nonlocal presses
         _, f = current()
         if ident(f) == target:
             return True
         keys = route(ident(f), target) if f else None
+        # Stranded on an excluded element (for example the tab bar) with no recorded way back: step toward the target,
+        # which usually re-enters the body where it was left. A few tries at most.
+        tries = 0
+        while keys is None and f is not None and target in info and tries < 3 \
+                and any(ident(f).startswith(p) for p in exclude_prefixes):
+            press(toward(f, info[target]), settle)
+            presses += 1
+            tries += 1
+            _, f = current()
+            if ident(f) == target:
+                return True
+            keys = route(ident(f), target) if f else None
         if keys is None:
             return False
         for k in keys:
@@ -303,6 +330,7 @@ def crawl(app, settle, max_presses, dirs, exclude_prefixes):
             if ident(back) != cur:
                 findings.append({"kind": "not-reversible", "from": cur, "dir": d, "to": to,
                                  "detail": f"{OPPOSITE[d].upper()} from {to!r} went to {ident(back)!r}, not back"})
+                goto(cur)
     unreached = [ident(n) for k, n in seen_focusable.items() if k not in graph and k not in queue
                  and not any(k.startswith(p) for p in exclude_prefixes)]
     for u in unreached:

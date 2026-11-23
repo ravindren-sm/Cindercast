@@ -1,6 +1,7 @@
 package io.github.ravindren_sm.openstream.ui.screens
 
 import androidx.activity.compose.BackHandler
+import io.github.ravindren_sm.openstream.ui.focus.trapFocus
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -232,7 +233,7 @@ fun ShowDetailScreen(
         }
 
         chooser?.let { c ->
-            Box(Modifier.fillMaxSize().background(Tokens.BgCanvas.copy(alpha = 0.85f)), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize().trapFocus().background(Tokens.BgCanvas.copy(alpha = 0.85f)), contentAlignment = Alignment.Center) {
                 Column(
                     Modifier.width(900.dp).background(Tokens.Surface1, RoundedCornerShape(Radii.Lg)).padding(Spacing.S3),
                     verticalArrangement = Arrangement.spacedBy(Spacing.S1),

@@ -1,6 +1,7 @@
 package io.github.ravindren_sm.openstream.ui.components
 
 import androidx.activity.compose.BackHandler
+import io.github.ravindren_sm.openstream.ui.focus.trapFocus
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -46,7 +47,7 @@ fun VersionPicker(
     fun close() { onDismiss(); returnFocusId?.let { memory.tryFocus(it) } }
     LaunchedEffect(Unit) { androidx.compose.runtime.withFrameNanos { }; memory.tryFocus(pickerRowId(index)) }
     BackHandler { close() }
-    Box(Modifier.fillMaxSize().background(Tokens.BgCanvas.copy(alpha = 0.88f)), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().trapFocus().background(Tokens.BgCanvas.copy(alpha = 0.88f)), contentAlignment = Alignment.Center) {
         Column(
             Modifier.width(720.dp).background(Tokens.Surface1).padding(Spacing.S3).onPreviewKeyEvent { e ->
                 if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent e.key in setOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight)

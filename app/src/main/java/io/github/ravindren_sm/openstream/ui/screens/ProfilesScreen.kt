@@ -1,6 +1,7 @@
 package io.github.ravindren_sm.openstream.ui.screens
 
 import androidx.activity.compose.BackHandler
+import io.github.ravindren_sm.openstream.ui.focus.trapFocus
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -97,7 +98,7 @@ fun ProfilesScreen(model: ProfilesModel, memory: FocusMemory, startInManage: Boo
         })
     }
 
-    Box(modifier.fillMaxSize().background(Tokens.BgCanvas)) {
+    Box(modifier.fillMaxSize().trapFocus().background(Tokens.BgCanvas)) {
         when (mode) {
             Mode.PICK -> Column(Modifier.fillMaxSize().padding(Spacing.SafeHorizontal), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Who's watching?", style = Tokens.TitleLarge, color = Tokens.TextPrimary)

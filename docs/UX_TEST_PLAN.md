@@ -58,3 +58,9 @@ until explained; `not-reversible` findings are judged one by one.
 | 2026-11-22 | Search, charter 3 | Results vanished and returned ("Searching…") when the connection blinked or the policy was rebuilt; suggestions reordered as the title index grew. | major | Fixed: results kept until new ones arrive; identical searches not re-run; suggestions frozen per query. |
 | 2026-11-22 | Profiles, charter 7 | Down from the last profile row skipped Add a profile and landed on Done. | major | Fixed: Add is a full-width row; Down from it goes to the PIN button. |
 | 2026-11-22 | Home, charter 4 | The focused Continue-watching tile was clipped at the left (card scale-up with no start padding). | major | Fixed in every card row (Home, Search, Favorites). |
+
+Found on the TV on 2026-11-23 (run log: `docs/ux-runs/2026-11-22-search-and-profiles.md`): focus fell to the tab bar after
+picking a suggestion; results the portal matched on hidden fields; Up from the box skipped the row above; Down into a card row
+landed mid-row; exact titles ranked late; Down on the bottom row moved sideways to a taller card; Left/Right left rows; Up from
+Profiles moved focus behind the layer; Back from Profiles and from Home's buttons lost the opener. All fixed and re-checked on
+the TV. Open (minor): Up from the first Home tile goes to the Live TV tab; "Use default" sits right under Language.

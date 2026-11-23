@@ -72,6 +72,8 @@ fun OsTextField(
     onDone: () -> Unit = {},
     /** Focus ID that Down should move to, when the layout's nearest-neighbor choice would be wrong. */
     downId: String? = null,
+    /** Focus ID that Up should move to, likewise (a full-width field otherwise picks the element nearest its centre). */
+    upId: String? = null,
 ) {
     var editing by remember { mutableStateOf(false) }
     var hadFocusWhileEditing by remember { mutableStateOf(false) }
@@ -82,7 +84,10 @@ fun OsTextField(
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     val shape = RoundedCornerShape(Radii.Md)
-    val downTarget = Modifier.focusProperties { if (downId != null) down = memory.requesterFor(downId) }
+    val downTarget = Modifier.focusProperties {
+        if (downId != null) down = memory.requesterFor(downId)
+        if (upId != null) up = memory.requesterFor(upId)
+    }
 
     // Entering edit mode: focus the real field and open the keyboard once it is on screen.
     LaunchedEffect(editing) {

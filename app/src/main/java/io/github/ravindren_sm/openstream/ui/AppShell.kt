@@ -170,6 +170,14 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     // "Who's watching?": shown at launch when there is more than one profile (the choice is then required), or on request.
     var profileScreen by remember { mutableStateOf<String?>(null) }            // null, "pick" or "manage"
     var profileScreenRequired by remember { mutableStateOf(false) }
+    // The element that opened the profiles layer (for example Settings' Manage row): focus goes back there when it closes.
+    var profileReturnFocus by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(profileScreen) {
+        if (profileScreen == null) profileReturnFocus?.let { id ->
+            androidx.compose.runtime.withFrameNanos { }
+            memory.tryFocus(id); profileReturnFocus = null
+        }
+    }
     LaunchedEffect(Unit) {
         val list = withContext(Dispatchers.IO) { repo.ensureDefaultProfile(); repo.profiles() }
         profiles = list
@@ -555,7 +563,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                         )
                         stack = stack.navigate(Route.VOD_PLAYER, mapOf("play" to "history"), currentFocusId = memory.focusedId)
                     },
-                    onDoor = { route -> stack = stack.resetToTab(route) },
+                    onDoor = { route -> stack = stack.resetToTab(route).let { s -> memory.focusedId?.let(s::withPreviousFocus) ?: s } },   // Back returns to the button used, not the tab
                     liveAllowed = !isKids,
                 )
             } else if (stack.current.route == Route.MOVIES || stack.current.route == Route.SHOWS) {
@@ -665,8 +673,8 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                         defaultsSummary = searchState.defaultFilters?.summary()?.ifEmpty { null } ?: "None saved (set them in Search, Save as default)",
                         onToggleApplyDefaults = { applyDefaultsEverywhere = !applyDefaultsEverywhere; policyStore.setFlag(profileId, "apply_defaults", applyDefaultsEverywhere) },
                         profileSummary = profile?.let { "${it.name} (${if (it.isKids) "Kids" else "Adult"})" } ?: "No profile",
-                        onSwitchProfile = { profileScreen = "pick"; profileScreenRequired = false },
-                        onManageProfiles = { withPin("Enter the PIN to manage profiles") { profileScreen = "manage"; profileScreenRequired = false } },
+                        onSwitchProfile = { profileReturnFocus = memory.focusedId; profileScreen = "pick"; profileScreenRequired = false },
+                        onManageProfiles = { profileReturnFocus = memory.focusedId; withPin("Enter the PIN to manage profiles") { profileScreen = "manage"; profileScreenRequired = false } },
                         tagStatus = tagger.status,
                         onSetTagKey = { tagKeyDialog = true },
                         onToggleTagging = { tagPrefs.edit().putBoolean("tagging_on", !tagPrefs.getBoolean("tagging_on", false)).apply(); tagTick++ },

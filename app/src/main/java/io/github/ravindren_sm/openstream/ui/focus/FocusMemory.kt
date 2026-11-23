@@ -1,6 +1,8 @@
 package io.github.ravindren_sm.openstream.ui.focus
 
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.foundation.focusGroup
 
 /**
  * Bridges stable string focus IDs (what [io.github.ravindren_sm.openstream.nav.NavStack]
@@ -48,3 +50,41 @@ class FocusMemory(private val nanoTime: () -> Long = System::nanoTime) {
     /** Tries each ID in order; returns the one that took focus, or null. */
     fun tryFocusFirst(vararg ids: String?): String? = ids.firstOrNull { it != null && tryFocus(it) }
 }
+
+/**
+ * For a horizontal row of items: Left at the first item and Right at the last stay put instead of jumping to whatever lies
+ * diagonally nearest (the tab bar, or a button in the next row). Up and Down leave the row as usual. With [entryId], coming
+ * into the row from above or below lands on that item (normally the first), not on whichever card is nearest the middle of
+ * the element focus came from (a full-width row above would otherwise pick a card in the middle and skip the first ones).
+ */
+fun androidx.compose.ui.Modifier.keepHorizontalFocus(memory: FocusMemory? = null, entryId: String? = null): androidx.compose.ui.Modifier = this
+    .then(androidx.compose.ui.Modifier.focusProperties {
+        onEnter = {
+            val d = requestedFocusDirection
+            if (memory != null && entryId != null && (d == androidx.compose.ui.focus.FocusDirection.Down || d == androidx.compose.ui.focus.FocusDirection.Up)) {
+                memory.tryFocus(entryId)
+            }
+        }
+        onExit = {
+            if (requestedFocusDirection == androidx.compose.ui.focus.FocusDirection.Left ||
+                requestedFocusDirection == androidx.compose.ui.focus.FocusDirection.Right) cancelFocusChange()
+        }
+    })
+    .focusGroup()
+
+/**
+ * For a layer drawn over the screen (a dialog, a picker, the profiles screen): the D-pad cannot move focus out of it. The
+ * screen underneath is still composed and focusable, so without this a press at the layer's edge could move focus to a
+ * hidden element behind it, where the viewer can no longer see it.
+ */
+fun androidx.compose.ui.Modifier.trapFocus(): androidx.compose.ui.Modifier = this
+    .then(androidx.compose.ui.Modifier.focusProperties {
+        onExit = {
+            // Only D-pad moves are held; a focus request from code (for example returning focus when the layer closes) passes.
+            val d = requestedFocusDirection
+            if (d == androidx.compose.ui.focus.FocusDirection.Up || d == androidx.compose.ui.focus.FocusDirection.Down ||
+                d == androidx.compose.ui.focus.FocusDirection.Left || d == androidx.compose.ui.focus.FocusDirection.Right ||
+                d == androidx.compose.ui.focus.FocusDirection.Next || d == androidx.compose.ui.focus.FocusDirection.Previous) cancelFocusChange()
+        }
+    })
+    .focusGroup()

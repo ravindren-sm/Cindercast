@@ -1,6 +1,7 @@
 package io.github.ravindren_sm.openstream.ui.components
 
 import androidx.activity.compose.BackHandler
+import io.github.ravindren_sm.openstream.ui.focus.trapFocus
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,7 +49,7 @@ fun ChoicePicker(
     fun close() { onClose(); returnFocusId?.let { memory.tryFocus(it) } }
     LaunchedEffect(Unit) { androidx.compose.runtime.withFrameNanos { }; memory.tryFocus(choiceId(0)) }
     BackHandler { close() }
-    Box(Modifier.fillMaxSize().background(Tokens.BgCanvas.copy(alpha = 0.9f)), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().trapFocus().background(Tokens.BgCanvas.copy(alpha = 0.9f)), contentAlignment = Alignment.Center) {
         Column(
             Modifier.width(760.dp).background(Tokens.Surface1).padding(Spacing.S3).onPreviewKeyEvent { e ->
                 if (e.key == Key.DirectionLeft || e.key == Key.DirectionRight) true else false

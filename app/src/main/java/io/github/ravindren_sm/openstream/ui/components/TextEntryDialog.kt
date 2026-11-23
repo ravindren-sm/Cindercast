@@ -1,6 +1,7 @@
 package io.github.ravindren_sm.openstream.ui.components
 
 import androidx.activity.compose.BackHandler
+import io.github.ravindren_sm.openstream.ui.focus.trapFocus
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,7 +31,7 @@ fun TextEntryDialog(title: String, note: String, label: String, memory: FocusMem
     var text by remember { mutableStateOf("") }
     LaunchedEffect(Unit) { withFrameNanos { }; memory.tryFocus("entry-field") }
     BackHandler { onCancel() }
-    Box(Modifier.fillMaxSize().background(Tokens.BgCanvas.copy(alpha = 0.92f)), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().trapFocus().background(Tokens.BgCanvas.copy(alpha = 0.92f)), contentAlignment = Alignment.Center) {
         Column(Modifier.width(900.dp).background(Tokens.Surface1).padding(Spacing.S3), verticalArrangement = Arrangement.spacedBy(Spacing.S2)) {
             Text(title, style = Tokens.TitleMedium, color = Tokens.TextPrimary)
             Text(note, style = Tokens.Body, color = Tokens.TextSecondary)

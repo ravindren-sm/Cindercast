@@ -1,6 +1,7 @@
 package io.github.ravindren_sm.openstream.ui.screens
 
 import androidx.activity.compose.BackHandler
+import io.github.ravindren_sm.openstream.ui.focus.trapFocus
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import io.github.ravindren_sm.openstream.ui.focus.keepHorizontalFocus
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -131,7 +133,7 @@ fun HomeScreen(
             }
             if (favoriteChannels.isNotEmpty()) {
                 Text("Favorite channels", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
+                LazyRow(modifier = Modifier.keepHorizontalFocus(memory, homeFavChannelFocusId(0)), horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
                     itemsIndexed(favoriteChannels, key = { _, f -> f.refId }) { i, f ->
                         ChannelCard(homeFavChannelFocusId(i), f.number.orEmpty(), f.name, memory, { onOpenFavoriteChannel(i) })
                     }
@@ -141,10 +143,10 @@ fun HomeScreen(
                 val live = row.pin.kind == PinKinds.LIVE
                 Text(if (live) "Live · ${PortalText.decodeEntities(row.pin.title)}" else "New in ${PortalText.decodeEntities(row.pin.title)}", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
                 when {
-                    row.channels != null -> LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
+                    row.channels != null -> LazyRow(modifier = Modifier.keepHorizontalFocus(memory, homePinFocusId(r, 0)), horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
                         itemsIndexed(row.channels, key = { _, c -> c.id }) { i, c -> ChannelCard(homePinFocusId(r, i), c.number, c.name, memory, { onOpenPinnedChannel(r, row.channels, i) }) }
                     }
-                    row.titles != null -> LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
+                    row.titles != null -> LazyRow(modifier = Modifier.keepHorizontalFocus(memory, homePinFocusId(r, 0)), horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
                         itemsIndexed(row.titles, key = { _, v -> v.id }) { i, v ->
                             OsFocusable(id = homePinFocusId(r, i), memory = memory, variant = FocusVariant.CARD, modifier = Modifier.width(170.dp), onSelect = { onOpenPinnedTitle(v) }) { _ ->
                                 Column(Modifier.background(Tokens.Surface1)) {
@@ -159,7 +161,7 @@ fun HomeScreen(
                 }
             }
             Text("Browse", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), modifier = Modifier.fillMaxWidth().keepHorizontalFocus(memory, doorFocusId(0))) {
                 DOORS.filter { liveAllowed || it.first != Route.LIVE_TV }.forEachIndexed { i, (route, label) ->
                     OsFocusable(id = doorFocusId(i), memory = memory, variant = FocusVariant.CARD, modifier = Modifier.weight(1f), onSelect = { onDoor(route) }) { _ ->
                         Box(Modifier.fillMaxWidth().height(if (empty) 160.dp else 100.dp).background(Tokens.Surface1), contentAlignment = Alignment.Center) {
@@ -180,7 +182,7 @@ private fun TileRow(
     tiles: List<ContinueTile>, idOf: (Int) -> String, width: androidx.compose.ui.unit.Dp, portalUrl: String, memory: FocusMemory,
     onSelect: (ContinueTile) -> Unit, onMenu: (ContinueTile, String) -> Unit,
 ) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
+    LazyRow(modifier = Modifier.keepHorizontalFocus(memory, idOf(0)), horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
         itemsIndexed(tiles, key = { _, t -> t.resumeKey }) { i, tile ->
             val id = idOf(i)
             OsFocusable(
@@ -220,7 +222,7 @@ private fun TileMenu(tile: ContinueTile, memory: FocusMemory, onChoose: (TileAct
         "Cancel" to null,
     )
     var index by remember { mutableIntStateOf(0) }
-    Box(Modifier.fillMaxSize().background(Tokens.BgCanvas.copy(alpha = 0.85f)), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().trapFocus().background(Tokens.BgCanvas.copy(alpha = 0.85f)), contentAlignment = Alignment.Center) {
         Column(
             Modifier.width(520.dp).background(Tokens.Surface1).padding(Spacing.S3)
                 .onPreviewKeyEvent { e ->
