@@ -69,6 +69,19 @@ import kotlinx.coroutines.withContext
  * Browsing state for one VOD tab (Movies or Shows), held by the shell so opening a title and coming back
  * keeps the categories, the loaded pages and both scroll positions.
  */
+/** What was chosen for one category (sort, genre, earliest year, language), kept between visits. Plain text in preferences. */
+class BrowseViewStore(private val prefs: android.content.SharedPreferences) {
+    class View(val sort: BrowseSort, val genre: String?, val yearFrom: Int?, val language: String?)
+    private fun key(kind: VodKind, categoryId: String) = "browse-view-${kind.name}-$categoryId"
+    fun get(kind: VodKind, categoryId: String): View? = prefs.getString(key(kind, categoryId), null)?.split("|")?.takeIf { it.size == 4 }?.let { p ->
+        View(runCatching { BrowseSort.valueOf(p[0]) }.getOrDefault(BrowseSort.NEWEST), p[1].ifEmpty { null }, p[2].toIntOrNull(), p[3].ifEmpty { null })
+    }
+    fun put(kind: VodKind, categoryId: String, v: View) {
+        val plain = v.sort == BrowseSort.NEWEST && v.genre == null && v.yearFrom == null && v.language == null
+        prefs.edit().apply { if (plain) remove(key(kind, categoryId)) else putString(key(kind, categoryId), "${v.sort.name}|${v.genre.orEmpty()}|${v.yearFrom ?: ""}|${v.language.orEmpty()}") }.apply()
+    }
+}
+
 class VodBrowseState(private val catalog: VodCatalog, val kind: VodKind) {
     private var allCategories: List<VodCategory> = emptyList()
     private var scope: DefaultScope? = null
@@ -94,7 +107,12 @@ class VodBrowseState(private val catalog: VodCatalog, val kind: VodKind) {
         private set
     var yearFrom: Int? by mutableStateOf(null)
         private set
-    private val viewFilter: Boolean get() = genre != null || yearFrom != null
+    var language: String? by mutableStateOf(null)
+        private set
+    private val viewFilter: Boolean get() = genre != null || yearFrom != null || language != null
+    /** Set by the shell: remembers the sort and filters of each category. */
+    var viewStore: BrowseViewStore? = null
+    private fun remember() { categories.getOrNull(selected)?.let { viewStore?.put(kind, it.id, BrowseViewStore.View(sort, genre, yearFrom, language)) } }
 
     /** Set by the shell: the on-device copy of the catalog, and which categories it holds completely. */
     var indexed: IndexedTitles? = null
@@ -123,13 +141,16 @@ class VodBrowseState(private val catalog: VodCatalog, val kind: VodKind) {
     fun select(index: Int, resetScroll: Boolean = true) {
         if (categories.getOrNull(index) == null) return
         selected = index
+        val saved = viewStore?.get(kind, categories[index].id)
+        sort = saved?.sort ?: BrowseSort.NEWEST; genre = saved?.genre; yearFrom = saved?.yearFrom; language = saved?.language
         reload()
         if (resetScroll) gridState.requestScrollToItem(0)
     }
 
-    fun changeSort(newSort: BrowseSort) { sort = newSort; reload(); gridState.requestScrollToItem(0) }
-    fun changeGenre(value: String?) { genre = value; reload(); gridState.requestScrollToItem(0) }
-    fun changeYearFrom(value: Int?) { yearFrom = value; reload(); gridState.requestScrollToItem(0) }
+    fun changeSort(newSort: BrowseSort) { sort = newSort; remember(); reload(); gridState.requestScrollToItem(0) }
+    fun changeGenre(value: String?) { genre = value; remember(); reload(); gridState.requestScrollToItem(0) }
+    fun changeYearFrom(value: Int?) { yearFrom = value; remember(); reload(); gridState.requestScrollToItem(0) }
+    fun changeLanguage(value: String?) { language = value; remember(); reload(); gridState.requestScrollToItem(0) }
     fun changeMinRating(value: Double?) { minRating = value; reload(); gridState.requestScrollToItem(0) }
 
     /** A Kids profile's own rules, and the profile's rule for which categories are listed (adult categories, a Kids allow-list). */
@@ -178,7 +199,7 @@ class VodBrowseState(private val catalog: VodCatalog, val kind: VodKind) {
             // The defaults' rating floor also leaves out unrated titles, as it does in search.
             val floor = listOfNotNull(policy.minRating, sc?.minRating).maxOrNull()
             val effective = ContentPolicy(floor, policy.hideUnrated || sc?.minRating != null)
-            titles = PagedTitles { page -> local!!.page(category.id, sort, effective, page, genres.orEmpty(), yearFrom) }
+            titles = PagedTitles { page -> local!!.page(category.id, sort, effective, page, genres.orEmpty(), yearFrom, language) }
         } else {
             usingIndex = false; sortUnavailable = sort != BrowseSort.NEWEST || viewFilter
             // The portal's pages, with the rating floor and the defaults applied to each page as it arrives.
@@ -208,7 +229,7 @@ fun VodBrowseScreen(
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
-    var picker by remember { mutableIntStateOf(0) }       // 0 none, 1 sort, 2 rating floor, 3 genre, 4 earliest year
+    var picker by remember { mutableIntStateOf(0) }       // 0 none, 1 sort, 2 rating floor, 3 genre, 4 earliest year, 5 language
     LaunchedEffect(connected) {
         if (connected && !state.categoriesLoaded) withContext(Dispatchers.IO) { state.loadCategories() }
     }
@@ -269,6 +290,11 @@ fun VodBrowseScreen(
             note = "Titles with no year are left out when a year is chosen.",
             memory = memory, returnFocusId = BROWSE_YEAR_ID, onToggle = { id -> state.changeYearFrom(id.toIntOrNull()) }, onClose = { picker = 0 },
         )
+        5 -> ChoicePicker(
+            "Original language", listOf(Choice("any", "Any language")) + LANGUAGES.map { Choice(it.first, it.second) }, setOf(state.language ?: "any"), multi = false,
+            note = "The title's original language from the online tags, so it only covers titles the tag check matched.",
+            memory = memory, returnFocusId = BROWSE_LANG_ID, onToggle = { id -> state.changeLanguage(id.takeIf { it != "any" }) }, onClose = { picker = 0 },
+        )
         2 -> ChoicePicker(
             "Hide titles rated below", listOf(Choice("any", "Show everything")) + ContentPolicy.STEPS.map { Choice("$it", "${"%.0f".format(it)}") },
             setOf(state.minRating?.toString() ?: "any"), multi = false,
@@ -283,6 +309,9 @@ const val BROWSE_SORT_ID = "browse-sort"
 const val BROWSE_RATING_ID = "browse-rating"
 const val BROWSE_GENRE_ID = "browse-genre"
 const val BROWSE_YEAR_ID = "browse-year"
+const val BROWSE_LANG_ID = "browse-language"
+private val LANGUAGES = listOf("en" to "English", "hi" to "Hindi", "ta" to "Tamil", "te" to "Telugu", "ml" to "Malayalam", "kn" to "Kannada", "bn" to "Bengali", "pa" to "Punjabi", "mr" to "Marathi",
+    "ko" to "Korean", "ja" to "Japanese", "zh" to "Chinese", "es" to "Spanish", "fr" to "French", "de" to "German", "it" to "Italian", "pt" to "Portuguese", "ru" to "Russian", "tr" to "Turkish", "ar" to "Arabic")
 private val GENRES = listOf("Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary", "Drama", "Family", "Fantasy", "History", "Horror", "Music", "Mystery", "Romance", "Science Fiction", "Thriller", "War", "Western")
 private val YEAR_STEPS = listOf(2020, 2010, 2000, 1990, 1980)
 
@@ -316,6 +345,10 @@ private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMem
         }
         OsFocusable(id = BROWSE_GENRE_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = { onOpenPicker(3) }) { _ ->
             Text(state.genre ?: "Genre: any", style = Tokens.Body, color = if (state.genre != null) Tokens.AccentPrimary else Tokens.TextPrimary, maxLines = 1,
+                modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1))
+        }
+        OsFocusable(id = BROWSE_LANG_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = { onOpenPicker(5) }) { _ ->
+            Text(state.language?.let { c -> LANGUAGES.firstOrNull { it.first == c }?.second ?: c } ?: "Language: any", style = Tokens.Body, color = if (state.language != null) Tokens.AccentPrimary else Tokens.TextPrimary, maxLines = 1,
                 modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1))
         }
         OsFocusable(id = BROWSE_YEAR_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = { onOpenPicker(4) }) { _ ->

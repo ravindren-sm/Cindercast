@@ -71,7 +71,7 @@ runs on the family TV still stands (see Environment notes).
 
 ## Sort, filter and content-filter follow-ups
 - Check on the TV: the sort picker, the rating chip, the Settings rows, opening a title from the device copy; then on the real portal once the index has ratings.
-- Done 2026-11-22: Genre and Year ("Released since") buttons on the Movies and Shows screens, read from the on-device copy (checked on the TV: Hindi TV Shows, Comedy, 971 to 38 titles). Still to do: language filter, remembering the sort and filters per category, and the same for Kids profiles (they read portal pages, so the filters show a notice instead).
+- Done 2026-11-22: Genre and Year ("Released since") buttons on the Movies and Shows screens, read from the on-device copy (checked on the TV: Hindi TV Shows, Comedy, 971 to 38 titles). Language filter (original language from the online tags) and per-category memory of sort and filters were added the same day (checked in a signed release build on the TV). Still to do: the same filters for Kids profiles (they read portal pages, so the filters show a notice instead).
 - The content filter is rating-based only. Age labels (G, PG, R) are in the data and could back a proper parental filter (deferred with profiles).
 
 ## Title index follow-ups
@@ -105,6 +105,7 @@ accelerating seek, filters and sort, the live info banner and mini channel list,
 transitions, Settings.
 
 ## Release readiness
+- Decisions and drafts are in docs/RELEASE_PLAN.md (2026-11-22). Done: release signing key and build script, cleartext policy, privacy policy, notices, store text. Left: owner's offline key copy, store artwork, trademark check, hosting the policy.
 - Release builds cannot reach an HTTP-only provider (cleartext is allowed in debug only). Needs a release
   network-security decision.
 - Public repo: the scrubbed history is on branch `native-app` of the OpenStream repo (pushed 2026-11-21; `main` there is

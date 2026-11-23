@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Release network policy (decided 2026-11-22).
+     Most Stalker/MAG portals are plain HTTP and the portal address is whatever the viewer types, so the app cannot list it ahead
+     of time. Cleartext is therefore permitted, as other IPTV players do; the setup screen warns when the address is not HTTPS.
+     TLS validation is NOT weakened: HTTPS connections (online tags, IMDb file, HTTPS portals) use the system trust store only,
+     with no user-added certificates and no "trust all" override. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

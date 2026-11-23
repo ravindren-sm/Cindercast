@@ -1,3 +1,5 @@
+import java.util.Properties
+
 // App module. Package id is a new one, not StbEmu's, so both apps can coexist.
 // Target device: Fire TV AFTMA08C15, Android 11 (API 30), 32-bit ABI only.
 
@@ -34,11 +36,28 @@ android {
         minSdk = 25
         targetSdk = 37
         versionCode = 1
-        versionName = "0.1.0-phase1"
+        versionName = "0.1.0"
 
         // The device has no 64-bit ABI, so ship the 32-bit ABI only.
         ndk {
             abiFilters += listOf("armeabi-v7a")
+        }
+    }
+
+    // Release signing. The key and its passwords live outside the repository (and outside any synced folder); this file only says where.
+    // Without that file the release build is produced unsigned, so a fresh clone still builds. Never commit the key. Losing it means
+    // every installed copy has to be uninstalled before an update can be installed.
+    val releaseProps = Properties().apply {
+        val path = System.getenv("OPENSTREAM_RELEASE_PROPS") ?: "${System.getProperty("user.home")}/.config/firetv-iptv/release/release.properties"
+        val f = file(path)
+        if (f.isFile) f.inputStream().use { load(it) }
+    }
+    signingConfigs {
+        if (releaseProps.containsKey("storeFile")) create("release") {
+            storeFile = file(releaseProps.getProperty("storeFile"))
+            storePassword = releaseProps.getProperty("storePassword")
+            keyAlias = releaseProps.getProperty("keyAlias")
+            keyPassword = releaseProps.getProperty("keyPassword")
         }
     }
 
@@ -49,7 +68,13 @@ android {
             if (providers.gradleProperty("checkSuffix").isPresent) applicationIdSuffix = ".check"
         }
         release {
-            isMinifyEnabled = false
+            // Smaller and harder to read: code and resource shrinking on. The debug logging, health sampler and probe screens are debug-only.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfigs.findByName("release")?.let { signingConfig = it }
+            // The same side-by-side switch as debug, to test a release build next to the real install.
+            if (providers.gradleProperty("checkSuffix").isPresent) applicationIdSuffix = ".check"
         }
     }
 

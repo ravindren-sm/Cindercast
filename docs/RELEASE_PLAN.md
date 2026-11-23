@@ -46,6 +46,23 @@ subscription, no provider is named. A rejection is possible, so the GitHub APK s
    documents kept out of the public repository (already scrubbed once; recheck at release).
 8. Name: OpenStream was decided; trademark databases were not checked. Do that before store submission.
 
+## Decisions made (2026-11-22, by the assistant on the owner's instruction)
+- **Cleartext:** allowed in release builds through a base network security config (`app/src/release`), TLS validation untouched
+  (system certificates only). Reason: most portals are plain HTTP and the address is typed by the viewer. The setup screen's warning stays.
+  Verified on the Fire TV: a signed release build connected to a plain-HTTP portal and browsed Live TV, Movies and Shows.
+- **Signing key:** created 2026-11-22 (RSA 4096, 30-year validity, alias `openstream`) in `~/.config/firetv-iptv/release/`
+  (outside the repo and Google Drive; `release.properties` holds the passwords, chmod 600). **Owner action: make an offline
+  copy of that whole folder (for example an encrypted USB stick) now.** Losing it means every install must be removed before an update.
+  `scripts/build_release.sh` builds, tests, signs and verifies; a clone without the key builds an unsigned APK.
+- **Release build:** code and resource shrinking on, 32-bit ABI only, versionName 0.1.0 (versionCode rises each release). About 2.5 MB.
+- **In-app update check: not in 0.1.** It needs the "install unknown apps" permission, which store builds should not carry.
+  GitHub Releases plus the Downloader app is the sideload path; stores update themselves. Revisit for a sideload-only flavour.
+- **Order of stores:** Amazon Appstore first (it is the Fire TV store), Google Play later if wanted. Publisher: an individual account.
+- **Plain HTTP and Amazon review:** if the store objects to cleartext, answer that the address is user-supplied; the GitHub APK is the fallback.
+- **Documents:** `docs/PRIVACY.md`, `docs/THIRD_PARTY_NOTICES.md`, `docs/STORE_LISTING.md` drafted (placeholder `<REPO_URL>` to fill).
+- **Still open before submission:** trademark search for "OpenStream", store artwork and screenshots, IMDb's licensing reply
+  (IMDb scores should be off in a public build unless licensed), hosting the privacy policy, a fresh scan of docs for provider detail.
+
 ## Rough timeline
 1. Now to about 4 weeks: finish features, soak tests on the real portal, read the health log over long sessions.
 2. About week 5: release key, release build, in-app update check, first signed GitHub Release.

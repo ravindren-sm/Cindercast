@@ -153,8 +153,10 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     // the resume positions, which live on the device.
     var portalUrl by remember { mutableStateOf((loaded as? SettingsStore.Loaded.Found)?.settings?.portalUrl.orEmpty()) }
     val vodCatalog = remember(portalEpoch) { VodCatalog(session) }
-    val moviesState = remember(portalEpoch) { VodBrowseState(vodCatalog, VodKind.MOVIES) }
-    val showsState = remember(portalEpoch) { VodBrowseState(vodCatalog, VodKind.SHOWS) }
+    val viewsContext = LocalContext.current.applicationContext
+    val browseViews = remember { io.github.ravindren_sm.openstream.ui.screens.BrowseViewStore(viewsContext.getSharedPreferences("browse", android.content.Context.MODE_PRIVATE)) }
+    val moviesState = remember(portalEpoch) { VodBrowseState(vodCatalog, VodKind.MOVIES).also { it.viewStore = browseViews } }
+    val showsState = remember(portalEpoch) { VodBrowseState(vodCatalog, VodKind.SHOWS).also { it.viewStore = browseViews } }
     val vodPlayback = remember(portalEpoch) { VodPlayback(session) }
     // The show page being viewed (seasons, loaded episodes, scroll), kept while an episode plays.
     var showDetail: ShowDetailState? by remember(portalEpoch) { mutableStateOf(null) }
