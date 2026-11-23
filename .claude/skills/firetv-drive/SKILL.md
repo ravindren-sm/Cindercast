@@ -93,6 +93,16 @@ and Back from every screen. Run a `crawl` on every screen a journey visits. Put 
 a summary of findings in the project's test-plan document; keep crawl output outside the repo unless
 reviewed for private text.
 
+## Gotchas learned on the device
+
+The long version, with examples, is `docs/TESTING_ON_FIRE_TV.md` in this repository. The ones that cost the most:
+
+- Read focus before every Select; never chain Select (or Menu, Back) after moves in one command.
+- Wait about 9 s after `am start`, then check the foreground window; early keys are dropped or go to the launcher.
+- Tabs and rails change on Select, not on focus. Lazy lists only contain what is on screen.
+- In zsh, quote `'down*8'` and use a shell function, not a variable, for `adb -s <serial>`.
+- In a player the tree is one node; read the redacted log for timings and states.
+
 ## References
 
 - Amazon, Test criteria for Amazon Appstore apps: https://developer.amazon.com/docs/app-testing/test-criteria
