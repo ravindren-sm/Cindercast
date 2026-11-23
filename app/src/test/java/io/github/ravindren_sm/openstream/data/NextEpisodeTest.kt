@@ -33,6 +33,34 @@ class NextEpisodeTest {
         assertNull(NextEpisodeLogic.next(seasons, "s1", "e1") { null })
     }
 
+    @Test fun newestFirstListsAreFollowedInNumberOrder() {
+        // Seen on a real portal: Season 2 listed above Season 1, and E12 above E11. After E11 comes E12, not E10.
+        fun named(id: String, name: String) = VodItem(id = id, name = name, isSeries = false, isSeason = false, isEpisode = true, cmd = null, episodeNumbers = emptyList())
+        val ss = listOf(SeasonRef(named("b", "Season 2. Show S02")), SeasonRef(named("a", "Season 1. Show - Season 1")))
+        val eps = mapOf(
+            "b" to listOf(named("b12", "S02 E12  |  Pies"), named("b11", "S02 E11  |  Hot Dog Day"), named("b10", "S02 E10  |  Pets")),
+            "a" to listOf(named("a2", "S01 E02 | Two"), named("a1", "S01 E01 | One")),
+        )
+        val of = { s: SeasonRef -> eps[s.item.id]?.map(::EpisodeRef) }
+        assertEquals("b12", NextEpisodeLogic.next(ss, "b", "b11", of)!!.episode.item.id)
+        val n = NextEpisodeLogic.next(ss, "a", "a2", of)!!      // end of season 1 leads to the first episode of season 2
+        assertEquals("b", n.season.item.id); assertEquals("b10", n.episode.item.id)
+        assertNull(NextEpisodeLogic.next(ss, "b", "b12", of))  // the last episode of the last season
+    }
+
+    @Test fun seasonAndEpisodeNumbersAreReadFromNames() {
+        assertEquals(2, NextEpisodeLogic.seasonNumber("Season 2. Mickey Mouse Clubhouse Plus S02"))
+        assertEquals(1, NextEpisodeLogic.seasonNumber("Mickey Mouse Clubhouse Plus - Season 1"))
+        assertEquals(3, NextEpisodeLogic.seasonNumber("Show S03"))
+        assertNull(NextEpisodeLogic.seasonNumber("Specials"))
+        assertEquals(11, NextEpisodeLogic.episodeNumber("S02 E11  |  Hot Dog Day"))
+        assertEquals(7, NextEpisodeLogic.episodeNumber("S01E07"))
+        assertEquals(4, NextEpisodeLogic.episodeNumber("Episode 4"))
+        assertNull(NextEpisodeLogic.episodeNumber("Pilot"))
+        // One name without a number keeps the portal's order.
+        assertEquals(listOf("x", "y"), NextEpisodeLogic.inNumberOrder(listOf("x", "y")) { if (it == "x") 2 else null })
+    }
+
     @Test fun resumeKeysAreSplitIntoShowSeasonEpisode() {
         assertEquals(Triple("a", "a-s1", "a-s1-e2"), NextEpisodeLogic.parseKey(ResumeKeys.episode("a", "a-s1", "a-s1-e2")))
         assertNull(NextEpisodeLogic.parseKey("12345"))

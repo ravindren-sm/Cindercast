@@ -1,4 +1,4 @@
-# Next run: playback journeys (prepared 2026-11-23, not yet run)
+# Next run: playback journeys (prepared 2026-11-23; run the same day, see 2026-11-23-playback.md; charter 11 still to play at game time)
 
 Needs the TV on screen for about 20 minutes with nobody watching; StbEmu and TiviMate stopped (single connection). Kid-safe
 titles only (G/PG/U), except charter 11, which plays the NFL game the search found. Record each with `templates/journey.md`.

@@ -22,6 +22,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -132,15 +133,21 @@ fun VodPlayerScreen(
     var ended by remember { mutableStateOf(false) }
     var countdown by remember { mutableIntStateOf(0) }
     val id = target?.resumeKey
+    // The title playing now. The player listener and the save-on-exit code below are set up once, when the player opens; the
+    // next episode changes [target] without reopening the player, so they read this instead of the first title's values
+    // (otherwise the next episode's position was saved under the previous episode's name).
+    val playing by rememberUpdatedState(target)
 
     fun knownDuration(): Long = player.duration.takeIf { it > 0 } ?: 0L
 
     /** Saves the position, or forgets it when the title was watched to the end. */
     fun savePosition() {
-        if (id == null || phase !is VodPhase.Playing) return
+        val target = playing ?: return
+        val id = target.resumeKey
+        if (phase !is VodPhase.Playing) return
         val pos = player.currentPosition
         val dur = knownDuration()
-        if (target != null && pos > 0) history.record(target, pos, dur)   // Home's Continue watching
+        if (pos > 0) history.record(target, pos, dur)   // Home's Continue watching
         when {
             ResumePolicy.shouldSave(pos, dur) -> resume.put(id, pos)
             dur > 0 && pos > dur - ResumePolicy.NEAR_END_MILLIS -> resume.clear(id)
@@ -153,13 +160,14 @@ fun VodPlayerScreen(
                 buffering = state == Player.STATE_BUFFERING
                 if (state == Player.STATE_READY && !resumeApplied) {
                     resumeApplied = true
-                    val start = ResumePolicy.startPosition(id?.let(resume::get), knownDuration())
+                    val start = ResumePolicy.startPosition(playing?.resumeKey?.let(resume::get), knownDuration())
                     if (start > 0) { player.seekTo(start); notice = "Resumed at ${TimeText.format(start)}" }
                 }
                 if (state == Player.STATE_ENDED) ended = true
-                if (state == Player.STATE_ENDED && id != null) {
-                    resume.clear(id)
-                    if (target != null) history.record(target, knownDuration(), knownDuration())   // finished: leaves Continue watching
+                val done = playing
+                if (state == Player.STATE_ENDED && done != null) {
+                    resume.clear(done.resumeKey)
+                    history.record(done, knownDuration(), knownDuration())   // finished: leaves Continue watching
                 }
             }
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) { paused = !playWhenReady }
