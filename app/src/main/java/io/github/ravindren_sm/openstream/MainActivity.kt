@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import io.github.ravindren_sm.openstream.data.AndroidKeystoreKey
@@ -41,7 +43,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             OpenStreamTheme {
                 if (store != null) {
-                    AppShell(store = store, session = session, onExit = { finish() })
+                    // Element ids (OsFocusable's testTag) appear as resource ids in the accessibility tree, so UI tests and the
+                    // Fire TV crawler (.claude/skills/firetv-drive) can name elements. The ids are fixed words such as "search-input".
+                    @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+                    Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
+                        AppShell(store = store, session = session, onExit = { finish() })
+                    }
                 } else {
                     Box(Modifier.fillMaxSize().background(Tokens.BgCanvas).padding(Spacing.SafeHorizontal)) {
                         Text(

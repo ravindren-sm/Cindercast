@@ -274,7 +274,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         profileId = p.id
         profilePrefs.edit().putLong("last_profile", p.id).apply()
         profileScreen = null; profileScreenRequired = false
-        searchState.query = ""; searchState.phase = SearchPhase.Idle; showDetail = null
+        searchState.query = ""; searchState.phase = SearchPhase.Idle; searchState.shown = null; searchState.shownKey = null; showDetail = null
         stack = NavStack.start(Route.HOME)
     }
     // Leaving a Kids profile needs the PIN (when one is set); every other switch is free.
@@ -334,16 +334,20 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     fun recordSearch(text: String) { tileScopeForSearch.launch(Dispatchers.IO) { repo.recordSearch(profileId, text) } }
     LaunchedEffect(searchState.query, searchState.submitTick, connected, searchState.filters, effectivePolicy, orderByStats) {
         val q = searchState.query.trim()
-        if (q.length < SearchRanking.MIN_QUERY) { searchState.phase = SearchPhase.Idle; return@LaunchedEffect }
-        if (!connected) { searchState.phase = SearchPhase.Idle; return@LaunchedEffect }
-        // Wait for a pause in typing (shorter once there are three letters), unless Done was pressed.
+        if (q.length < SearchRanking.MIN_QUERY) { searchState.phase = SearchPhase.Idle; searchState.shown = null; searchState.shownKey = null; return@LaunchedEffect }
+        // A dropped connection keeps what is on screen; the search runs again once it is back.
+        if (!connected) return@LaunchedEffect
         val submitted = searchState.submitTick > 0 && searchState.submitTick != lastSubmitHandled
+        // The same search already answered (for example the connection blinked, or the policy object was rebuilt): keep it.
+        val key = listOf(q, searchState.filters.encode(), effectivePolicy.hashCode(), orderByStats).joinToString("\u0001")
+        if (key == searchState.shownKey && searchState.phase is SearchPhase.Done) { lastSubmitHandled = searchState.submitTick; return@LaunchedEffect }
+        // Wait for a pause in typing (shorter once there are three letters), unless Done was pressed.
         delay(if (submitted) 0L else if (q.length >= 3) 350L else 800L)
         lastSubmitHandled = searchState.submitTick
         searchState.phase = SearchPhase.Loading
         val result = withContext(Dispatchers.IO) { searchCatalog.search(q, searchState.filters, searchState.categories, effectivePolicy, if (orderByStats) personalization else null, tagEnricher::enrich) }
         searchState.phase = when (result) {
-            is CatalogResult.Ok -> SearchPhase.Done(result.value)
+            is CatalogResult.Ok -> { searchState.shown = result.value; searchState.shownKey = key; SearchPhase.Done(result.value) }
             is CatalogResult.Failed -> SearchPhase.Failed(result.message)
         }
         if (submitted && result is CatalogResult.Ok) recordSearch(q)
@@ -431,10 +435,16 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     LaunchedEffect(portalEpoch) { if (portalEpoch > 0) indexer.clear() }
     LaunchedEffect(indexer) { withContext(Dispatchers.IO) { indexer.refreshStatus() } }
     LaunchedEffect(indexer, indexTick) { if (indexer.enabled) withContext(Dispatchers.IO) { indexer.run { canIndex.get() } } }
+    // Suggestions follow the typed text only. Once a query has a list it stays put while the viewer moves through it, even if the
+    // title index or the channel list grows in the background (that used to reorder the rows under the viewer's focus).
+    var suggestedFor by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(searchState.query, favorites.all, channelsWarm, indexer.status.titles / 500, profileId, onSearchRoute) {
         if (!onSearchRoute) return@LaunchedEffect
+        val key = "$profileId\u0001${searchState.query}"
+        if (key == suggestedFor && searchState.suggestions.isNotEmpty()) return@LaunchedEffect
         delay(120)
         searchState.suggestions = withContext(Dispatchers.IO) { searchSources.suggestions(profileId, searchState.query, effectivePolicy.kids) }
+        suggestedFor = key
     }
     // A picker for the versions of a title opened from Search, and which versions the open page has.
     var pickerOpen by remember { mutableStateOf(false) }

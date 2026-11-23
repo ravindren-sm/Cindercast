@@ -224,6 +224,8 @@ class VodItem(
     val posterUri: String? = null,
     /** The online tag service's score (0 to 10), when the viewer turned that on and the title was matched. Shown only if the portal sent none. */
     val tmdbRating: Double? = null,
+    /** The portal category the item belongs to (`category_id`), when the portal sends it; lets search filter one global answer by category. */
+    val categoryId: String? = null,
 ) {
     /**
      * The rating to show: the portal's IMDb value if it sent one, else its Kinopoisk value, labelled as that and
@@ -240,7 +242,7 @@ class VodItem(
         id = id, name = name, isSeries = isSeries, isSeason = isSeason, isEpisode = isEpisode, cmd = cmd, episodeNumbers = episodeNumbers,
         isFile = isFile, fileCmds = fileCmds, year = year, description = description, actors = actors, director = director,
         genres = genres ?: tagGenres, imdbRating = imdbRating ?: imdbScore, kinopoiskRating = kinopoiskRating, age = age ?: ageLabel, posterUri = posterUri,
-        tmdbRating = tmdbRating ?: rating,
+        tmdbRating = tmdbRating ?: rating, categoryId = categoryId,
     )
 
     override fun toString() = "VodItem(id=$id, name=$name, series=$isSeries, season=$isSeason, episode=$isEpisode, file=$isFile, inlineFiles=${fileCmds.size})"
@@ -285,6 +287,7 @@ class VodItem(
                     kinopoiskRating = PortalText.rating(text(o, "rating_kinopoisk")),
                     age = text(o, "rating_mpaa") ?: text(o, "age"),
                     posterUri = text(o, "screenshot_uri") ?: text(o, "pic"),
+                    categoryId = text(o, "category_id"),
                 )
             }
         }

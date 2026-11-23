@@ -131,7 +131,7 @@ fun HomeScreen(
             }
             if (favoriteChannels.isNotEmpty()) {
                 Text("Favorite channels", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = PaddingValues(end = Spacing.S1, top = Spacing.S1, bottom = Spacing.S1)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
                     itemsIndexed(favoriteChannels, key = { _, f -> f.refId }) { i, f ->
                         ChannelCard(homeFavChannelFocusId(i), f.number.orEmpty(), f.name, memory, { onOpenFavoriteChannel(i) })
                     }
@@ -141,10 +141,10 @@ fun HomeScreen(
                 val live = row.pin.kind == PinKinds.LIVE
                 Text(if (live) "Live · ${PortalText.decodeEntities(row.pin.title)}" else "New in ${PortalText.decodeEntities(row.pin.title)}", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
                 when {
-                    row.channels != null -> LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = PaddingValues(end = Spacing.S1, top = Spacing.S1, bottom = Spacing.S1)) {
+                    row.channels != null -> LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
                         itemsIndexed(row.channels, key = { _, c -> c.id }) { i, c -> ChannelCard(homePinFocusId(r, i), c.number, c.name, memory, { onOpenPinnedChannel(r, row.channels, i) }) }
                     }
-                    row.titles != null -> LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = PaddingValues(end = Spacing.S1, top = Spacing.S1, bottom = Spacing.S1)) {
+                    row.titles != null -> LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
                         itemsIndexed(row.titles, key = { _, v -> v.id }) { i, v ->
                             OsFocusable(id = homePinFocusId(r, i), memory = memory, variant = FocusVariant.CARD, modifier = Modifier.width(170.dp), onSelect = { onOpenPinnedTitle(v) }) { _ ->
                                 Column(Modifier.background(Tokens.Surface1)) {
@@ -180,7 +180,7 @@ private fun TileRow(
     tiles: List<ContinueTile>, idOf: (Int) -> String, width: androidx.compose.ui.unit.Dp, portalUrl: String, memory: FocusMemory,
     onSelect: (ContinueTile) -> Unit, onMenu: (ContinueTile, String) -> Unit,
 ) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = PaddingValues(end = Spacing.S1, top = Spacing.S1, bottom = Spacing.S1)) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
         itemsIndexed(tiles, key = { _, t -> t.resumeKey }) { i, tile ->
             val id = idOf(i)
             OsFocusable(

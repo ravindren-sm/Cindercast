@@ -34,13 +34,17 @@ private fun choiceId(i: Int) = "choice-$i"
 /**
  * A list to choose from. With [multi], Select toggles an entry (a tick shows the chosen ones) and the list stays open; otherwise
  * Select picks and closes. The first row, Done, closes. Left and Right do nothing so the D-pad cannot wander to the page behind,
- * Back closes, and focus returns to [returnFocusId]. [note] explains where the choices come from.
+ * Back closes, and focus returns to [returnFocusId]. [note] explains where the choices come from. With [clearLabel] (for
+ * example "Any language") a second row turns every choice off and closes, so a filter can be undone where it was set.
  */
 @Composable
 fun ChoicePicker(
     title: String, options: List<Choice>, selected: Set<String>, multi: Boolean, note: String?, memory: FocusMemory,
     returnFocusId: String?, onToggle: (String) -> Unit, onClose: () -> Unit,
+    clearLabel: String? = null, onClear: () -> Unit = {},
 ) {
+    val clearId = "\u0000any"
+    val rows = listOf(Choice("", "Done")) + listOfNotNull(clearLabel?.let { Choice(clearId, it) }) + options
     fun close() { onClose(); returnFocusId?.let { memory.tryFocus(it) } }
     LaunchedEffect(Unit) { androidx.compose.runtime.withFrameNanos { }; memory.tryFocus(choiceId(0)) }
     BackHandler { close() }
@@ -54,12 +58,13 @@ fun ChoicePicker(
             Text(title, style = Tokens.TitleMedium, color = Tokens.TextPrimary)
             note?.let { Text(it, style = Tokens.Body, color = Tokens.TextSecondary) }
             LazyColumn(Modifier.heightIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(Spacing.S1)) {
-                itemsIndexed(listOf(Choice("", "Done")) + options, key = { i, c -> "$i-${c.id}" }) { i, c ->
+                itemsIndexed(rows, key = { i, c -> "$i-${c.id}" }) { i, c ->
                     val isDone = i == 0
-                    val chosen = !isDone && c.id in selected
+                    val isClear = c.id == clearId
+                    val chosen = !isDone && (if (isClear) selected.isEmpty() else c.id in selected)
                     OsFocusable(
                         id = choiceId(i), memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth(),
-                        onSelect = { if (isDone) close() else { onToggle(c.id); if (!multi) close() } },
+                        onSelect = { when { isDone -> close(); isClear -> { onClear(); close() }; else -> { onToggle(c.id); if (!multi) close() } } },
                     ) { _ ->
                         Text(
                             (if (chosen) "✓  " else if (multi && !isDone) "    " else "") + c.label,

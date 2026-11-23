@@ -58,7 +58,7 @@ data class SearchFilters(
 }
 
 /** Which categories to ask the portal for, given the filters. [ids] null means "all categories" (no category or language filter). */
-class CategoryPlan(val ids: List<String>?, val capped: Boolean, val matching: Int) {
+class CategoryPlan(val ids: List<String>?, val capped: Boolean, val matching: Int, val allIds: Set<String> = ids.orEmpty().toSet()) {
     /** The language or category choices left nothing to search. */
     val none get() = ids != null && ids.isEmpty()
 }
@@ -86,7 +86,7 @@ object FilterRules {
         var candidates = all
         if (f.categoryIds.isNotEmpty()) candidates = candidates.filter { it.id in f.categoryIds }
         if (f.languages.isNotEmpty()) candidates = candidates.filter { c -> languagesIn(c.title).any { it in f.languages } }
-        return CategoryPlan(candidates.take(cap).map { it.id }, candidates.size > cap, candidates.size)
+        return CategoryPlan(candidates.take(cap).map { it.id }, candidates.size > cap, candidates.size, candidates.mapTo(HashSet()) { it.id })
     }
 
     private val ENGLISH_SUBS = Regex("(?i)\\b(e-?subs?|eng(lish)?[\\s._-]*sub(s|bed|titles?)?|sub(s|bed|titles?)?[\\s._-]*eng(lish)?|english[\\s._-]+subtitles?|hardsubs?)\\b")

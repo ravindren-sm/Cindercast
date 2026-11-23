@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
@@ -122,7 +123,11 @@ fun ProfilesScreen(model: ProfilesModel, memory: FocusMemory, startInManage: Boo
                         }
                     }
                 }
-                ActionButton(ADD_ID, "Add a profile", memory) { editing = null; mode = Mode.EDIT }
+                // A full-width row like the profiles above it: a narrow button at the left lost Down from a full-width row to
+                // Done, which the focus search judged nearer to the row's centre.
+                OsFocusable(id = ADD_ID, memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth().focusProperties { down = memory.requesterFor("profile-pin") }, onSelect = { editing = null; mode = Mode.EDIT }) { _ ->
+                    Text("+  Add a profile", style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 1, modifier = Modifier.padding(Spacing.S2))
+                }
                 Row(Modifier.padding(top = Spacing.S2), horizontalArrangement = Arrangement.spacedBy(Spacing.S3)) {
                     ActionButton("profile-pin", if (model.pinIsSet) "Change the household PIN" else "Set a household PIN", memory) { model.onChangePin() }
                     if (model.pinIsSet && model.profiles.none { it.isKids }) ActionButton("profile-pin-remove", "Remove the PIN", memory) { model.onRemovePin() }

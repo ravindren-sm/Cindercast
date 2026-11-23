@@ -56,6 +56,11 @@ object Spacing {
     val S2 = 16.dp   // card padding, dense list gap
     val S3 = 24.dp   // grid gutters, button groups
     val S4 = 32.dp   // shelf spacing, column gutters
+    /**
+     * Inner padding of a horizontal row of cards. A focused card grows by [FocusStyle.CardScale] (about 7 dp each side on a
+     * 220 dp tile); without room on every side, including the start, the first card is cut off at the row's edge.
+     */
+    val CardRow = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 16.dp)
 }
 
 object Radii {

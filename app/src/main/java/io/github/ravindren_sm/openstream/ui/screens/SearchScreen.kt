@@ -77,7 +77,16 @@ class SearchState {
     var categories: List<VodCategory> by mutableStateOf(emptyList())
     /** The saved default filters, if any. */
     var defaultFilters: SearchFilters? by mutableStateOf(null)
+    /**
+     * The last results shown and the search they answer. They stay on screen while a newer search runs (or the connection
+     * blinks), so the rows do not vanish and come back under the viewer's focus.
+     */
+    var shown: SearchResults? by mutableStateOf(null)
+    var shownKey: String? by mutableStateOf(null)
 }
+
+/** How many type-ahead suggestions are listed; fixed so the results below never jump when a search finishes. */
+const val SUGGESTION_ROWS = 5
 
 fun searchSuggestionFocusId(i: Int) = "search-sug-$i"
 
@@ -122,16 +131,17 @@ fun SearchScreen(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.S2),
         verticalArrangement = Arrangement.spacedBy(Spacing.S3),
     ) {
+        // Filters sit above the box so Down from the box goes straight to suggestions and results.
+        FilterBar(state, memory, onOpen = { picker = it }, onChange = onFiltersChange, onSaveDefault = onSaveDefaultFilters)
         OsTextField(
             id = SEARCH_INPUT_ID, memory = memory, value = state.query, onValueChange = { state.query = it },
-            label = "Search", hint = "Movies, shows and channels", imeAction = ImeAction.Done,
+            label = "Search", hint = "Movies, shows and channels. Back closes the keyboard; then Down reaches the results.", imeAction = ImeAction.Done,
             onDone = { state.submitTick++ },
         )
-        FilterBar(state, memory, onOpen = { picker = it }, onChange = onFiltersChange, onSaveDefault = onSaveDefaultFilters)
         if (state.suggestions.isNotEmpty()) {
             Text(if (state.query.isBlank()) "Recent searches" else "Suggestions", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.S1)) {
-                state.suggestions.take(if (state.phase is SearchPhase.Done) 3 else 6).forEachIndexed { i, sug ->
+                state.suggestions.take(SUGGESTION_ROWS).forEachIndexed { i, sug ->
                     OsFocusable(id = searchSuggestionFocusId(i), memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth(), onSelect = { onPickSuggestion(sug) }) { _ ->
                         Row(Modifier.fillMaxWidth().padding(horizontal = Spacing.S2, vertical = Spacing.S1), verticalAlignment = Alignment.CenterVertically) {
                             Text(PortalText.decodeEntities(sug.text), style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 1, modifier = Modifier.weight(1f))
@@ -141,14 +151,20 @@ fun SearchScreen(
                 }
             }
         }
-        when (val phase = state.phase) {
-            SearchPhase.Idle -> Text(
+        // One status line whose place never moves, then the latest results (kept while a newer search runs).
+        val phase = state.phase
+        val shown = (phase as? SearchPhase.Done)?.results ?: state.shown?.takeIf { state.query.trim().length >= 2 }
+        when (phase) {
+            SearchPhase.Idle -> if (shown == null) Text(
                 if (connected) "Type at least two letters." else "Waiting for the portal connection…",
                 style = Tokens.Body, color = Tokens.TextSecondary,
             )
-            SearchPhase.Loading -> Text("Searching…", style = Tokens.BodyLarge, color = Tokens.TextSecondary)
+            SearchPhase.Loading -> Text("Searching…", style = Tokens.Body, color = Tokens.TextSecondary)
             is SearchPhase.Failed -> Text(phase.message, style = Tokens.BodyLarge, color = Tokens.StatusError)
-            is SearchPhase.Done -> Results(phase.results, state.query.trim(), state.filters.isActive, portalUrl, memory, isFavoriteVod, isFavoriteChannel, onOpenChannel, onOpenMovie, onOpenShow)
+            is SearchPhase.Done -> Unit
+        }
+        if (shown != null && phase !is SearchPhase.Failed) {
+            Results(shown, state.query.trim(), state.filters.isActive, state.filters.summary { id -> state.categories.firstOrNull { it.id == id }?.title }, portalUrl, memory, isFavoriteVod, isFavoriteChannel, onOpenChannel, onOpenMovie, onOpenShow)
         }
         IndexPanel(state.index, memory, onEnableIndex, onPauseIndex)
     }
@@ -189,16 +205,20 @@ private fun IndexPanel(status: IndexStatus, memory: FocusMemory, onEnable: () ->
 
 @Composable
 private fun Results(
-    r: SearchResults, query: String, filtersOn: Boolean, portalUrl: String, memory: FocusMemory, isFavoriteVod: (VodItem) -> Boolean,
+    r: SearchResults, query: String, filtersOn: Boolean, filterSummary: String, portalUrl: String, memory: FocusMemory, isFavoriteVod: (VodItem) -> Boolean,
     isFavoriteChannel: (LiveChannel) -> Boolean, onOpenChannel: (Int) -> Unit, onOpenMovie: (TitleGroup) -> Unit, onOpenShow: (TitleGroup) -> Unit,
 ) {
     if (r.isEmpty) {
         Text("No matches for “$query”" + if (filtersOn) " with these filters" else "", style = Tokens.BodyLarge, color = Tokens.TextSecondary)
     }
+    if (r.relaxed) Text(
+        "Nothing matched “$query” with your filters ($filterSummary). These match without them; use Clear filters or the Any choices above to search this way.",
+        style = Tokens.BodyLarge, color = Tokens.StatusWarning,
+    )
     r.note?.let { Text(it, style = Tokens.Body, color = Tokens.StatusWarning) }
     if (r.channels.isNotEmpty()) {
         Text("Channels", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = PaddingValues(end = Spacing.S1, top = Spacing.S1, bottom = Spacing.S1)) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
             itemsIndexed(r.channels, key = { _, c -> c.id }) { i, c ->
                 ChannelCard(searchChannelFocusId(i), c.number, c.name + if (isFavoriteChannel(c)) "  $HEART" else "", memory, { onOpenChannel(i) })
             }
@@ -216,7 +236,7 @@ private fun PosterRow(
 ) {
     if (items.isEmpty()) return
     Text(heading, style = Tokens.TitleMedium, color = Tokens.TextPrimary)
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = PaddingValues(end = Spacing.S1, top = Spacing.S1, bottom = Spacing.S1)) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
         itemsIndexed(items, key = { _, g -> g.best.id }) { i, g ->
             val v = g.best
             OsFocusable(id = idOf(i), memory = memory, variant = FocusVariant.CARD, onSelect = { onOpen(g) }, modifier = Modifier.width(190.dp)) { _ ->
@@ -301,15 +321,18 @@ private fun FilterPickerHost(kind: FilterPicker, state: SearchState, memory: Foc
             note = if (state.categories.isEmpty()) "The portal's categories have not loaded yet." else "Languages are read from category names.",
             memory = memory, returnFocusId = chipId(kind),
             onToggle = { id -> onChange(f.copy(languages = f.languages.toggled(id))) }, onClose = onClose,
+            clearLabel = "Any language", onClear = { onChange(f.copy(languages = emptySet())) },
         )
         FilterPicker.GENRE -> ChoicePicker(
             "Genre", SearchFilters.GENRES.map { Choice(it, it) }, f.genres, multi = true, note = "Matches the genres each title lists.",
             memory = memory, returnFocusId = chipId(kind), onToggle = { id -> onChange(f.copy(genres = f.genres.toggled(id))) }, onClose = onClose,
+            clearLabel = "Any genre", onClear = { onChange(f.copy(genres = emptySet())) },
         )
         FilterPicker.CATEGORY -> ChoicePicker(
             "Category", state.categories.map { Choice(it.id, PortalText.decodeEntities(it.title)) }, f.categoryIds, multi = true,
-            note = if (state.categories.isEmpty()) "The portal's categories have not loaded yet." else "The portal is asked one category at a time (up to six).",
+            note = if (state.categories.isEmpty()) "The portal's categories have not loaded yet." else "Titles in any of the chosen categories.",
             memory = memory, returnFocusId = chipId(kind), onToggle = { id -> onChange(f.copy(categoryIds = f.categoryIds.toggled(id))) }, onClose = onClose,
+            clearLabel = "Any category", onClear = { onChange(f.copy(categoryIds = emptySet())) },
         )
         FilterPicker.RATING -> ChoicePicker(
             "Minimum rating", listOf(Choice("any", "Any rating")) + SearchFilters.RATING_STEPS.map { Choice("$it", "${"%.0f".format(it)} and above") },

@@ -89,7 +89,7 @@ fun FavoritesScreen(
         }
         if (channels.isNotEmpty()) {
             Text("Channels", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = PaddingValues(end = Spacing.S1, top = Spacing.S1, bottom = Spacing.S1)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
                 itemsIndexed(channels, key = { _, f -> f.refId }) { i, f ->
                     ChannelCard(favChannelFocusId(i), f.number.orEmpty(), f.name, memory, { onOpenChannel(i) }, Modifier.onMenuKey { remove(f, i, ::favChannelFocusId) })
                 }
@@ -119,7 +119,7 @@ private fun TitleRow(
 ) {
     if (items.isEmpty()) return
     Text(heading, style = Tokens.TitleMedium, color = Tokens.TextPrimary)
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = PaddingValues(end = Spacing.S1, top = Spacing.S1, bottom = Spacing.S1)) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
         itemsIndexed(items, key = { _, f -> f.refId }) { i, f ->
             OsFocusable(id = idOf(i), memory = memory, variant = FocusVariant.CARD, onSelect = { onOpen(f) }, modifier = Modifier.width(190.dp).onMenuKey { onRemove(f, i) }) { _ ->
                 Column(Modifier.background(Tokens.Surface1)) {

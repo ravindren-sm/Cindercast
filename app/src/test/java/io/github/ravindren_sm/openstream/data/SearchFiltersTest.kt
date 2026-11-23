@@ -54,6 +54,8 @@ class SearchFiltersTest {
         val many = List(10) { VodCategory("$it", "ENGLISH $it") }
         val plan = FilterRules.plan(many, SearchFilters(languages = setOf("English")), cap = 4)
         assertEquals(4, plan.ids!!.size); assertTrue(plan.capped); assertEquals(10, plan.matching)
+        // The full set is kept for narrowing one global answer, so no matching category is left out there.
+        assertEquals(10, plan.allIds.size)
     }
 
     @Test fun genreAndRatingMustBothHold() {

@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
@@ -61,6 +62,7 @@ fun OsFocusable(
 
     Box(
         modifier
+            .testTag(id)                       // exposed as a resource id (see MainActivity) so UI tests and the TV crawler see stable ids
             .focusRequester(requester)
             .onFocusChanged { state ->
                 focused = state.isFocused

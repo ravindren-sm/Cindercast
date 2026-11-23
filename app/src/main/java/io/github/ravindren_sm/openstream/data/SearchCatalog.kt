@@ -12,6 +12,8 @@ class SearchResults(
     val channelsFailed: Boolean = false,
     /** A line to show with the results, for example that only some matching categories were searched. */
     val note: String? = null,
+    /** Nothing passed the filters, so these are the matches without them. */
+    val relaxed: Boolean = false,
 ) {
     val isEmpty get() = movies.isEmpty() && shows.isEmpty() && channels.isEmpty()
 }
@@ -71,35 +73,72 @@ class SearchCatalog(private val session: PortalSession, private val maxPages: In
     @Volatile private var serverChannelSearchIgnored = false
 
     /**
-     * Searches titles (through the portal, one request per category when the filters name categories or languages) and
-     * channels (only when no filter is on, since channels have no category, genre or rating). Genre and rating filters
+     * Searches titles and channels (channels only when no filter is on, since channels have no category, genre or rating).
+     *
+     * Language and category filters: the portal is first asked once for all categories and the answer is narrowed here by
+     * each title's `category_id`, so every matching category counts (asking one category per request could only cover a
+     * few). Portals that do not send `category_id` are asked one category at a time, up to six. Genre and rating filters
      * are applied here to what the portal returns.
+     *
+     * When filters leave nothing but the text alone matches something, those unfiltered matches are returned with
+     * [SearchResults.relaxed] set, so the viewer sees that the title exists and that the filters hid it.
      */
     fun search(query: String, filters: SearchFilters = SearchFilters(), categories: List<VodCategory> = emptyList(), policy: ContentPolicy = ContentPolicy(), personal: Personalization? = null, enrich: (List<VodItem>) -> List<VodItem> = { it }): CatalogResult<SearchResults> {
+        val first = searchOnce(query, filters, categories, policy, personal, enrich)
+        if (!filters.isActive) return first
+        val r = (first as? CatalogResult.Ok)?.value ?: return first
+        if (!(r.movies.isEmpty() && r.shows.isEmpty())) return first
+        val loose = (searchOnce(query, SearchFilters(), categories, policy, personal, enrich) as? CatalogResult.Ok)?.value ?: return first
+        if (loose.isEmpty) return first
+        SearchHooks.event("relaxed movies=${loose.movies.size} shows=${loose.shows.size}")
+        return CatalogResult.Ok(SearchResults(loose.movies, loose.shows, loose.channels, loose.channelsFailed, note = loose.note, relaxed = true))
+    }
+
+    private fun searchOnce(query: String, filters: SearchFilters, categories: List<VodCategory>, policy: ContentPolicy, personal: Personalization?, enrich: (List<VodItem>) -> List<VodItem>): CatalogResult<SearchResults> {
         val q = query.trim()
         val plan = FilterRules.plan(categories, filters)
         if (plan.none) return CatalogResult.Ok(SearchResults(emptyList(), emptyList(), emptyList(), note = "No category matches the language and category choices."))
-        val targets = plan.ids ?: listOf("*")
-        val pagesPerTarget = if (plan.ids == null) maxPages else 2
         val titles = mutableListOf<VodItem>()
         val hinted = HashSet<String>()                    // ids of titles from a category whose name mentions English subtitles
-        var firstRequest = true
-        for (category in targets) {
-            val categoryMentionsSubs = categories.firstOrNull { it.id == category }?.let { FilterRules.mentionsEnglishSubtitles(it.title) } == true
-            for (page in 1..pagesPerTarget) {
+        val subsCategories = categories.filter { FilterRules.mentionsEnglishSubtitles(it.title) }.mapTo(HashSet()) { it.id }
+        var note: String? = null
+        var truncated = false                             // the portal had more pages than were read
+
+        /** Reads up to [pages] pages for [category] into [titles]: null if not connected, false if the first request failed. */
+        fun read(category: String, pages: Int, onPage: (VodItem) -> Unit = {}): Boolean? {
+            for (page in 1..pages) {
                 var parsed: io.github.ravindren_sm.openstream.provider.VodPage? = null
-                val result = session.withSession { m -> m.call { c -> val (r, p) = c.vodSearch(q, page, category); parsed = p; r } }
-                    ?: return CatalogResult.Failed(LiveCatalog.NOT_CONNECTED)
+                val result = session.withSession { m -> m.call { c -> val (r, p) = c.vodSearch(q, page, category); parsed = p; r } } ?: return null
                 val p = parsed
-                if (!result.ok || p == null) {
-                    if (firstRequest) return CatalogResult.Failed(NO_RESULTS)
-                    break                                                  // keep what was read
-                }
-                firstRequest = false
+                if (!result.ok || p == null) return page > 1                // keep what was read after page 1
                 val known = titles.mapTo(HashSet()) { it.id }
                 titles += p.items.filter { it.id !in known }
-                if (categoryMentionsSubs) p.items.forEach { hinted += it.id }
-                if (!p.hasMore(p.items.size * page)) break
+                p.items.forEach(onPage)
+                if (!p.hasMore(p.items.size * page)) return true
+                if (page == pages) truncated = true
+            }
+            return true
+        }
+
+        if (plan.ids == null) {
+            when (read("*", maxPages)) { null -> return CatalogResult.Failed(LiveCatalog.NOT_CONNECTED); false -> return CatalogResult.Failed(NO_RESULTS); true -> Unit }
+        } else {
+            // One global search, narrowed by category here.
+            when (read("*", GLOBAL_PAGES)) { null -> return CatalogResult.Failed(LiveCatalog.NOT_CONNECTED); false -> return CatalogResult.Failed(NO_RESULTS); true -> Unit }
+            val carriesCategory = titles.isNotEmpty() && titles.all { it.categoryId != null }
+            if (carriesCategory || titles.isEmpty()) {
+                titles.retainAll { it.categoryId in plan.allIds }
+                titles.forEach { if (it.categoryId in subsCategories) hinted += it.id }
+                if (truncated) note = "The portal found more matches than were read; type more of the name to narrow it."
+                SearchHooks.event("filtered globally categories=${plan.allIds.size}")
+            } else {
+                // This portal does not say which category a title is in: ask the matching categories one at a time.
+                titles.clear()
+                for (category in plan.ids) {
+                    val mentionsSubs = category in subsCategories
+                    if (read(category, 2) { if (mentionsSubs) hinted += it.id } == null) return CatalogResult.Failed(LiveCatalog.NOT_CONNECTED)
+                }
+                if (plan.capped) note = "Searched the first ${plan.ids.size} of ${plan.matching} matching categories."
             }
         }
         // The profile's rating floor applies unless the viewer chose a rating filter for this search.
@@ -109,8 +148,7 @@ class SearchCatalog(private val session: PortalSession, private val maxPages: In
         val (channels, failed) = if (filters.isActive || policy.isKids) emptyList<LiveChannel>() to false else findChannels(q)
         val movies = TitleMerge.group(ranked.filter { !it.isSeries })
         val shows = TitleMerge.group(ranked.filter { it.isSeries })
-        SearchHooks.event("titles=${titles.size} kept=${kept.size} movies=${movies.size} shows=${shows.size} categories=${targets.size} channels=${channels.size} channelsFailed=$failed")
-        val note = if (plan.capped) "Searched the first ${targets.size} of ${plan.matching} matching categories." else null
+        SearchHooks.event("titles=${titles.size} kept=${kept.size} movies=${movies.size} shows=${shows.size} channels=${channels.size} channelsFailed=$failed")
         return CatalogResult.Ok(SearchResults(movies = movies, shows = shows, channels = channels, channelsFailed = failed, note = note))
     }
 
@@ -161,5 +199,9 @@ class SearchCatalog(private val session: PortalSession, private val maxPages: In
         return parsed?.takeIf { result.ok }?.also { channelCache = it }
     }
 
-    companion object { const val NO_RESULTS = "The portal did not answer the search." }
+    companion object {
+        const val NO_RESULTS = "The portal did not answer the search."
+        /** Pages of the global answer read when a language or category filter is on (the portal sends about 14 per page). */
+        const val GLOBAL_PAGES = 6
+    }
 }
