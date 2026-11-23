@@ -110,6 +110,8 @@ import io.github.ravindren_sm.openstream.data.ResumeKeys
 import io.github.ravindren_sm.openstream.data.SessionStatus
 import io.github.ravindren_sm.openstream.data.VodCatalog
 import io.github.ravindren_sm.openstream.data.VodKind
+import io.github.ravindren_sm.openstream.data.NflSearch
+import androidx.lifecycle.compose.currentStateAsState
 import io.github.ravindren_sm.openstream.data.VodPlayback
 import io.github.ravindren_sm.openstream.data.SettingsStore
 import io.github.ravindren_sm.openstream.nav.NavStack
@@ -157,7 +159,14 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     // TV Guide: which channels it lists, and the per-channel guide cache.
     val liveCatalog = remember(portalEpoch) { LiveCatalog(session) }
     val guideLoader = remember(portalEpoch) { GuideLoader(session) }
-    val sportsState = remember(portalEpoch) { SportsState(liveCatalog, guideLoader) }
+    val appContextForFiles = LocalContext.current.applicationContext
+    // NFL listings are kept in the app's private storage so Sports shows them at once after a restart.
+    val nflFile = remember { java.io.File(appContextForFiles.filesDir, "nfl-listings.json") }
+    val sportsState = remember(portalEpoch) {
+        SportsState(liveCatalog, guideLoader, saveNfl = { text -> runCatching { nflFile.writeText(text) } }).also { st ->
+            runCatching { if (nflFile.exists()) NflSearch.decode(nflFile.readText()).let { (list, at) -> st.nfl.restore(list, at) } }
+        }
+    }
     val guideState = remember(portalEpoch) { GuideState() }
     // Movies and Shows get the same treatment, plus the portal address (poster paths are relative to it) and
     // the resume positions, which live on the device.
@@ -434,6 +443,26 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     LaunchedEffect(vodCategoryRule, moviesState, showsState) { moviesState.applyCategoryRule(vodCategoryRule); showsState.applyCategoryRule(vodCategoryRule) }
     // The saved search defaults, when this profile asked for them everywhere.
     val defaultScope = if (applyDefaultsEverywhere) searchState.defaultFilters?.takeIf { it.isActive }?.let(::DefaultScope) else null
+    // The live groups the viewer may see (the set the TV Guide offers): the Sports rail and the NFL search use these.
+    val visibleGenres = liveState.allGenres.filter { g -> liveState.genres.any { it.id == g.id } && (defaultScope?.groupAllowed(g) ?: true) }
+
+    // The NFL search runs in the background, at most once an hour, so Sports > NFL has games ready when opened. Never while
+    // something plays (a stream request must not wait behind guide requests), never on a Kids profile, and only while the app
+    // is on screen: in the background (another IPTV app open, the stick asleep) it would be a second session on the account.
+    val lifecycleState by androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+    val appOnScreen = lifecycleState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+    val playing = stack.current.route == Route.LIVE_PLAYER || stack.current.route == Route.VOD_PLAYER
+    val nflGenres by androidx.compose.runtime.rememberUpdatedState(visibleGenres)
+    LaunchedEffect(connected, playing, appOnScreen, isKids, portalEpoch) {
+        if (!connected || playing || !appOnScreen || isKids) return@LaunchedEffect
+        delay(20_000)   // let start-up and whatever the viewer opens first go ahead
+        if (!liveState.genresLoaded) withContext(Dispatchers.IO) { liveState.loadGenres() }
+        while (true) {
+            val nfl = sportsState.nfl
+            if ((nfl.running || nfl.due(NFL_REFRESH_MILLIS)) && nflGenres.isNotEmpty()) withContext(Dispatchers.IO) { nfl.refresh(nflGenres) }
+            delay(60_000)
+        }
+    }
     LaunchedEffect(defaultScope?.summary(), moviesState, showsState, liveState, profile?.showAdultCategories) {
         moviesState.applyScope(defaultScope); showsState.applyScope(defaultScope)
         liveState.applyGroupFilter { g -> (profile?.showAdultCategories == true || !CategoryRules.isAdult(io.github.ravindren_sm.openstream.provider.PortalText.decodeEntities(g.title))) && (defaultScope?.groupAllowed(g) ?: true) }
@@ -707,7 +736,6 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 )
             } else if (stack.current.route == Route.SPORTS) {
                 // The groups the viewer may see (the same set the TV Guide offers), and the movie and show categories.
-                val visibleGenres = liveState.allGenres.filter { g -> liveState.genres.any { it.id == g.id } && (defaultScope?.groupAllowed(g) ?: true) }
                 LaunchedEffect(connected) {
                     if (!connected) return@LaunchedEffect
                     withContext(Dispatchers.IO) {
@@ -913,3 +941,6 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
             *(if (stack.current.route == Route.FAVORITES) FAVORITES_INITIAL_IDS else emptyArray()), if (stack.current.route == Route.TV_GUIDE) GUIDE_GROUP_ID else null, topTab?.let(::tabFocusId))
     }
 }
+
+/** How often the background NFL search reads the guides again. */
+private const val NFL_REFRESH_MILLIS = 60 * 60_000L

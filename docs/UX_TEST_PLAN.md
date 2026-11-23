@@ -77,3 +77,5 @@ categories opened with focus on the wrong category; all fixed and checked on the
 found; Select latency right after scrolling Live TV not measured. Add a charter: **Find tonight's NFL game** (Sports, NFL, the
 game is listed with its channel and start time; Select plays it).
 
+Next run (playback, prepared, not yet run): `docs/ux-runs/next-playback-run.md`.
+

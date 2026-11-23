@@ -60,12 +60,12 @@ sealed interface SportsEntry {
 }
 
 /** What the Sports tab keeps while the viewer is elsewhere (held by the app shell, like the Live TV state). */
-class SportsState(private val catalog: LiveCatalog, loader: GuideLoader) {
+class SportsState(private val catalog: LiveCatalog, loader: GuideLoader, saveNfl: (String) -> Unit = {}) {
     var selected: Int by mutableIntStateOf(0)
         private set
     var channels: PagedChannels by mutableStateOf(PagedChannels { CatalogResult.Failed(LiveCatalog.NOT_CONNECTED) })
         private set
-    val nfl = NflSearch(catalog, loader)
+    val nfl = NflSearch(catalog, loader, save = saveNfl)
     val railState = LazyListState()
     val listState = LazyListState()
 
@@ -191,28 +191,30 @@ private fun NflPane(
     val nfl = state.nfl
     var more by remember { mutableIntStateOf(0) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    // The search normally runs in the background (see the shell). If Sports is opened before any pass has finished and none
+    // is under way (the first minute after start-up), start one here so the viewer is not left waiting.
     LaunchedEffect(connected, allGenres.size) {
-        if (!connected || allGenres.isEmpty()) return@LaunchedEffect
-        if (nfl.stale()) nfl.reset()
-        if (!nfl.done) withContext(Dispatchers.IO) { nfl.run(allGenres) }
+        if (connected && allGenres.isNotEmpty() && nfl.finishedAt == 0L && !nfl.running) withContext(Dispatchers.IO) { nfl.refresh(allGenres) }
     }
     LaunchedEffect(more) {
-        if (more > 0 && connected && allGenres.isNotEmpty()) withContext(Dispatchers.IO) { nfl.run(allGenres, more = true) }
+        if (more > 0 && connected && allGenres.isNotEmpty()) withContext(Dispatchers.IO) { nfl.extend(allGenres) }
     }
+    val updated = if (nfl.finishedAt > 0) "Updated ${timeText(context, nfl.finishedAt / 1000)}" else ""
     val status = when {
-        !connected -> "Waiting for the portal connection…"
-        !nfl.done -> "Checking the guide: ${nfl.current.ifBlank { "…" }} · ${nfl.checked} of ${nfl.queued} channels"
-        else -> "Checked the guide of ${nfl.checked} channels" + if (nfl.extended) "" else " (named NFL, the US and Canadian networks, ESPN, Paramount+, Peacock, DAZN)"
+        nfl.finishedAt == 0L && !connected -> "Waiting for the portal connection…"
+        nfl.finishedAt == 0L -> "Looking for NFL games in the guide: ${nfl.current.ifBlank { "…" }} · ${nfl.checked} of ${nfl.queued} channels"
+        nfl.running -> "$updated · checking again in the background (${nfl.checked} of ${nfl.queued} channels)"
+        else -> "$updated · from the guides of ${if (nfl.extended) "the sports and network channels" else "channels named NFL, the US and Canadian networks, ESPN, Paramount+, Peacock and DAZN"}"
     }
     Text(status, style = Tokens.Body, color = Tokens.TextSecondary, maxLines = 2, modifier = Modifier.padding(bottom = Spacing.S1))
-    val list = nfl.listings
+    val list = remember(nfl.listings, nowSec) { nfl.current(nowSec) }
     val channels = list.map { it.channel }
     // Games are sorted to the top as they are found. A lazy list keeps its first visible row in place when rows are added
     // above it, which would push the new games off the top, so stay at the top until the viewer moves into the results.
     LaunchedEffect(list.size) {
         if (memory.focusedId?.startsWith("sports-row-") != true) state.listState.scrollToItem(0)
     }
-    if (list.isEmpty() && nfl.done) Text("No NFL games in the guide right now.", style = Tokens.BodyLarge, color = Tokens.TextPrimary, modifier = Modifier.padding(bottom = Spacing.S2))
+    if (list.isEmpty() && nfl.finishedAt > 0L) Text("No NFL games in the guide right now.", style = Tokens.BodyLarge, color = Tokens.TextPrimary, modifier = Modifier.padding(bottom = Spacing.S2))
     LazyColumn(
         state = state.listState, verticalArrangement = Arrangement.spacedBy(Spacing.S1),
         modifier = Modifier.fillMaxSize().enterAt(memory) { if (list.isEmpty()) SPORTS_MORE_ID else sportsRowFocusId(state.listState.firstVisibleItemIndex) },
@@ -245,7 +247,7 @@ private fun NflPane(
             }
             }
         }
-        if (nfl.done && !nfl.extended) item(key = "more") {
+        if (nfl.finishedAt > 0L && !nfl.running && !nfl.extended) item(key = "more") {
             Box(Modifier.padding(top = Spacing.S2)) {
                 OsFocusable(id = SPORTS_MORE_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = { more++ }) { _ ->
                     Text("Check more channels (the other sports groups, slower)", style = Tokens.Body, color = Tokens.TextPrimary,
