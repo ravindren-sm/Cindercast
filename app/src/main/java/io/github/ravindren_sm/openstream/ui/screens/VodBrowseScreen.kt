@@ -89,6 +89,12 @@ class VodBrowseState(private val catalog: VodCatalog, val kind: VodKind) {
     var minRating: Double? by mutableStateOf(null)
         private set
     var hideUnrated: Boolean = false
+    /** A genre and an earliest year chosen for this view (read from the on-device copy; they need it). */
+    var genre: String? by mutableStateOf(null)
+        private set
+    var yearFrom: Int? by mutableStateOf(null)
+        private set
+    private val viewFilter: Boolean get() = genre != null || yearFrom != null
 
     /** Set by the shell: the on-device copy of the catalog, and which categories it holds completely. */
     var indexed: IndexedTitles? = null
@@ -122,6 +128,8 @@ class VodBrowseState(private val catalog: VodCatalog, val kind: VodKind) {
     }
 
     fun changeSort(newSort: BrowseSort) { sort = newSort; reload(); gridState.requestScrollToItem(0) }
+    fun changeGenre(value: String?) { genre = value; reload(); gridState.requestScrollToItem(0) }
+    fun changeYearFrom(value: Int?) { yearFrom = value; reload(); gridState.requestScrollToItem(0) }
     fun changeMinRating(value: Double?) { minRating = value; reload(); gridState.requestScrollToItem(0) }
 
     /** A Kids profile's own rules, and the profile's rule for which categories are listed (adult categories, a Kids allow-list). */
@@ -163,16 +171,16 @@ class VodBrowseState(private val catalog: VodCatalog, val kind: VodKind) {
         val sc = scope?.takeIf { it.active }
         val local = indexed
         val haveCopy = local != null && kids == null && ready(category.id)        // the device copy has no age or word filter, so a Kids profile reads the portal's pages
-        val genres = sc?.indexGenres
-        val deviceCanDoIt = sc == null || genres != null                      // the subtitle wording check needs the portal's own pages
-        if (haveCopy && deviceCanDoIt && (sort != BrowseSort.NEWEST || policy.active || sc != null)) {
+        val genres = genre?.let { listOf(it) } ?: sc?.indexGenres
+        val deviceCanDoIt = sc == null || sc.indexGenres != null || genre != null                      // the subtitle wording check needs the portal's own pages
+        if (haveCopy && deviceCanDoIt && (sort != BrowseSort.NEWEST || policy.active || sc != null || viewFilter)) {
             usingIndex = true; sortUnavailable = false
             // The defaults' rating floor also leaves out unrated titles, as it does in search.
             val floor = listOfNotNull(policy.minRating, sc?.minRating).maxOrNull()
             val effective = ContentPolicy(floor, policy.hideUnrated || sc?.minRating != null)
-            titles = PagedTitles { page -> local!!.page(category.id, sort, effective, page, genres.orEmpty()) }
+            titles = PagedTitles { page -> local!!.page(category.id, sort, effective, page, genres.orEmpty(), yearFrom) }
         } else {
-            usingIndex = false; sortUnavailable = sort != BrowseSort.NEWEST
+            usingIndex = false; sortUnavailable = sort != BrowseSort.NEWEST || viewFilter
             // The portal's pages, with the rating floor and the defaults applied to each page as it arrives.
             titles = PagedTitles(keep = { policy.passes(it) && (sc?.titlePasses(it) ?: true) }) { page -> catalog.titles(category.id, page).let { r -> if (r is CatalogResult.Ok && enricher != null) CatalogResult.Ok(VodPage(r.value.page, enricher!!(r.value.items), r.value.totalItems, r.value.pageSize)) else r } }
         }
@@ -200,7 +208,7 @@ fun VodBrowseScreen(
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
-    var picker by remember { mutableIntStateOf(0) }       // 0 none, 1 sort, 2 rating floor
+    var picker by remember { mutableIntStateOf(0) }       // 0 none, 1 sort, 2 rating floor, 3 genre, 4 earliest year
     LaunchedEffect(connected) {
         if (connected && !state.categoriesLoaded) withContext(Dispatchers.IO) { state.loadCategories() }
     }
@@ -251,6 +259,16 @@ fun VodBrowseScreen(
                 memory = memory, returnFocusId = BROWSE_SORT_ID, onToggle = { id -> state.changeSort(BrowseSort.valueOf(id)) }, onClose = { picker = 0 },
             )
         }
+        3 -> ChoicePicker(
+            "Genre", listOf(Choice("any", "Any genre")) + GENRES.map { Choice(it, it) }, setOf(state.genre ?: "any"), multi = false,
+            note = "From the saved title list (portal genres, or the online tags). Needs the title index for this category.",
+            memory = memory, returnFocusId = BROWSE_GENRE_ID, onToggle = { id -> state.changeGenre(id.takeIf { it != "any" }) }, onClose = { picker = 0 },
+        )
+        4 -> ChoicePicker(
+            "Released since", listOf(Choice("any", "Any year")) + YEAR_STEPS.map { Choice("$it", "$it or later") }, setOf(state.yearFrom?.toString() ?: "any"), multi = false,
+            note = "Titles with no year are left out when a year is chosen.",
+            memory = memory, returnFocusId = BROWSE_YEAR_ID, onToggle = { id -> state.changeYearFrom(id.toIntOrNull()) }, onClose = { picker = 0 },
+        )
         2 -> ChoicePicker(
             "Hide titles rated below", listOf(Choice("any", "Show everything")) + ContentPolicy.STEPS.map { Choice("$it", "${"%.0f".format(it)}") },
             setOf(state.minRating?.toString() ?: "any"), multi = false,
@@ -263,6 +281,10 @@ fun VodBrowseScreen(
 
 const val BROWSE_SORT_ID = "browse-sort"
 const val BROWSE_RATING_ID = "browse-rating"
+const val BROWSE_GENRE_ID = "browse-genre"
+const val BROWSE_YEAR_ID = "browse-year"
+private val GENRES = listOf("Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary", "Drama", "Family", "Fantasy", "History", "Horror", "Music", "Mystery", "Romance", "Science Fiction", "Thriller", "War", "Western")
+private val YEAR_STEPS = listOf(2020, 2010, 2000, 1990, 1980)
 
 @Composable
 private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMemory, onOpen: (Int, VodItem) -> Unit, isFavorite: (VodItem) -> Boolean, onOpenPicker: (Int) -> Unit) {
@@ -292,9 +314,17 @@ private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMem
                 color = if (state.minRating != null) Tokens.AccentPrimary else Tokens.TextPrimary, maxLines = 1,
                 modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1))
         }
+        OsFocusable(id = BROWSE_GENRE_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = { onOpenPicker(3) }) { _ ->
+            Text(state.genre ?: "Genre: any", style = Tokens.Body, color = if (state.genre != null) Tokens.AccentPrimary else Tokens.TextPrimary, maxLines = 1,
+                modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1))
+        }
+        OsFocusable(id = BROWSE_YEAR_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = { onOpenPicker(4) }) { _ ->
+            Text(state.yearFrom?.let { "$it+" } ?: "Year: any", style = Tokens.Body, color = if (state.yearFrom != null) Tokens.AccentPrimary else Tokens.TextPrimary, maxLines = 1,
+                modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1))
+        }
     }
     when {
-        state.sortUnavailable -> Text("Sorting this category needs the title index (Settings). Showing the portal's order.", style = Tokens.Body, color = Tokens.StatusWarning)
+        state.sortUnavailable -> Text("Sorting and filtering this category need the title index (Settings). Showing the portal's order, unfiltered.", style = Tokens.Body, color = Tokens.StatusWarning)
         state.usingIndex -> Text("Sorted on this device", style = Tokens.Body, color = Tokens.TextSecondary)
     }
     Box(Modifier.fillMaxSize()) {

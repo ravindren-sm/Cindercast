@@ -71,7 +71,7 @@ runs on the family TV still stands (see Environment notes).
 
 ## Sort, filter and content-filter follow-ups
 - Check on the TV: the sort picker, the rating chip, the Settings rows, opening a title from the device copy; then on the real portal once the index has ratings.
-- Filter by genre, year range and language inside a category; remember the chosen sort per category.
+- Done 2026-11-22: Genre and Year ("Released since") buttons on the Movies and Shows screens, read from the on-device copy (checked on the TV: Hindi TV Shows, Comedy, 971 to 38 titles). Still to do: language filter, remembering the sort and filters per category, and the same for Kids profiles (they read portal pages, so the filters show a notice instead).
 - The content filter is rating-based only. Age labels (G, PG, R) are in the data and could back a proper parental filter (deferred with profiles).
 
 ## Title index follow-ups

@@ -101,6 +101,7 @@ interface CatalogIndexDao {
              OR (COALESCE(c.imdbRating, t.imdbScore, c.kinopoiskRating, t.rating) IS NULL AND :keepUnrated = 1))
         AND (:g1 IS NULL OR COALESCE(c.genres, t.genres) LIKE '%' || :g1 || '%'
              OR (:g2 IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g2 || '%') OR (:g3 IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g3 || '%'))
+        AND (:yearFrom IS NULL OR CAST(c.year AS INTEGER) >= :yearFrom)
         ORDER BY
           CASE :sort WHEN 1 THEN c.ord END ASC,
           CASE :sort WHEN 2 THEN CAST(c.year AS INTEGER) END DESC,
@@ -110,14 +111,15 @@ interface CatalogIndexDao {
           CASE :sort WHEN 6 THEN c.nameKey END ASC,
           c.ord ASC
         LIMIT :limit OFFSET :offset""")
-    suspend fun browse(categoryId: String, minRating: Double?, keepUnrated: Int, g1: String?, g2: String?, g3: String?, sort: Int, limit: Int, offset: Int): List<CatalogTitleEntity>
+    suspend fun browse(categoryId: String, minRating: Double?, keepUnrated: Int, g1: String?, g2: String?, g3: String?, yearFrom: Int?, sort: Int, limit: Int, offset: Int): List<CatalogTitleEntity>
 
     @Query("""SELECT COUNT(*) FROM catalog_titles c LEFT JOIN title_tags t ON t.kind = c.kind AND t.id = c.id WHERE c.categoryId = :categoryId
         AND (:minRating IS NULL OR COALESCE(c.imdbRating, t.imdbScore, c.kinopoiskRating, t.rating) >= :minRating
              OR (COALESCE(c.imdbRating, t.imdbScore, c.kinopoiskRating, t.rating) IS NULL AND :keepUnrated = 1))
         AND (:g1 IS NULL OR COALESCE(c.genres, t.genres) LIKE '%' || :g1 || '%'
-             OR (:g2 IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g2 || '%') OR (:g3 IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g3 || '%'))""")
-    suspend fun browseCount(categoryId: String, minRating: Double?, keepUnrated: Int, g1: String?, g2: String?, g3: String?): Int
+             OR (:g2 IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g2 || '%') OR (:g3 IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g3 || '%'))
+        AND (:yearFrom IS NULL OR CAST(c.year AS INTEGER) >= :yearFrom)""")
+    suspend fun browseCount(categoryId: String, minRating: Double?, keepUnrated: Int, g1: String?, g2: String?, g3: String?, yearFrom: Int?): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putProgress(p: IndexProgressEntity)
     @Query("SELECT * FROM index_progress") suspend fun progress(): List<IndexProgressEntity>
