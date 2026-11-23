@@ -55,6 +55,14 @@ The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
 Most providers allow **one connection per MAC address**: close any other app using the same subscription first.
 
+## Testing on the device
+
+The app is tested on a real Fire TV by driving the remote over ADB and reading where focus lands after every key
+(`.claude/skills/firetv-drive/scripts/ftv.py`), with timings taken from the debug build's redacted log. The full guide,
+with the gotchas learned along the way (screensaver, launch timing, why Select is never chained after moves, zsh quirks,
+reading the players): [docs/TESTING_ON_FIRE_TV.md](docs/TESTING_ON_FIRE_TV.md). Test plan and run logs:
+[docs/UX_TEST_PLAN.md](docs/UX_TEST_PLAN.md), [docs/ux-runs/](docs/ux-runs/).
+
 ## Project layout
 
 | Path | What it is |
