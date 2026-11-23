@@ -20,5 +20,6 @@ access with a registered MAC address. Use it only with content you are entitled 
 **Permissions:** Internet, network state.
 **Support:** <REPO_URL>/issues  **Privacy policy:** docs/PRIVACY.md (host on GitHub Pages or the README).
 
-**Assets still to make:** 1280x720 Fire TV banner (the in-app banner is a 320x180 vector), 512x512 icon, 1920x1080 screenshots
+**Assets made (2026-11-22):** logo, 1280x720 Fire TV banner and 512x512 icon in `branding/` (SVG masters plus PNG exports; the banner and launcher icon in the app use the same PNGs). The wordmark uses Helvetica Neue as rendered on the Mac, so re-export from the SVG if the font changes.
+**Assets still to make:** 1920x1080 screenshots (fake portal or kid-safe content only)
 (take them on the TV with fake-portal or kid-safe content only).
