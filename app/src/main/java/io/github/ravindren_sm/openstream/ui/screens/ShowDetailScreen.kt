@@ -108,6 +108,19 @@ class ShowDetailState(val show: VodItem, private val catalog: VodCatalog) {
         )
     }
 
+    /**
+     * Moves the page to an episode the player went on to by itself (the next episode), so Back lands on it: selects its season
+     * and scrolls to it. Returns the focus id to return to: the episode when it is in the loaded list, else its season tab
+     * (a newly selected season's episodes are not loaded yet), or null when the episode is not part of this show's page.
+     */
+    fun showPlayed(seasonId: String, episodeId: String): String? {
+        val si = seasons.indexOfFirst { it.id == seasonId }.takeIf { it >= 0 } ?: return null
+        if (si != selectedSeason) { selectSeason(si); return seasonFocusId(si) }
+        val ei = episodes.items.indexOfFirst { it.id == episodeId }.takeIf { it >= 0 } ?: return seasonFocusId(si)
+        episodeListState.requestScrollToItem((ei - 2).coerceAtLeast(0))
+        return episodeFocusId(ei)
+    }
+
     fun resumeKeyFor(episode: VodItem): String? =
         seasons.getOrNull(selectedSeason)?.let { ResumeKeys.episode(show.id, it.id, episode.id) }
 }

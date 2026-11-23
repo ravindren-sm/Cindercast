@@ -49,6 +49,7 @@ import io.github.ravindren_sm.openstream.ui.focus.FocusMemory
 import io.github.ravindren_sm.openstream.ui.theme.Spacing
 import io.github.ravindren_sm.openstream.ui.theme.Tokens
 import kotlinx.coroutines.delay
+import io.github.ravindren_sm.openstream.ui.components.onMenuKey
 
 fun continueFocusId(index: Int) = "home-cw-$index"
 fun recentFocusId(index: Int) = "home-rw-$index"
@@ -74,6 +75,8 @@ fun HomeScreen(
     recentTiles: List<ContinueTile>,
     favoriteChannels: List<io.github.ravindren_sm.openstream.profiles.db.FavoriteEntity>,
     onOpenFavoriteChannel: (Int) -> Unit,
+    /** Menu on a favorite channel tile: remove it from favorites. */
+    onRemoveFavoriteChannel: (io.github.ravindren_sm.openstream.profiles.db.FavoriteEntity) -> Unit = {},
     pinnedRows: List<PinnedRow>,
     onOpenPinnedTitle: (io.github.ravindren_sm.openstream.provider.VodItem) -> Unit,
     onOpenPinnedChannel: (rowIndex: Int, channels: List<io.github.ravindren_sm.openstream.provider.LiveChannel>, index: Int) -> Unit,
@@ -135,7 +138,12 @@ fun HomeScreen(
                 Text("Favorite channels", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
                 LazyRow(modifier = Modifier.keepHorizontalFocus(memory, homeFavChannelFocusId(0)), horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
                     itemsIndexed(favoriteChannels, key = { _, f -> f.refId }) { i, f ->
-                        ChannelCard(homeFavChannelFocusId(i), f.number.orEmpty(), f.name, memory, { onOpenFavoriteChannel(i) })
+                        // Menu removes the channel from favorites, as on the Favorites tab; focus moves to its neighbour.
+                        ChannelCard(homeFavChannelFocusId(i), f.number.orEmpty(), f.name, memory, { onOpenFavoriteChannel(i) },
+                            Modifier.onMenuKey {
+                                refocus = listOfNotNull(homeFavChannelFocusId(i), if (i > 0) homeFavChannelFocusId(i - 1) else null, continueFocusId(0))
+                                onRemoveFavoriteChannel(f)
+                            })
                     }
                 }
             }
@@ -171,7 +179,14 @@ fun HomeScreen(
                 }
             }
             if (pinnedRows.isEmpty()) Text("Tip: press Menu on a category in Movies or Shows, or a group in Live TV, to show it here (a tick marks pinned ones).", style = Tokens.Body, color = Tokens.TextSecondary)
-            if (!continueTiles.isNullOrEmpty() || recentTiles.isNotEmpty()) Text("Press Menu on a title for options", style = Tokens.Body, color = Tokens.TextSecondary)
+            val titles = !continueTiles.isNullOrEmpty() || recentTiles.isNotEmpty()
+            val hint = when {
+                titles && favoriteChannels.isNotEmpty() -> "Press Menu on a title for options, or on a favorite channel to remove it"
+                titles -> "Press Menu on a title for options"
+                favoriteChannels.isNotEmpty() -> "Press Menu on a favorite channel to remove it"
+                else -> null
+            }
+            if (hint != null) Text(hint, style = Tokens.Body, color = Tokens.TextSecondary)
         }
         menuTile?.let { tile -> TileMenu(tile, memory, onChoose = ::close) }
     }

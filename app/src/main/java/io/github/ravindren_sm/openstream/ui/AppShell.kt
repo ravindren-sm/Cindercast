@@ -548,7 +548,17 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                     ?.let { PlayTarget(it, it.name, ResumeKeys.movie(it.id), languageText = browse.categories.getOrNull(browse.selected)?.title) }
             }
             VodPlayerScreen(target = target, playback = vodPlayback, resume = resumeStore, memory = memory, portalUrl = portalUrl, history = recorder,
-                findNext = nextFinder::find, onPlayNext = { playOverride = it }, autoPlayNext = autoPlayNext)
+                findNext = nextFinder::find, autoPlayNext = autoPlayNext,
+                onPlayNext = { next ->
+                    playOverride = next
+                    // Opened from the show page: Back lands on the episode now playing, not the one first chosen.
+                    val below = stack.frames.getOrNull(stack.frames.size - 2)?.route
+                    val page = showDetail
+                    val key = io.github.ravindren_sm.openstream.data.NextEpisodeLogic.parseKey(next.resumeKey)
+                    if (below == Route.SHOW_DETAIL && page != null && key != null && key.first == page.show.id) {
+                        page.showPlayed(key.second, key.third)?.let { stack = stack.withPreviousFocus(it) }
+                    }
+                })
         } else {
             TopNavBar(
                 activeTab = topTab,
@@ -578,6 +588,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                         stack = stack.navigate(Route.LIVE_PLAYER, mapOf("item" to "$i", "src" to "fav", "from" to "homepin", "row" to "$r"), currentFocusId = memory.focusedId)
                     },
                     favoriteChannels = favorites.channels(),
+                    onRemoveFavoriteChannel = { f -> favorites.toggle(f.kind, f.refId, f.name, f.posterUri, f) },
                     onOpenFavoriteChannel = { i ->
                         favPlayer = PagedChannels.fixed(favorites.channels().map(FavoriteItems::toChannel))
                         stack = stack.navigate(Route.LIVE_PLAYER, mapOf("item" to "$i", "src" to "fav", "from" to "home"), currentFocusId = memory.focusedId)

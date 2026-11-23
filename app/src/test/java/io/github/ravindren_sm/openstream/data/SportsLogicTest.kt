@@ -61,6 +61,16 @@ class SportsLogicTest {
     private fun ch(id: String, name: String, number: String = id) = LiveChannel(id, number, name, null)
     private fun p(name: String, start: Long, stop: Long) = EpgProgramme(name, null, null, start, stop)
 
+    @Test fun aRepeatedShowIsListedOnceButEveryGameIsKept() {
+        val rz = ch("9", "NFL: REDZONE 4K")
+        val filler = (0..2).map { k -> EpgProgramme("Every Sunday Afternoon", "NFL RedZone", null, 1_000L + k * 100, 1_100L + k * 100) }
+        val shown = SportsLogic.listings(rz, filler, nowSec = 1_050)
+        assertEquals(1, shown.size); assertEquals(1_000L, shown[0].programme?.startSec)
+        val fox = ch("2", "FOX")
+        val games = listOf(p("Bills at Chiefs", 1_000, 2_000), p("Bills at Chiefs", 5_000, 6_000))   // live, then a replay
+        assertEquals(2, SportsLogic.listings(fox, games, nowSec = 1_500).size)
+    }
+
     @Test fun listingsShowTheLiveGameAndLaterGamesInOrder() {
         val now = 10_000L
         val fox = ch("1", "FOX 5 HD")

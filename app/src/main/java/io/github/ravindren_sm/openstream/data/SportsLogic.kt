@@ -127,7 +127,10 @@ object SportsLogic {
      */
     fun listings(channel: LiveChannel, programmes: List<EpgProgramme>, nowSec: Long): List<NflListing> {
         val current = programmes.filter { it.stopSec > nowSec }.sortedBy { it.startSec }
+        // A show repeated through the guide (RedZone's "Every Sunday Afternoon" filler, a magazine show twice a day) is listed
+        // once, at its next showing; each game is kept.
         val games = current.filter(::isNfl).map { NflListing(channel, it, live = it.startSec <= nowSec, game = isGame(it)) }
+            .distinctBy { if (it.game) "game ${it.programme?.startSec}" else "show " + words(it.programme?.name.orEmpty()).joinToString(" ") }
         if (games.isNotEmpty()) return games
         // A channel named for the NFL (NFL Network, RedZone, a team's channel) is listed with what is on now, but only when the
         // guide says something: team channels show "No details available" all week until a game is on.

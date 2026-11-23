@@ -23,6 +23,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
 import io.github.ravindren_sm.openstream.data.CatalogResult
@@ -141,7 +142,16 @@ fun LiveTvScreen(
             when {
                 // Left from a channel comes back to the group being watched, not to whichever group is level with the channel.
                 state.genresLoaded -> LazyColumn(state = state.genreListState, verticalArrangement = Arrangement.spacedBy(Spacing.S1),
-                    modifier = Modifier.enterAt(memory) { genreFocusId(state.selected) }) {
+                    modifier = Modifier
+                        // Leaving the rail with the group being watched scrolled out of view (the viewer looked further down
+                        // without choosing): bring it back, so Left returns to it rather than to the group beside the channel.
+                        .onFocusChanged { f ->
+                            val rail = state.genreListState
+                            if (!f.hasFocus && rail.layoutInfo.visibleItemsInfo.none { it.index == state.selected }) {
+                                rail.requestScrollToItem((state.selected - 3).coerceAtLeast(0))
+                            }
+                        }
+                        .enterAt(memory) { genreFocusId(state.selected) }) {
                     itemsIndexed(state.genres, key = { _, g -> g.id }) { index, genre ->
                         OsFocusable(
                             id = genreFocusId(index), memory = memory, variant = FocusVariant.ROW,
