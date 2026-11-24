@@ -14,8 +14,8 @@ import java.io.File
  * storage (docs/MILESTONES.md, M2).
  *
  * File shape (values are the user's; never logged):
- *   {"portalUrl": "...", "mac": "...", "genre": "ENGLISH USA LOCAL",
- *    "channel": "NEWS 12 LONG ISLAND", "identity": "honest", "streamUserAgent": "player",
+ *   {"portalUrl": "...", "mac": "...", "genre": "ENGLISH NEWS",
+ *    "channel": "CNN", "identity": "honest", "streamUserAgent": "player",
  *    "mode": "live" | "vod-catalog" | "vod-movie" | "vod-episode", "vodCategory": "ENGLISH MOVIES"}
  */
 data class DevConfig(
@@ -49,8 +49,8 @@ data class DevConfig(
                 DevConfig(
                     portalUrl = j.getString("portalUrl").trim(),
                     mac = j.getString("mac").trim(),
-                    genre = j.optString("genre", "ENGLISH USA LOCAL"),
-                    channel = j.optString("channel", "NEWS 12 LONG ISLAND"),
+                    genre = j.optString("genre", "ENGLISH NEWS"),
+                    channel = j.optString("channel", "CNN"),
                     identity = if (j.optString("identity", "honest") == "mag") StalkerIdentity.MAG else StalkerIdentity.HONEST,
                     streamUserAgent = j.optString("streamUserAgent", "player"),
                     mode = j.optString("mode", "live"),

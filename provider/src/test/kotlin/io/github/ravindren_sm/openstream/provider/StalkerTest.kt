@@ -123,15 +123,15 @@ class StalkerTest {
         server.enqueue(json("""{"js":{"token":"t0k3n"}}"""))
         server.enqueue(json("""{"js":[{"id":"*","title":"All"},{"id":"12","title":"English USA Local"},{"id":"13","title":"Kids"}]}"""))
         server.enqueue(json("""{"js":{"total_items":"57","max_page_items":14,"data":[
-            {"number":"1","name":"NEWS 12 LONG ISLAND 4K","cmd":"ffrt http://localhost/ch/101_"},
-            {"number":"2","name":"NEWS 12 CONNECTICUT","cmd":"ffrt http://localhost/ch/102_"}]}}"""))
+            {"number":"1","name":"CITY NEWS EAST 4K","cmd":"ffrt http://localhost/ch/101_"},
+            {"number":"2","name":"CITY NEWS WEST","cmd":"ffrt http://localhost/ch/102_"}]}}"""))
         val c = client(); c.handshake()
         val (g, id) = c.findGenreId("ENGLISH USA LOCAL")
         assertEquals("12", id)
         assertTrue(g.summary.contains("requested genre 'ENGLISH USA LOCAL': found"), g.summary.toString())
-        val (page, cmd, label) = c.channelInGenre(id!!, "news 12 long island")
+        val (page, cmd, label) = c.channelInGenre(id!!, "city news east")
         assertEquals("ffrt http://localhost/ch/101_", cmd)
-        assertEquals("1 NEWS 12 LONG ISLAND 4K", label)
+        assertEquals("1 CITY NEWS EAST 4K", label)
         assertTrue(page.summary.first().contains("channels in genre: 57"), page.summary.toString())
         server.takeRequest(); server.takeRequest()
         val listReq = server.takeRequest()
@@ -145,7 +145,7 @@ class StalkerTest {
         server.enqueue(json("""{"js":{"total_items":"1","data":[{"number":"9","name":"Other","cmd":"ffrt http://localhost/ch/9_"}]}}"""))
         val c = client(); c.handshake()
         assertNull(c.findGenreId("ENGLISH USA LOCAL").second)
-        val (_, cmd, label) = c.channelInGenre("1", "NEWS 12")
+        val (_, cmd, label) = c.channelInGenre("1", "CITY NEWS")
         assertNull(cmd); assertNull(label)
     }
 

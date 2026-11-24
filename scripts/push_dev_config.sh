@@ -3,7 +3,7 @@
 #   /data/data/<package>/files/dev-config.json
 #
 #   bash scripts/push_dev_config.sh [genre] [channel] [identity] [streamUserAgent] [mode] [vodCategory]
-#   defaults: "ENGLISH USA LOCAL" "NEWS 12 LONG ISLAND" honest player live "ENGLISH MOVIES"
+#   defaults: "ENGLISH NEWS" "CNN" honest player live "ENGLISH MOVIES"
 #   mode: live | vod-catalog (4e, no playback) | vod-movie | vod-episode (4f, play + seek check)
 #         | keepalive (4g, ~8.5 min, no playback)
 #
@@ -18,7 +18,7 @@ set -euo pipefail
 PKG="io.github.ravindren_sm.openstream"
 FILE="${FIRETV_IPTV_SECRETS:-$HOME/.config/firetv-iptv/secrets.env}"
 ADB="${ADB:-$HOME/Library/Android/sdk/platform-tools/adb}"
-GENRE="${1:-ENGLISH USA LOCAL}"; CHANNEL="${2:-NEWS 12 LONG ISLAND}"
+GENRE="${1:-ENGLISH NEWS}"; CHANNEL="${2:-CNN}"
 IDENTITY="${3:-honest}"; STREAM_UA="${4:-player}"; MODE="${5:-live}"; VOD_CAT="${6:-ENGLISH MOVIES}"
 
 [ -f "$FILE" ] || { echo "push-config: secrets file not found"; exit 78; }

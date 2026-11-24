@@ -19,7 +19,7 @@ are placeholders: `<PORTAL_HOST>`, `<EMU_MAC>`, `<TOKEN>`. No secrets are includ
 ## 2. Reference result: a third-party app works
 TiviMate 5.3.3 on the same Fire TV, configured with portal URL + MAC only, loads 5,092 live
 channels, 99,461 movies, 27,736 shows, and plays live video (verified by screenshot several
-times, including News 12 Long Island). So the account and portal accept third-party
+times, including a local news channel). So the account and portal accept third-party
 MAC-only clients, and streams play from the Fire TV.
 
 ## 3. What our client has proven (Mac probe, same home LAN as the Fire TV)
@@ -63,7 +63,7 @@ in every hop's URL but were not logged.
 |---|---|---|---|
 | 1 | honest UA `firetv-iptv-probe/0.1` | first by number (ch 40, Canadian 4K) | - |
 | 2 | MAG200 stbapp UA + `X-User-Agent: Model: MAG250; Link: WiFi` on portal calls, MAG UA on stream | ch 40 | 210 s wait first (> `watchdog_timeout`), StbEmu and TiviMate force-stopped and verified not running |
-| 3 | honest UA | News 12 Long Island 4K (the channel TiviMate plays), via genre lookup | apps force-stopped, verified |
+| 3 | honest UA | A local news channel (the one TiviMate plays), via genre lookup | apps force-stopped, verified |
 
 ### Ruled out (with evidence)
 - User-Agent (honest vs MAG): same 403.

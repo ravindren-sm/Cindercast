@@ -53,8 +53,12 @@ import kotlinx.coroutines.withContext
  * not by the screen, so leaving the screen does not throw the loaded pages away.
  */
 class LiveBrowseState(private val catalog: LiveCatalog) {
-    /** Every group the portal lists, and the ones shown (the saved search defaults can hide groups by language). */
-    var allGenres: List<LiveGenre> = emptyList()
+    /**
+     * Every group the portal lists, and the ones shown (the saved search defaults can hide groups by language). Compose state:
+     * the shell derives the Sports rail and the background NFL search's groups from it, and as a plain field the shell did
+     * not redraw when it filled (the NFL search then waited for some unrelated redraw, 42 s in one run).
+     */
+    var allGenres: List<LiveGenre> by mutableStateOf(emptyList())
         private set
     private var groupFilter: (LiveGenre) -> Boolean = { true }
     var genres: List<LiveGenre> by mutableStateOf(emptyList())
