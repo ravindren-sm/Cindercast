@@ -32,6 +32,7 @@ import io.github.ravindren_sm.openstream.profiles.ProfileInfo
 import io.github.ravindren_sm.openstream.ui.components.Choice
 import io.github.ravindren_sm.openstream.ui.components.ChoicePicker
 import io.github.ravindren_sm.openstream.ui.components.FocusVariant
+import io.github.ravindren_sm.openstream.ui.components.LogoMark
 import io.github.ravindren_sm.openstream.ui.components.OsFocusable
 import io.github.ravindren_sm.openstream.ui.components.OsTextField
 import io.github.ravindren_sm.openstream.ui.focus.FocusMemory
@@ -101,6 +102,7 @@ fun ProfilesScreen(model: ProfilesModel, memory: FocusMemory, startInManage: Boo
     Box(modifier.fillMaxSize().trapFocus().background(Tokens.BgCanvas)) {
         when (mode) {
             Mode.PICK -> Column(Modifier.fillMaxSize().padding(Spacing.SafeHorizontal), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                LogoMark(Modifier.padding(bottom = Spacing.S3), size = 72.dp)
                 Text("Who's watching?", style = Tokens.TitleLarge, color = Tokens.TextPrimary)
                 Row(Modifier.padding(vertical = Spacing.S4), horizontalArrangement = Arrangement.spacedBy(Spacing.S3)) {
                     model.profiles.forEachIndexed { i, p ->
@@ -113,9 +115,13 @@ fun ProfilesScreen(model: ProfilesModel, memory: FocusMemory, startInManage: Boo
                 }
             }
             Mode.MANAGE -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.S3), verticalArrangement = Arrangement.spacedBy(Spacing.S1)) {
-                Text("Profiles", style = Tokens.TitleLarge, color = Tokens.TextPrimary)
+                // A way out at the top (the bottom has Done too): this screen has no tab bar, and Back on the remote is not obvious.
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Profiles", style = Tokens.TitleLarge, color = Tokens.TextPrimary)
+                    ActionButton("profile-back", if (startInManage) "‹  Back to Settings" else "‹  Back", memory) { back() }
+                }
                 model.profiles.forEachIndexed { i, p ->
-                    OsFocusable(id = profileFocusId(i), memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth(), onSelect = { editing = p; mode = Mode.EDIT }) { _ ->
+                    OsFocusable(id = profileFocusId(i), memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth().then(if (i == 0) Modifier.focusProperties { up = memory.requesterFor("profile-back") } else Modifier), onSelect = { editing = p; mode = Mode.EDIT }) { _ ->
                         Row(Modifier.fillMaxWidth().padding(Spacing.S2), verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.width(24.dp).height(24.dp).background(PROFILE_COLORS[p.colorIndex.mod(PROFILE_COLORS.size)]))
                             Text(p.name, style = Tokens.BodyLarge, color = Tokens.TextPrimary, modifier = Modifier.padding(start = Spacing.S2).width(500.dp), maxLines = 1)
@@ -134,7 +140,7 @@ fun ProfilesScreen(model: ProfilesModel, memory: FocusMemory, startInManage: Boo
                     if (model.pinIsSet && model.profiles.none { it.isKids }) ActionButton("profile-pin-remove", "Remove the PIN", memory) { model.onRemovePin() }
                     ActionButton(CLOSE_ID, "Done", memory) { back() }
                 }
-                Text("The PIN protects Settings, profile changes and adult categories. Kids profiles need it to leave.", style = Tokens.Body, color = Tokens.TextSecondary)
+                Text("The PIN protects Settings, profile changes and adult categories. Kids profiles need it to leave. Back on the remote also leaves this screen.", style = Tokens.Body, color = Tokens.TextSecondary)
             }
             Mode.EDIT -> EditForm(model, editing, memory, onCancel = { mode = Mode.MANAGE }, onSaved = { d -> model.onSave(d); mode = Mode.MANAGE },
                 onDelete = { confirmDelete = it }, onKidsCategories = { model.onOpenKidsCategories(it); kidsPicker = it })

@@ -82,6 +82,7 @@ fun TopNavBar(
             }
         }
         Spacer(Modifier.weight(1f))
+        LogoMark(Modifier.padding(end = Spacing.S3))
         Clock()
     }
 }

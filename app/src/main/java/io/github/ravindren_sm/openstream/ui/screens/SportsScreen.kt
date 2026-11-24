@@ -145,9 +145,12 @@ fun SportsScreen(
                             id = sportsRailFocusId(i), memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth(),
                             onSelect = { if (e is SportsEntry.OnDemand) onOpenOnDemand(e) else state.select(i, e) },
                         ) { _ ->
-                            val gameCount = if (e is SportsEntry.Games) remember(state.games.listings, nowSec) { Leagues.forLeague(state.games.current(nowSec), e.league).count { it.game } } else 0
+                            // Games found for a league (or, with none, how many shows), so the rail says where something is on.
+                            val found = if (e is SportsEntry.Games) remember(state.games.listings, nowSec) { Leagues.forLeague(state.games.current(nowSec), e.league) } else emptyList()
+                            val gameCount = found.count { it.game }
+                            val countText = when { gameCount > 0 -> "  ·  $gameCount"; found.isNotEmpty() -> "  ·  ${found.size} shows"; else -> "" }
                             Text(
-                                e.label + if (e is SportsEntry.OnDemand) "  ›" else if (gameCount > 0) "  ·  $gameCount" else "", style = Tokens.BodyLarge, maxLines = 1,
+                                e.label + if (e is SportsEntry.OnDemand) "  ›" else countText, style = Tokens.BodyLarge, maxLines = 1,
                                 color = if (i == state.selected) Tokens.AccentPrimary else Tokens.TextPrimary,
                                 modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1 + 4.dp),
                             )
