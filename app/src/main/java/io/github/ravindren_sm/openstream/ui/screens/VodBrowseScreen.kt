@@ -337,6 +337,7 @@ private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMem
     val paged = state.titles
     val gridState = state.gridState
     val scope = rememberCoroutineScope()
+    val pending = remember { GridMove() }
 
     LaunchedEffect(paged) {
         if (paged.items.isEmpty() && !paged.exhausted) withContext(Dispatchers.IO) { paged.loadNext() }
@@ -392,7 +393,7 @@ private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMem
                 horizontalArrangement = Arrangement.spacedBy(Spacing.S2), verticalArrangement = Arrangement.spacedBy(Spacing.S2),
             ) {
                 itemsIndexed(paged.items, key = { _, t -> t.id }) { index, item ->
-                    TitleCard(index, item, portalUrl, memory, onOpen, isFavorite(item), onVertical = { from, down -> moveInGrid(from, down, paged, gridState, memory, scope) })
+                    TitleCard(index, item, portalUrl, memory, onOpen, isFavorite(item), onVertical = { from, down -> moveInGrid(from, down, paged, gridState, memory, scope, pending) })
                 }
                 if (paged.error != null) {
                     item(key = "retry", span = { androidx.compose.foundation.lazy.grid.GridItemSpan(COLUMNS) }) {
@@ -462,17 +463,29 @@ private fun Message(text: String) {
  * search, a held key raced the grid's scrolling and the focused card's growing: presses were dropped and focus drifted into
  * another column. Returns true when the key is handled; false from the first row going Up, so focus leaves for the filter buttons.
  */
-private fun moveInGrid(from: Int, down: Boolean, paged: PagedTitles, gridState: LazyGridState, memory: FocusMemory, scope: kotlinx.coroutines.CoroutineScope): Boolean {
+private fun moveInGrid(from: Int, down: Boolean, paged: PagedTitles, gridState: LazyGridState, memory: FocusMemory, scope: kotlinx.coroutines.CoroutineScope, pending: GridMove): Boolean {
     val last = paged.items.lastIndex
-    var target = from + if (down) COLUMNS else -COLUMNS
-    if (target < 0) return false
+    // Keys can arrive faster than focus lands on a card that had to be scrolled into view: count from the card the last key
+    // aimed at while that is still on its way, not from the card that still has focus, or those presses all aim at one row.
+    val now = System.nanoTime()
+    val base = if (pending.target >= 0 && now - pending.at < GridMove.WINDOW_NANOS) pending.target else from
+    var target = base + if (down) COLUMNS else -COLUMNS
+    if (target < 0) { pending.target = -1; return false }
     if (target > last) {
         // Below the last full row: the last card of a short final row, or stay put on the final row.
-        if (from / COLUMNS >= last / COLUMNS) return true
+        if (base / COLUMNS >= last / COLUMNS) return true
         target = last
     }
+    pending.target = target; pending.at = now
     if (!memory.tryFocus(titleFocusId(target))) {
         scope.launch { gridState.scrollToItem(target); androidx.compose.runtime.withFrameNanos { }; memory.tryFocus(titleFocusId(target)) }
     }
     return true
+}
+
+/** The card the last Up or Down key aimed at, and when, so a burst of keys moves one row each (see [moveInGrid]). */
+private class GridMove {
+    var target = -1
+    var at = 0L
+    companion object { const val WINDOW_NANOS = 400_000_000L }
 }

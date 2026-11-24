@@ -83,7 +83,11 @@ class LiveBrowseState(private val catalog: LiveCatalog) {
     /** Loads the genres and selects the first one ("All channels"). Blocking: call off the main thread. */
     fun loadGenres() {
         when (val r = catalog.genres()) {
-            is CatalogResult.Ok -> { allGenres = r.value; genres = r.value.filter(groupFilter); genresLoaded = true; genresError = null; select(rememberedIndex(), resetScroll = false, chosen = false) }
+            is CatalogResult.Ok -> androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
+                // One step for the screen: the groups and the group shown change together, so focus never lands on "All" first.
+                allGenres = r.value; genres = r.value.filter(groupFilter); genresLoaded = true; genresError = null
+                select(rememberedIndex(), resetScroll = false, chosen = false)
+            }
             is CatalogResult.Failed -> genresError = r.message
         }
     }

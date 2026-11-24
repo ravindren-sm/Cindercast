@@ -951,17 +951,21 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         if (!homeReady) return@LaunchedEffect
         androidx.compose.runtime.withFrameNanos { }   // let the new screen compose and attach
         // Movies, Shows and Live TV open on the category or group being shown (Sports can open them on any category).
-        val browseFocus = when (stack.current.route) {
+        fun browseTarget() = when (stack.current.route) {
             Route.MOVIES -> categoryFocusId(moviesState.selected); Route.SHOWS -> categoryFocusId(showsState.selected)
             Route.LIVE_TV -> genreFocusId(liveState.selected); else -> null
         }
+        val browseFocus = browseTarget()
         // A tab opened from a Home door starts inside its page, but the page's first item may still be loading (the channel
-        // groups, the categories): wait for it, up to 3 s, instead of settling on the tab bar.
+        // groups, the categories; right after launch the portal may still be connecting): wait for it, up to 8 s, instead of
+        // settling on the tab bar. The target is read again each time, since the chosen group is known only once they load.
         if (stack.restoreFocusId == null && stack.current.route.isTab && stack.current.route != Route.HOME) {
-            val first = browseFocus ?: initialFocusId(stack.current.route)
             var tries = 0
-            while (!memory.tryFocus(first) && tries++ < 15) delay(200)
-            if (memory.focusedId == first) return@LaunchedEffect
+            while (tries++ < 40) {
+                val target = browseTarget() ?: initialFocusId(stack.current.route)
+                if (memory.tryFocus(target)) return@LaunchedEffect
+                delay(200)
+            }
         }
         memory.tryFocusFirst(stack.restoreFocusId, browseFocus, initialFocusId(stack.current.route), if (onHome) recentFocusId(0) else null, if (onHome) homeFavChannelFocusId(0) else null, if (onHome) doorFocusId(0) else null,
             *(if (stack.current.route == Route.FAVORITES) FAVORITES_INITIAL_IDS else emptyArray()), if (stack.current.route == Route.TV_GUIDE) GUIDE_GROUP_ID else null, topTab?.let(::tabFocusId))
