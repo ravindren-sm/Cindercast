@@ -92,16 +92,17 @@ private val streamClient: OkHttpClient by lazy {
 
 /** The player's own HTTP identity, on the shared client, with the debug hooks attached (none in release). */
 @androidx.annotation.OptIn(UnstableApi::class)
-internal fun createStreamPlayer(context: Context): ExoPlayer {
+internal fun createStreamPlayer(context: Context, preview: Boolean = false): ExoPlayer {
     val client = streamClient
     val dataSource = OkHttpDataSource.Factory(client).setUserAgent("AndroidXMedia3/${MediaLibraryInfo.VERSION}")
     // If a hardware decoder fails, try the next one (a software decoder) before giving up.
     val renderers = DefaultRenderersFactory(context).setEnableDecoderFallback(true)
     // A smaller buffer than Media3's default (50 s and up to about 50 MB for 1080p): this stick has little memory to spare, and a
     // few seconds' margin is enough on a steady connection. Bytes decide before time, so the cap holds for high-bitrate streams.
+    // A preview inset gets a much smaller buffer (it plays muted in a small box and is dropped as soon as focus moves on).
     val load = androidx.media3.exoplayer.DefaultLoadControl.Builder()
-        .setBufferDurationsMs(10_000, 25_000, 2_500, 5_000)
-        .setTargetBufferBytes(14 * 1024 * 1024)
+        .apply { if (preview) setBufferDurationsMs(2_500, 6_000, 1_000, 2_000) else setBufferDurationsMs(10_000, 25_000, 2_500, 5_000) }
+        .setTargetBufferBytes(if (preview) 4 * 1024 * 1024 else 14 * 1024 * 1024)
         .setPrioritizeTimeOverSizeThresholds(false)
         .build()
     return ExoPlayer.Builder(context, renderers)

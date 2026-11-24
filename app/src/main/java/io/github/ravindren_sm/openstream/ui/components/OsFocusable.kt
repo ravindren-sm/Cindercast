@@ -48,6 +48,8 @@ fun OsFocusable(
     onSelect: () -> Unit = {},
     /** For composites (such as a text field with two modes) that register one requester for several nodes. */
     ownedRequester: FocusRequester? = null,
+    /** Told whenever this element gains or loses focus (for a screen that shows something about the focused row). */
+    onFocusChange: (Boolean) -> Unit = {},
     content: @Composable (focused: Boolean) -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -67,6 +69,7 @@ fun OsFocusable(
             .focusRequester(requester)
             .onFocusChanged { state ->
                 focused = state.isFocused
+                onFocusChange(state.isFocused)
                 if (state.isFocused) memory.focusedId = id
             }
             .zIndex(if (focused) 1f else 0f)   // drawn above its neighbours while scaled up, so they do not cover its edges

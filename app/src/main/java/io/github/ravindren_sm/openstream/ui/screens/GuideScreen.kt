@@ -174,6 +174,8 @@ fun ChannelGuideRow(
     onGuide: (hasGuide: Boolean) -> Unit = {},
     /** When true a channel without a guide shows nothing after its name (the screen already says so for the whole group). */
     quietWhenEmpty: Boolean = false,
+    /** Told when this row gains or loses focus. */
+    onFocusChange: (Boolean) -> Unit = {},
     onSelect: () -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -187,7 +189,7 @@ fun ChannelGuideRow(
             onGuide(GuideLogic.nowAndNext(r.filterNot { SportsLogic.isPlaceholder(it.name, channel.name) }, nowSec).let { it.now != null || it.next != null })
         }
     }
-    OsFocusable(id = id, memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth().then(modifier), onSelect = onSelect) { _ ->
+    OsFocusable(id = id, memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth().then(modifier), onSelect = onSelect, onFocusChange = onFocusChange) { _ ->
         Row(Modifier.fillMaxWidth().height(96.dp).padding(horizontal = Spacing.S2), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.width(340.dp)) {
                 Text(channel.number, style = Tokens.Mono, color = Tokens.TextSecondary, maxLines = 1)

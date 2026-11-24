@@ -30,6 +30,8 @@ import androidx.tv.material3.Text
 import io.github.ravindren_sm.openstream.data.CatalogResult
 import io.github.ravindren_sm.openstream.data.GuideLoader
 import io.github.ravindren_sm.openstream.data.LiveCatalog
+import io.github.ravindren_sm.openstream.data.LivePlayback
+import io.github.ravindren_sm.openstream.ui.components.ChannelPreview
 import io.github.ravindren_sm.openstream.data.NflSearch
 import io.github.ravindren_sm.openstream.data.PagedChannels
 import io.github.ravindren_sm.openstream.data.SportsLogic
@@ -100,6 +102,8 @@ fun SportsScreen(
     allGenres: List<LiveGenre>,
     loading: Boolean,
     loader: GuideLoader,
+    /** Resolves a channel to a stream for the preview inset. */
+    playback: LivePlayback,
     connected: Boolean,
     memory: FocusMemory,
     onOpenChannel: (channels: List<LiveChannel>, index: Int) -> Unit,
@@ -150,7 +154,7 @@ fun SportsScreen(
         Column(Modifier.weight(1f).fillMaxHeight()) {
             when (entry) {
                 is SportsEntry.Nfl -> NflPane(state, allGenres, connected, nowSec, memory, onOpenChannel)
-                is SportsEntry.Live -> LivePane(state, loader, nowSec, memory, onOpenChannel)
+                is SportsEntry.Live -> LivePane(state, loader, playback, nowSec, memory, onOpenChannel)
                 is SportsEntry.OnDemand -> Unit
             }
         }
@@ -158,7 +162,7 @@ fun SportsScreen(
 }
 
 @Composable
-private fun LivePane(state: SportsState, loader: GuideLoader, nowSec: Long, memory: FocusMemory, onOpenChannel: (List<LiveChannel>, Int) -> Unit) {
+private fun LivePane(state: SportsState, loader: GuideLoader, playback: LivePlayback, nowSec: Long, memory: FocusMemory, onOpenChannel: (List<LiveChannel>, Int) -> Unit) {
     val paged = state.channels
     val listState = state.listState
     LaunchedEffect(paged) {
@@ -167,6 +171,8 @@ private fun LivePane(state: SportsState, loader: GuideLoader, nowSec: Long, memo
             if (loaded > 0 && last >= loaded - 4 && !paged.exhausted && paged.error == null) withContext(Dispatchers.IO) { paged.loadNext() }
         }
     }
+    // The channel under focus, shown live in the inset beside the list.
+    var previewed: LiveChannel? by remember(paged) { mutableStateOf(null) }
     // Which channels of this group have a guide: when the first several have none, say so once instead of on every row.
     val hasGuide = remember(paged) { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
     val noGuideAtAll = hasGuide.size >= 6 && hasGuide.values.none { it }
@@ -181,12 +187,25 @@ private fun LivePane(state: SportsState, loader: GuideLoader, nowSec: Long, memo
         paged.items.isEmpty() && paged.error != null -> Text(paged.error!!, style = Tokens.BodyLarge, color = Tokens.StatusError)
         paged.items.isEmpty() && paged.exhausted -> Text("No channels in this group.", style = Tokens.BodyLarge, color = Tokens.TextSecondary)
         paged.items.isEmpty() -> Text("Loading channels…", style = Tokens.BodyLarge, color = Tokens.TextSecondary)
-        else -> LazyColumn(
-            state = listState, verticalArrangement = Arrangement.spacedBy(Spacing.S1),
-            modifier = Modifier.fillMaxSize().enterAt(memory) { sportsRowFocusId(listState.firstVisibleItemIndex) },
-        ) {
-            itemsIndexed(paged.items, key = { _, c -> c.id }) { i, ch ->
-                ChannelGuideRow(sportsRowFocusId(i), ch, loader, nowSec, memory, onGuide = { has -> hasGuide[ch.id] = has }, quietWhenEmpty = noGuideAtAll) { onOpenChannel(paged.items, i) }
+        else -> Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(Spacing.S3)) {
+            LazyColumn(
+                state = listState, verticalArrangement = Arrangement.spacedBy(Spacing.S1),
+                modifier = Modifier.weight(1f).fillMaxHeight().enterAt(memory) { sportsRowFocusId(listState.firstVisibleItemIndex) },
+            ) {
+                itemsIndexed(paged.items, key = { _, c -> c.id }) { i, ch ->
+                    ChannelGuideRow(
+                        sportsRowFocusId(i), ch, loader, nowSec, memory, onGuide = { has -> hasGuide[ch.id] = has }, quietWhenEmpty = noGuideAtAll,
+                        onFocusChange = { f -> if (f) previewed = ch else if (previewed?.id == ch.id) previewed = null },
+                    ) { onOpenChannel(paged.items, i) }
+                }
+            }
+            // The empty space beside the list: a small muted live picture of the channel under focus.
+            Column(Modifier.width(PREVIEW_WIDTH).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(Spacing.S1)) {
+                ChannelPreview(previewed, playback)
+                Text(
+                    if (previewed != null) "Live picture, no sound. Select opens the channel full screen." else "Move to a channel to see what it shows.",
+                    style = Tokens.Body, color = Tokens.TextSecondary,
+                )
             }
         }
     }
@@ -266,3 +285,6 @@ private fun NflPane(
         }
     }
 }
+
+/** Width of the preview inset beside a channel list (a 16:9 box of this width). */
+private val PREVIEW_WIDTH = 520.dp

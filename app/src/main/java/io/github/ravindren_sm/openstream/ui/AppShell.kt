@@ -769,7 +769,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 SportsScreen(
                     state = sportsState, entries = entries, allGenres = visibleGenres,
                     loading = !liveState.genresLoaded || !moviesState.categoriesLoaded || !showsState.categoriesLoaded,
-                    loader = guideLoader, connected = connected, memory = memory,
+                    loader = guideLoader, playback = livePlayback, connected = connected, memory = memory,
                     onOpenChannel = { list, i ->
                         favPlayer = PagedChannels.fixed(list)
                         stack = stack.navigate(Route.LIVE_PLAYER, mapOf("item" to "$i", "src" to "fav", "from" to "sports"), currentFocusId = memory.focusedId)
