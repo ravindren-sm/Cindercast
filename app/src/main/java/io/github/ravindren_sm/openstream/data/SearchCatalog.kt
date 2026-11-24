@@ -49,14 +49,21 @@ object SearchRanking {
     fun explains(item: VodItem, query: String): Boolean {
         val words = normalize(query).split(' ').filter { it.isNotEmpty() }
         if (words.isEmpty()) return true
-        val text = listOfNotNull(item.name, item.actors, item.director, item.description).joinToString(" ") { normalize(it) }
-        return words.all { it in text }
+        val name = normalize(item.name)
+        val others = listOfNotNull(item.actors, item.director, item.description).joinToString(" ") { normalize(it) }
+        // In the name a word may match anywhere ("leg" while typing "legend"); in people and the description it must begin a
+        // word, so "lego" does not match the director López-Gallego.
+        return words.all { it in name || startsAWord(others, it) }
     }
+
+    /** True when [word] begins a word of [text] (both already normalized). */
+    private fun startsAWord(text: String, word: String): Boolean =
+        Regex("(^|[^\\p{L}\\p{N}])" + Regex.escape(word)).containsMatchIn(text)
 
     /** Where the query was found when it is not in the name ("Cast", "Director", "Description"), or null when the name shows it. */
     fun matchReason(item: VodItem, query: String): String? {
         val words = normalize(query).split(' ').filter { it.isNotEmpty() }
-        fun has(t: String?) = t != null && normalize(t).let { n -> words.any { it in n } }
+        fun has(t: String?) = t != null && normalize(t).let { n -> words.any { startsAWord(n, it) } }
         if (words.isEmpty() || words.all { it in normalize(item.name) }) return null
         return when { has(item.actors) -> "Cast"; has(item.director) -> "Director"; has(item.description) -> "Description"; else -> null }
     }

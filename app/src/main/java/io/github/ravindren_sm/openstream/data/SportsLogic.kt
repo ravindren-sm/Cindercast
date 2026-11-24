@@ -102,6 +102,13 @@ object SportsLogic {
         return teams.any { it !in AMBIGUOUS } && "FOOTBALL" in w
     }
 
+    /** A show about the league: its title or category says NFL, or its title names an NFL team ("49ers Talk"). */
+    private fun isNflShowTitle(p: EpgProgramme): Boolean {
+        if (isNflText(listOfNotNull(p.name, p.category).joinToString(" "))) return true
+        val w = words(p.name)
+        return OTHER_SPORT.none { it in w } && TEAMS.any { it in w && it !in AMBIGUOUS }
+    }
+
     /** One line of the NFL results: [programme] on [channel], playing now or later; [game] when it is a match, not a show about the league. */
     class NflListing(val channel: LiveChannel, val programme: EpgProgramme?, val live: Boolean, val game: Boolean = false)
 
@@ -132,7 +139,10 @@ object SportsLogic {
         val current = programmes.filter { it.stopSec > nowSec }.sortedBy { it.startSec }
         // A show repeated through the guide (RedZone's "Every Sunday Afternoon" filler, a magazine show twice a day) is listed
         // once, at its next showing; each game is kept.
-        val games = current.filter(::isNfl).map { NflListing(channel, it, live = it.startSec <= nowSec, game = isGame(it)) }
+        // A game may be recognised from its description ("Bills at Chiefs" in the blurb); a show about the league only when its
+        // title or category says so, so a sports-talk show that merely mentions the NFL in its blurb is not listed.
+        val games = current.filter { isNfl(it) && (isGame(it) || isNflShowTitle(it)) }
+            .map { NflListing(channel, it, live = it.startSec <= nowSec, game = isGame(it)) }
             .distinctBy { if (it.game) "game ${it.programme?.startSec}" else "show " + words(it.programme?.name.orEmpty()).joinToString(" ") }
         if (games.isNotEmpty()) return games
         // A channel named for the NFL (NFL Network, RedZone, a team's channel) is listed with what is on now, but only when the

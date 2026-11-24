@@ -15,6 +15,16 @@ import kotlin.test.assertTrue
 
 class NavStackTest {
 
+    @Test fun aTabOpenedFromAHomeDoorStartsInsideItsPageAndBackReturnsToTheDoor() {
+        val viaTab = NavStack.start().resetToTab(Route.LIVE_TV)
+        assertEquals(tabFocusId(Route.LIVE_TV), viaTab.restoreFocusId)           // from the bar: focus stays on the tab
+        val viaDoor = NavStack.start().enterTab(Route.LIVE_TV).withPreviousFocus("home-door-0")
+        assertNull(viaDoor.restoreFocusId)                                        // from a door: focus goes into the page
+        assertEquals(Route.LIVE_TV, viaDoor.current.route)
+        assertEquals("home-door-0", viaDoor.goBack()?.restoreFocusId)             // Back lands on the door used
+        assertFailsWith<IllegalArgumentException> { NavStack.start().enterTab(Route.HOME) }
+    }
+
     @Test fun `navigate remembers the focus of the screen being left, back restores it`() {
         val s = NavStack.start()
             .navigate(Route.MOVIES, currentFocusId = "home-continue-0")
@@ -73,7 +83,7 @@ class NavStackTest {
         assertEquals("grid-4", again.frames[1].savedFocusId)
     }
 
-    @Test fun `switching tabs resets the stack so back returns home with that tab focused`() {
+    @Test fun `switching tabs resets the stack so back returns home on its own first item`() {
         val deep = NavStack.start()
             .navigate(Route.MOVIES, currentFocusId = "nav-movies")
             .navigate(Route.MOVIE_DETAIL, currentFocusId = "poster-3")
@@ -82,7 +92,7 @@ class NavStackTest {
         assertEquals(tabFocusId(Route.SHOWS), shows.restoreFocusId)
         val back = shows.goBack()!!
         assertEquals(Route.HOME, back.current.route)
-        assertEquals(tabFocusId(Route.SHOWS), back.restoreFocusId)
+        assertNull(back.restoreFocusId)                                          // Home picks its own first item; the bar does not keep focus
         assertEquals(1, NavStack.start().navigate(Route.MOVIES, currentFocusId = "x").resetToTab(Route.HOME).depth)
     }
 

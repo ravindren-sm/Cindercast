@@ -16,6 +16,11 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -351,20 +356,20 @@ private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMem
                 modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1))
         }
         OsFocusable(id = BROWSE_RATING_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = { onOpenPicker(2) }) { _ ->
-            Text(state.minRating?.let { "Rating ${"%.0f".format(it)}+" } ?: "Rating: any", style = Tokens.Body,
+            Text(state.minRating?.let { "Rating: ${"%.0f".format(it)}+" } ?: "Rating: any", style = Tokens.Body,
                 color = if (state.minRating != null) Tokens.AccentPrimary else Tokens.TextPrimary, maxLines = 1,
                 modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1))
         }
         OsFocusable(id = BROWSE_GENRE_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = { onOpenPicker(3) }) { _ ->
-            Text(state.genre ?: "Genre: any", style = Tokens.Body, color = if (state.genre != null) Tokens.AccentPrimary else Tokens.TextPrimary, maxLines = 1,
+            Text(state.genre?.let { "Genre: $it" } ?: "Genre: any", style = Tokens.Body, color = if (state.genre != null) Tokens.AccentPrimary else Tokens.TextPrimary, maxLines = 1,
                 modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1))
         }
         OsFocusable(id = BROWSE_LANG_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = { onOpenPicker(5) }) { _ ->
-            Text(state.language?.let { c -> LANGUAGES.firstOrNull { it.first == c }?.second ?: c } ?: "Language: any", style = Tokens.Body, color = if (state.language != null) Tokens.AccentPrimary else Tokens.TextPrimary, maxLines = 1,
+            Text(state.language?.let { c -> "Language: " + (LANGUAGES.firstOrNull { it.first == c }?.second ?: c) } ?: "Language: any", style = Tokens.Body, color = if (state.language != null) Tokens.AccentPrimary else Tokens.TextPrimary, maxLines = 1,
                 modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1))
         }
         OsFocusable(id = BROWSE_YEAR_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = { onOpenPicker(4) }) { _ ->
-            Text(state.yearFrom?.let { "$it+" } ?: "Year: any", style = Tokens.Body, color = if (state.yearFrom != null) Tokens.AccentPrimary else Tokens.TextPrimary, maxLines = 1,
+            Text(state.yearFrom?.let { "Year: $it+" } ?: "Year: any", style = Tokens.Body, color = if (state.yearFrom != null) Tokens.AccentPrimary else Tokens.TextPrimary, maxLines = 1,
                 modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1))
         }
     }
@@ -387,7 +392,7 @@ private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMem
                 horizontalArrangement = Arrangement.spacedBy(Spacing.S2), verticalArrangement = Arrangement.spacedBy(Spacing.S2),
             ) {
                 itemsIndexed(paged.items, key = { _, t -> t.id }) { index, item ->
-                    TitleCard(index, item, portalUrl, memory, onOpen, isFavorite(item))
+                    TitleCard(index, item, portalUrl, memory, onOpen, isFavorite(item), onVertical = { from, down -> moveInGrid(from, down, paged, gridState, memory, scope) })
                 }
                 if (paged.error != null) {
                     item(key = "retry", span = { androidx.compose.foundation.lazy.grid.GridItemSpan(COLUMNS) }) {
@@ -400,10 +405,16 @@ private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMem
 }
 
 @Composable
-private fun TitleCard(index: Int, item: VodItem, portalUrl: String, memory: FocusMemory, onOpen: (Int, VodItem) -> Unit, favorite: Boolean) {
+private fun TitleCard(
+    index: Int, item: VodItem, portalUrl: String, memory: FocusMemory, onOpen: (Int, VodItem) -> Unit, favorite: Boolean,
+    onVertical: (from: Int, down: Boolean) -> Boolean,
+) {
     OsFocusable(
         id = titleFocusId(index), memory = memory, variant = FocusVariant.CARD,
-        modifier = Modifier.fillMaxWidth(), onSelect = { onOpen(index, item) },
+        modifier = Modifier.fillMaxWidth().onPreviewKeyEvent { e ->
+            if (e.type == KeyEventType.KeyDown && (e.key == Key.DirectionDown || e.key == Key.DirectionUp)) onVertical(index, e.key == Key.DirectionDown) else false
+        },
+        onSelect = { onOpen(index, item) },
     ) { _ ->
         Column {
             Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f)) {
@@ -444,4 +455,24 @@ private fun RetryText(message: String, memory: FocusMemory, onRetry: () -> Unit)
 @Composable
 private fun Message(text: String) {
     Text(text, style = Tokens.BodyLarge, color = Tokens.TextSecondary)
+}
+
+/**
+ * Up or Down in the poster grid moves exactly one row, by position, however fast the keys come. Left to Compose's own focus
+ * search, a held key raced the grid's scrolling and the focused card's growing: presses were dropped and focus drifted into
+ * another column. Returns true when the key is handled; false from the first row going Up, so focus leaves for the filter buttons.
+ */
+private fun moveInGrid(from: Int, down: Boolean, paged: PagedTitles, gridState: LazyGridState, memory: FocusMemory, scope: kotlinx.coroutines.CoroutineScope): Boolean {
+    val last = paged.items.lastIndex
+    var target = from + if (down) COLUMNS else -COLUMNS
+    if (target < 0) return false
+    if (target > last) {
+        // Below the last full row: the last card of a short final row, or stay put on the final row.
+        if (from / COLUMNS >= last / COLUMNS) return true
+        target = last
+    }
+    if (!memory.tryFocus(titleFocusId(target))) {
+        scope.launch { gridState.scrollToItem(target); androidx.compose.runtime.withFrameNanos { }; memory.tryFocus(titleFocusId(target)) }
+    }
+    return true
 }

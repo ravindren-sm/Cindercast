@@ -152,13 +152,14 @@ fun SearchScreen(
     ) {
         // Filters sit above the box so Down from the box goes straight to suggestions and results.
         FilterBar(state, memory, onOpen = { picker = it }, onChange = onFiltersChange, onSaveDefault = onSaveDefaultFilters)
-        // Up from the box goes to the first button of the filter row just above it (the second row when it is shown).
+        // Up from the box goes to the first button of the row just above it: the second row (Save as default, Use default) when
+        // it is shown, else the filter buttons. "Clear filters" is not a target: it ends the filter row, so a viewer pressing
+        // Up to reach the tabs cannot land on it and wipe the filters with one stray Select.
         val saved = state.defaultFilters
         val f = state.filters
         val upTarget = when {
             f.isActive && saved != f -> "search-filter-save"
             saved != null && saved != f -> "search-filter-usedefault"
-            f.isActive -> "search-filter-clear"
             else -> "search-filter-language"
         }
         OsTextField(
@@ -327,13 +328,13 @@ private fun FilterBar(
             FilterChip(chipId(FilterPicker.CATEGORY), chipLabel("Category", f.categoryIds.mapNotNull { titles[it] }.sorted()), f.categoryIds.isNotEmpty(), memory) { onOpen(FilterPicker.CATEGORY) }
             FilterChip(chipId(FilterPicker.RATING), if (f.minRating == null) "Rating" else "Rating ${"%.0f".format(f.minRating)}+", f.minRating != null, memory) { onOpen(FilterPicker.RATING) }
             FilterChip("search-filter-subs", if (f.englishSubtitles) "✓ English subtitles" else "English subtitles", f.englishSubtitles, memory) { onChange(f.copy(englishSubtitles = !f.englishSubtitles)) }
+            if (f.isActive) FilterChip("search-filter-clear", "Clear filters", false, memory) { onChange(SearchFilters()); refocus++ }
         }
         val saved = state.defaultFilters
-        if (f.isActive || (saved != null && saved != f)) {
+        if (saved != f && (f.isActive || saved != null)) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.S1)) {
                 if (f.isActive && saved != f) FilterChip("search-filter-save", "Save as default", false, memory, onSelect = { onSaveDefault(); refocus++ })
                 if (saved != null && saved != f) FilterChip("search-filter-usedefault", "Use default (${saved.summary(titles::get)})", false, memory) { onChange(saved); refocus++ }
-                if (f.isActive) FilterChip("search-filter-clear", "Clear filters", false, memory) { onChange(SearchFilters()); refocus++ }
             }
         }
         if (f.isActive) Text("Filters apply to movies and shows; channels are hidden while a filter is on.", style = Tokens.Body, color = Tokens.TextSecondary)

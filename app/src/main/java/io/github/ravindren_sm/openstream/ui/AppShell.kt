@@ -100,6 +100,7 @@ import io.github.ravindren_sm.openstream.ui.screens.HomeScreen
 import io.github.ravindren_sm.openstream.ui.screens.TileAction
 import kotlinx.coroutines.launch
 import io.github.ravindren_sm.openstream.ui.screens.doorFocusId
+import io.github.ravindren_sm.openstream.ui.screens.genreFocusId
 import io.github.ravindren_sm.openstream.ui.screens.recentFocusId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -154,7 +155,13 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     // Live TV browsing state lives here so it survives opening a channel and coming back. A new
     // portal (saved from setup) gets a fresh one, so nothing from the old portal is shown.
     var portalEpoch by remember { mutableIntStateOf(0) }
-    val liveState = remember(portalEpoch) { LiveBrowseState(LiveCatalog(session)) }
+    val liveGroupPrefs = LocalContext.current.let { c -> remember { c.applicationContext.getSharedPreferences("browse", android.content.Context.MODE_PRIVATE) } }
+    val liveState = remember(portalEpoch) {
+        LiveBrowseState(LiveCatalog(session)).also { s ->
+            s.rememberedGroupId = { liveGroupPrefs.getString("live_group", null) }
+            s.onGroupChosen = { id -> liveGroupPrefs.edit().putString("live_group", id).apply() }
+        }
+    }
     val livePlayback = remember(portalEpoch) { LivePlayback(session) }
     // TV Guide: which channels it lists, and the per-channel guide cache.
     val liveCatalog = remember(portalEpoch) { LiveCatalog(session) }
@@ -616,7 +623,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                         )
                         stack = stack.navigate(Route.VOD_PLAYER, mapOf("play" to "history"), currentFocusId = memory.focusedId)
                     },
-                    onDoor = { route -> stack = stack.resetToTab(route).let { s -> memory.focusedId?.let(s::withPreviousFocus) ?: s } },   // Back returns to the button used, not the tab
+                    onDoor = { route -> stack = stack.enterTab(route).let { s -> memory.focusedId?.let(s::withPreviousFocus) ?: s } },   // Back returns to the button used, not the tab
                     liveAllowed = !isKids,
                 )
             } else if (stack.current.route == Route.MOVIES || stack.current.route == Route.SHOWS) {
@@ -943,8 +950,19 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     LaunchedEffect(stack, homeReady) {
         if (!homeReady) return@LaunchedEffect
         androidx.compose.runtime.withFrameNanos { }   // let the new screen compose and attach
-        // Movies and Shows open on the category being shown (Sports can open them on any category).
-        val browseFocus = when (stack.current.route) { Route.MOVIES -> categoryFocusId(moviesState.selected); Route.SHOWS -> categoryFocusId(showsState.selected); else -> null }
+        // Movies, Shows and Live TV open on the category or group being shown (Sports can open them on any category).
+        val browseFocus = when (stack.current.route) {
+            Route.MOVIES -> categoryFocusId(moviesState.selected); Route.SHOWS -> categoryFocusId(showsState.selected)
+            Route.LIVE_TV -> genreFocusId(liveState.selected); else -> null
+        }
+        // A tab opened from a Home door starts inside its page, but the page's first item may still be loading (the channel
+        // groups, the categories): wait for it, up to 3 s, instead of settling on the tab bar.
+        if (stack.restoreFocusId == null && stack.current.route.isTab && stack.current.route != Route.HOME) {
+            val first = browseFocus ?: initialFocusId(stack.current.route)
+            var tries = 0
+            while (!memory.tryFocus(first) && tries++ < 15) delay(200)
+            if (memory.focusedId == first) return@LaunchedEffect
+        }
         memory.tryFocusFirst(stack.restoreFocusId, browseFocus, initialFocusId(stack.current.route), if (onHome) recentFocusId(0) else null, if (onHome) homeFavChannelFocusId(0) else null, if (onHome) doorFocusId(0) else null,
             *(if (stack.current.route == Route.FAVORITES) FAVORITES_INITIAL_IDS else emptyArray()), if (stack.current.route == Route.TV_GUIDE) GUIDE_GROUP_ID else null, topTab?.let(::tabFocusId))
     }

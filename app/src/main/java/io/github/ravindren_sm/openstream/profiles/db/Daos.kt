@@ -94,7 +94,8 @@ interface CatalogIndexDao {
 
     /**
      * One category's titles in a chosen order, with a minimum rating. [sort]: 1 newest added (the portal's order), 2 release year,
-     * 3 best rated (IMDb, else Kinopoisk), 4 IMDb, 5 Kinopoisk, 6 name. Unrated titles come last in the rating orders, and are
+     * 3 best rated (IMDb, else Kinopoisk or the online tags' score counted as at most 8.0: those come from few voters, and a
+     * perfect 10.0 from a handful of them must not outrank a well-voted IMDb 9.2), 4 IMDb, 5 Kinopoisk, 6 name. Unrated titles come last in the rating orders, and are
      * kept or dropped by [keepUnrated] (1 or 0) when [minRating] is set.
      */
     @Query("""SELECT c.* FROM catalog_titles c LEFT JOIN title_tags t ON t.kind = c.kind AND t.id = c.id WHERE c.categoryId = :categoryId
@@ -107,7 +108,7 @@ interface CatalogIndexDao {
         ORDER BY
           CASE :sort WHEN 1 THEN c.ord END ASC,
           CASE :sort WHEN 2 THEN CAST(c.year AS INTEGER) END DESC,
-          CASE :sort WHEN 3 THEN COALESCE(c.imdbRating, t.imdbScore, c.kinopoiskRating, t.rating) END DESC,
+          CASE :sort WHEN 3 THEN COALESCE(c.imdbRating, t.imdbScore, MIN(COALESCE(c.kinopoiskRating, t.rating), 8.0)) END DESC,
           CASE :sort WHEN 4 THEN c.imdbRating END DESC,
           CASE :sort WHEN 5 THEN c.kinopoiskRating END DESC,
           CASE :sort WHEN 6 THEN c.nameKey END ASC,

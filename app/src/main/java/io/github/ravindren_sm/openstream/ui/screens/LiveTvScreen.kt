@@ -53,6 +53,11 @@ import kotlinx.coroutines.withContext
  * not by the screen, so leaving the screen does not throw the loaded pages away.
  */
 class LiveBrowseState(private val catalog: LiveCatalog) {
+    /** The group the viewer chose last (kept across restarts by the shell), or null; Live TV opens on it instead of "All". */
+    var rememberedGroupId: () -> String? = { null }
+    /** Called with the id of a group the viewer picked, so the shell can keep it. */
+    var onGroupChosen: (String) -> Unit = {}
+
     /**
      * Every group the portal lists, and the ones shown (the saved search defaults can hide groups by language). Compose state:
      * the shell derives the Sports rail and the background NFL search's groups from it, and as a plain field the shell did
@@ -78,7 +83,7 @@ class LiveBrowseState(private val catalog: LiveCatalog) {
     /** Loads the genres and selects the first one ("All channels"). Blocking: call off the main thread. */
     fun loadGenres() {
         when (val r = catalog.genres()) {
-            is CatalogResult.Ok -> { allGenres = r.value; genres = r.value.filter(groupFilter); genresLoaded = true; genresError = null; select(0, resetScroll = false) }
+            is CatalogResult.Ok -> { allGenres = r.value; genres = r.value.filter(groupFilter); genresLoaded = true; genresError = null; select(rememberedIndex(), resetScroll = false, chosen = false) }
             is CatalogResult.Failed -> genresError = r.message
         }
     }
@@ -88,13 +93,17 @@ class LiveBrowseState(private val catalog: LiveCatalog) {
         groupFilter = filter ?: { true }
         if (!genresLoaded) return
         genres = allGenres.filter(groupFilter)
-        select(0, resetScroll = true)
+        select(rememberedIndex(), resetScroll = true, chosen = false)
     }
 
+    /** Where the remembered group is in the shown groups, else the first ("All"). */
+    private fun rememberedIndex(): Int = rememberedGroupId()?.let { id -> genres.indexOfFirst { it.id == id } }?.takeIf { it >= 0 } ?: 0
+
     /** Shows the channels of genre [index], from the first page. */
-    fun select(index: Int, resetScroll: Boolean = true) {
+    fun select(index: Int, resetScroll: Boolean = true, chosen: Boolean = true) {
         val genre = genres.getOrNull(index) ?: return
         selected = index
+        if (chosen) onGroupChosen(genre.id)
         channels = PagedChannels { page -> catalog.channels(genre.id, page) }
         if (resetScroll) channelListState.requestScrollToItem(0)
     }

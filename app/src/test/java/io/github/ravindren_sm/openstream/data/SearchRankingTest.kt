@@ -44,6 +44,12 @@ class SearchRankingTest {
         assertTrue(SearchRanking.explains(v("1", "Ramayana: Rise of a Legend"), "rise  RAMAYANA"))   // words in any order
         assertTrue(SearchRanking.explains(cast, "hanks"))                                          // found in the cast
         assertTrue(!SearchRanking.explains(v("2", "Behind Her Eyes"), "ramay"))                   // matched on a field the portal did not send
+        // A query must begin a word in a person's name or the description, not sit in the middle of one.
+        val director = VodItem(id = "4", name = "Apollo 18", isSeries = false, isSeason = false, isEpisode = false, cmd = "c", episodeNumbers = emptyList(), director = "Gonzalo Lopez-Gallego")
+        assertTrue(!SearchRanking.explains(director, "lego"))
+        assertTrue(SearchRanking.explains(director, "gallego"))
+        assertTrue(SearchRanking.explains(director, "gonz"))
+        assertEquals(null, SearchRanking.matchReason(director, "lego"))
     }
 
     @Test fun aSingleLetterFindsNoChannels() {

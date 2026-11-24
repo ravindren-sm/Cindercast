@@ -77,10 +77,21 @@ class NavStack private constructor(
     fun resetToTab(tab: Route): NavStack {
         require(tab.isTab) { "not a top-level tab" }
         if (tab == Route.HOME) return NavStack(listOf(RouteEntry(Route.HOME)), restoreFocusId = tabFocusId(tab))
+        // Back from the tab returns to Home with focus on Home's own first item, not on this tab in the bar: the bar would
+        // then highlight one tab while Home is shown.
         return NavStack(
-            listOf(RouteEntry(Route.HOME, savedFocusId = tabFocusId(tab)), RouteEntry(tab)),
+            listOf(RouteEntry(Route.HOME), RouteEntry(tab)),
             restoreFocusId = tabFocusId(tab),
         )
+    }
+
+    /**
+     * Opens a tab from a button on another screen (a Home door): like [resetToTab], but focus goes into the tab's page, not to
+     * the tab in the bar, since the viewer chose that page by name and wants to start on it.
+     */
+    fun enterTab(tab: Route): NavStack {
+        require(tab.isTab && tab != Route.HOME) { "not a tab with a page to enter" }
+        return NavStack(listOf(RouteEntry(Route.HOME), RouteEntry(tab)), restoreFocusId = null)
     }
 
     /**

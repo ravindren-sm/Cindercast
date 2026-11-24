@@ -74,6 +74,14 @@ class SportsLogicTest {
         assertEquals(2, SportsLogic.listings(fox, games, nowSec = 1_500).size)
     }
 
+    @Test fun aTalkShowThatOnlyMentionsTheNflInItsBlurbIsNotListed() {
+        val cbs = ch("7", "CBS SN")
+        val talk = EpgProgramme("Boomer and Gio", "Sports talk. Today: the Bills and the Chiefs, and the NFL playoff picture.", null, 1_000L, 2_000L)
+        assertTrue(SportsLogic.listings(cbs, listOf(talk), nowSec = 1_500).isEmpty())
+        val show = EpgProgramme("49ers Talk", "The NFL week ahead for the 49ers.", null, 1_000L, 2_000L)
+        assertEquals(1, SportsLogic.listings(ch("8", "NBC SPORTS BAY AREA"), listOf(show), nowSec = 1_500).size)
+    }
+
     @Test fun listingsShowTheLiveGameAndLaterGamesInOrder() {
         val now = 10_000L
         val fox = ch("1", "FOX 5 HD")

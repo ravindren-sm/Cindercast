@@ -84,6 +84,7 @@ private class Row_(val title: String, val value: String, val action: String, val
 fun SettingsScreen(model: SettingsModel, memory: FocusMemory, modifier: Modifier = Modifier) {
     var confirming: Row_? by remember { mutableStateOf(null) }
     var ratingPicker by remember { mutableStateOf(false) }
+    var confirmingId: String? by remember { mutableStateOf(null) }
     val indexValue = when {
         model.index.complete && model.index.enabled -> "Ready · %,d titles".format(model.index.titles)
         model.index.enabled -> "Building ${model.index.percent}%% · %,d titles".format(model.index.titles)
@@ -107,9 +108,8 @@ fun SettingsScreen(model: SettingsModel, memory: FocusMemory, modifier: Modifier
             Row_("Most watched", model.statsSummary, "Reset", "Reset what this profile has watched? Search goes back to the portal's order.", model.onResetStats),
         ),
         "Search" to listOf(
-            Row_("Use my search defaults everywhere", if (model.applyDefaultsEverywhere) "On" else "Off", if (model.applyDefaultsEverywhere) "Turn off" else "Turn on", run = model.onToggleApplyDefaults),
-            Row_("Defaults applied", model.defaultsSummary, "", run = {}),
-            Row_("Title index", indexValue, if (model.index.enabled) "Pause" else if (model.index.titles > 0) "Resume" else "Build",
+            Row_("Use my search defaults everywhere", if (model.applyDefaultsEverywhere) "On · ${model.defaultsSummary}" else "Off", if (model.applyDefaultsEverywhere) "Turn off" else "Turn on", run = model.onToggleApplyDefaults),
+            Row_("Title index (fast search and sorting)", indexValue, if (model.index.enabled) "Pause" else if (model.index.titles > 0) "Resume" else "Build",
                 run = { if (model.index.enabled) model.onPauseIndex() else model.onBuildIndex() }),
             Row_("Title index data", if (model.index.titles > 0) "%,d titles on this device".format(model.index.titles) else "None", "Delete", "Delete the title index? It can be built again.", model.onClearIndex),
             Row_("Default search filters", model.defaultFilters ?: "None", "Clear", "Clear the default search filters?", model.onClearDefaultFilters),
@@ -153,9 +153,17 @@ fun SettingsScreen(model: SettingsModel, memory: FocusMemory, modifier: Modifier
                 Text(heading, style = Tokens.TitleMedium, color = Tokens.AccentPrimary, modifier = Modifier.padding(top = Spacing.S2))
                 rows.forEach { row ->
                     val id = settingFocusId(n++)
+                    if (row.action.isEmpty() && row.confirm == null) {
+                        // Information only (nothing to select): plain text, so the D-pad does not stop on it.
+                        Row(Modifier.fillMaxWidth().padding(horizontal = Spacing.S2, vertical = Spacing.S1), verticalAlignment = Alignment.CenterVertically) {
+                            Text(row.title, style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 1, modifier = Modifier.width(620.dp))
+                            Text(row.value, style = Tokens.Body, color = Tokens.TextSecondary, maxLines = 2, modifier = Modifier.weight(1f))
+                        }
+                        return@forEach
+                    }
                     OsFocusable(
                         id = id, memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth(),
-                        onSelect = { if (row.confirm != null) confirming = row else row.run() },
+                        onSelect = { confirmingId = id; if (row.confirm != null) confirming = row else row.run() },
                     ) { _ ->
                         Row(Modifier.fillMaxWidth().padding(horizontal = Spacing.S2, vertical = Spacing.S1), verticalAlignment = Alignment.CenterVertically) {
                             Text(row.title, style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 1, modifier = Modifier.width(620.dp))
@@ -174,14 +182,14 @@ fun SettingsScreen(model: SettingsModel, memory: FocusMemory, modifier: Modifier
             ChoicePicker(
                 "Hide titles rated below", listOf(Choice("any", "Show everything")) + io.github.ravindren_sm.openstream.data.ContentPolicy.STEPS.map { Choice("$it", "${"%.0f".format(it)}") },
                 setOf(model.contentPolicy.minRating?.toString() ?: "any"), multi = false,
-                note = "Uses the portal's rating: IMDb when it has one, otherwise Kinopoisk. Applies to lists, search and Home rows for this profile.",
-                memory = memory, returnFocusId = null, onToggle = { id -> model.onSetMinRating(id.toDoubleOrNull()) }, onClose = { ratingPicker = false },
+                note = "Uses the best rating this device has: IMDb (the portal's, or the IMDb file below), else Kinopoisk, else the online tags' score. Applies to lists, search and Home rows for this profile.",
+                memory = memory, returnFocusId = confirmingId, onToggle = { id -> model.onSetMinRating(id.toDoubleOrNull()) }, onClose = { ratingPicker = false },
             )
         }
         confirming?.let { row ->
             ChoicePicker(
                 row.confirm ?: "", listOf(Choice("yes", "Yes, ${row.action.lowercase()}"), Choice("no", "Cancel")), emptySet(), multi = false, note = null,
-                memory = memory, returnFocusId = null,
+                memory = memory, returnFocusId = confirmingId,
                 onToggle = { id -> if (id == "yes") row.run() }, onClose = { confirming = null },
             )
         }
