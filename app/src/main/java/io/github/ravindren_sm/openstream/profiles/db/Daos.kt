@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 
 @Dao
@@ -150,6 +151,11 @@ interface TitleTagDao {
     @Query("SELECT * FROM title_tags WHERE tmdbId > 0 AND imdbId IS NULL LIMIT :limit") suspend fun needingImdbId(limit: Int): List<TitleTagEntity>
     @Query("SELECT imdbId FROM title_tags WHERE imdbId IS NOT NULL AND imdbId <> ''") suspend fun imdbIds(): List<String>
     @Query("UPDATE title_tags SET imdbScore = :score WHERE imdbId = :imdbId") suspend fun setImdbScore(imdbId: String, score: Double)
+    /**
+     * Every score from the IMDb file in one transaction: tens of thousands of single updates each committed on their own took
+     * minutes on the stick; one commit takes seconds.
+     */
+    @Transaction suspend fun setImdbScores(scores: Map<String, Double>) { for ((id, score) in scores) setImdbScore(id, score) }
     @Query("SELECT COUNT(*) FROM title_tags WHERE imdbScore IS NOT NULL") suspend fun imdbScored(): Int
     @Query("SELECT COUNT(*) FROM title_tags WHERE imdbId IS NOT NULL AND imdbId <> ''") suspend fun withImdbId(): Int
     @Query("UPDATE title_tags SET imdbScore = NULL") suspend fun forgetImdbScores()

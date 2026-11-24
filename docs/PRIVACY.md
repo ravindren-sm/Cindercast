@@ -7,6 +7,9 @@ and no server of its own.
 - The portal address and the registered MAC address you enter, sealed with a key held by Android (AES-256-GCM, Android Keystore).
 - Profiles, the household PIN (stored only as a salted hash), favorites, watch history, resume positions, viewing statistics,
   the saved title list used for search and sorting, and the optional online tags.
+- Only the portal address and MAC are encrypted. The rest is stored as is in the app's private storage, which other apps
+  cannot read. That includes the portal's play commands for channels and titles kept in the history, favorites, saved
+  title list and saved NFL listings; some portals put a host name or a token inside those commands.
 - Nothing is backed up to the cloud (`allowBackup` is off). Uninstalling the app deletes it all.
 
 ## What leaves the device

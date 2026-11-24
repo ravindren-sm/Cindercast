@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -68,6 +69,7 @@ fun OsFocusable(
                 focused = state.isFocused
                 if (state.isFocused) memory.focusedId = id
             }
+            .zIndex(if (focused) 1f else 0f)   // drawn above its neighbours while scaled up, so they do not cover its edges
             .scale(scale)
             .background(background, shape)
             .border(if (focused) BorderStroke(FocusStyle.RingWidth, Tokens.FocusRing) else BorderStroke(0.dp, Color.Transparent), shape)

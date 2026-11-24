@@ -75,6 +75,7 @@ import io.github.ravindren_sm.openstream.ui.focus.FocusMemory
 import io.github.ravindren_sm.openstream.ui.theme.Spacing
 import io.github.ravindren_sm.openstream.ui.theme.Tokens
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
@@ -115,6 +116,8 @@ fun VodPlayerScreen(
     val scope = rememberCoroutineScope()
     val player = remember { createStreamPlayer(context) }
     val recovery = remember { PlaybackRecovery() }
+    // The pending automatic restart after a stream error, cancelled when the title changes or the viewer retries.
+    val recoveryJob = remember { arrayOfNulls<Job>(1) }
     var tracks by remember { mutableStateOf(Tracks.EMPTY) }
     var tracksOpen by remember { mutableStateOf(false) }
     var phase: VodPhase by remember { mutableStateOf(VodPhase.Resolving) }
@@ -176,7 +179,8 @@ fun VodPlayerScreen(
                 if (recovery.shouldRecover(error.errorCode)) {
                     // A momentary failure: pick up again from where it stopped, without the viewer doing anything.
                     notice = "Recovering…"
-                    scope.launch { delay(PlaybackRecovery.RETRY_DELAY_MILLIS); player.prepare() }
+                    recoveryJob[0]?.cancel()
+                    recoveryJob[0] = scope.launch { delay(PlaybackRecovery.RETRY_DELAY_MILLIS); player.prepare() }
                     return
                 }
                 val http = (error.cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode
@@ -198,6 +202,7 @@ fun VodPlayerScreen(
     }
 
     LaunchedEffect(id, attempt) {   // id is the resume key
+        recoveryJob[0]?.cancel(); recoveryJob[0] = null
         if (target == null) { phase = VodPhase.Failed("This title is not available."); return@LaunchedEffect }
         nextTarget = null; nextLooked = false; ended = false; countdown = 0
         phase = VodPhase.Resolving
@@ -259,7 +264,7 @@ fun VodPlayerScreen(
     fun seekBy(delta: Long) {
         val dur = knownDuration()
         var target = (player.currentPosition + delta).coerceAtLeast(0)
-        if (dur > 0) target = target.coerceAtMost(dur - 1_000)
+        if (dur > 0) target = target.coerceAtMost((dur - 1_000).coerceAtLeast(0))
         player.seekTo(target)
     }
 
@@ -308,13 +313,14 @@ fun VodPlayerScreen(
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     useController = false
-                    keepScreenOn = true
                     isFocusable = false
                     isFocusableInTouchMode = false
                     layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                     this.player = player
                 }
             },
+            // Keep the screen on only while a title plays or is starting: paused, failed or finished, the screensaver may start.
+            update = { view -> view.keepScreenOn = phase !is VodPhase.Failed && !paused && !ended },
         )
 
         if (overlayVisible && target != null && phase is VodPhase.Playing) {

@@ -129,7 +129,7 @@ import io.github.ravindren_sm.openstream.ui.screens.VodBrowseScreen
 import io.github.ravindren_sm.openstream.ui.screens.VodBrowseState
 import io.github.ravindren_sm.openstream.ui.screens.VodPlayerScreen
 import io.github.ravindren_sm.openstream.ui.screens.titleFocusId
-import io.github.ravindren_sm.openstream.ui.screens.PlaceholderScreen
+import io.github.ravindren_sm.openstream.ui.screens.UnavailableScreen
 import io.github.ravindren_sm.openstream.ui.screens.SessionStatusLine
 import io.github.ravindren_sm.openstream.ui.screens.SetupScreen
 import io.github.ravindren_sm.openstream.ui.screens.channelFocusId
@@ -206,9 +206,9 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     val profile: ProfileInfo? = profiles.firstOrNull { it.id == profileId }
     val isKids = profile?.isKids == true
     val resumeStore = remember { ProfileResumeStore(PrefsResumeStore(appContext)) { profileId } }
-    val recorder = remember { RoomHistoryRecorder(repo, { profileId }, CoroutineScope(SupervisorJob() + Dispatchers.IO)) }
+    val recorder = remember { RoomHistoryRecorder(repo, { profileId }, io.github.ravindren_sm.openstream.data.AppScope.io) }
     // Favorites (channels, movies, shows) of the current profile, shared by every screen that shows a heart.
-    val favorites = remember { FavoritesState(repo, { profileId }, CoroutineScope(SupervisorJob() + Dispatchers.IO)) }
+    val favorites = remember { FavoritesState(repo, { profileId }, io.github.ravindren_sm.openstream.data.AppScope.io) }
     LaunchedEffect(profileId) { if (profileId > 0L) withContext(Dispatchers.IO) { favorites.reload() } }
     // The favorite channels being played (a fixed list to zap through), and the favorite movie whose page is open.
     var favPlayer: PagedChannels? by remember { mutableStateOf(null) }
@@ -661,7 +661,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
             } else if (stack.current.route == Route.SHOW_DETAIL) {
                 val detail = showDetail
                 if (detail == null) {
-                    PlaceholderScreen(entry = stack.current, memory = memory, onOpenDetail = { _, _ -> })
+                    UnavailableScreen()
                 } else {
                     val showVersions = if (detailVersions.any { it.id == detail.show.id }) detailVersions else emptyList()
                     ShowDetailScreen(
@@ -835,13 +835,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                     },
                 )
             } else {
-                PlaceholderScreen(
-                    entry = stack.current,
-                    memory = memory,
-                    onOpenDetail = { route, params ->
-                        stack = stack.navigate(route, params, currentFocusId = memory.focusedId)
-                    },
-                )
+                UnavailableScreen(message = "This screen is not available.")
             }
         }
     }

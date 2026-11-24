@@ -53,7 +53,7 @@ class ImdbRatingsLoader(
             if (!r.isSuccessful) return@use ImdbResult.Failed("IMDb answered HTTP ${r.code}")
             val stream = r.body?.byteStream() ?: return@use ImdbResult.Failed("Empty answer")
             val ratings = BufferedReader(InputStreamReader(GZIPInputStream(stream), Charsets.UTF_8)).use { reader -> ImdbRatings.parse(reader.lineSequence(), wanted) }
-            kotlinx.coroutines.runBlocking { for ((id, score) in ratings) dao.setImdbScore(id, score) }
+            kotlinx.coroutines.runBlocking { dao.setImdbScores(ratings) }
             ImdbResult.Done(ratings.size)
         }
     } catch (e: IOException) { ImdbResult.Failed("Network error (${e.javaClass.simpleName})") }

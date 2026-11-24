@@ -68,6 +68,7 @@ import io.github.ravindren_sm.openstream.ui.focus.FocusMemory
 import io.github.ravindren_sm.openstream.ui.theme.Spacing
 import io.github.ravindren_sm.openstream.ui.theme.Tokens
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -79,12 +80,20 @@ import okhttp3.OkHttpClient
 const val PLAYER_SURFACE_ID = "player-surface"
 const val PLAYER_RETRY_ID = "player-retry"
 
-/** The player's own HTTP identity and client, with the debug hooks attached (none in release). */
-@androidx.annotation.OptIn(UnstableApi::class)
-internal fun createStreamPlayer(context: Context): ExoPlayer {
-    val client = OkHttpClient.Builder()
+/**
+ * One HTTP client for every player, so opening and closing players does not leave idle connection pools and threads behind.
+ * Built on first use, after the debug app has filled [PlayerHooks.networkInterceptors] (none in release).
+ */
+private val streamClient: OkHttpClient by lazy {
+    OkHttpClient.Builder()
         .apply { PlayerHooks.networkInterceptors.forEach { addNetworkInterceptor(it) } }
         .build()
+}
+
+/** The player's own HTTP identity, on the shared client, with the debug hooks attached (none in release). */
+@androidx.annotation.OptIn(UnstableApi::class)
+internal fun createStreamPlayer(context: Context): ExoPlayer {
+    val client = streamClient
     val dataSource = OkHttpDataSource.Factory(client).setUserAgent("AndroidXMedia3/${MediaLibraryInfo.VERSION}")
     // If a hardware decoder fails, try the next one (a software decoder) before giving up.
     val renderers = DefaultRenderersFactory(context).setEnableDecoderFallback(true)
@@ -140,6 +149,9 @@ fun LivePlayerScreen(
     var notice: String? by remember { mutableStateOf(null) }
     val player = remember { createStreamPlayer(context) }
     val recovery = remember { PlaybackRecovery() }
+    // The pending automatic restart after a stream error, cancelled when the channel changes or the viewer retries, so a
+    // restart meant for the old stream never lands on the new one.
+    val recoveryJob = remember { arrayOfNulls<Job>(1) }
     var tracks by remember { mutableStateOf(Tracks.EMPTY) }
     var tracksOpen by remember { mutableStateOf(false) }
     var phase: Phase by remember { mutableStateOf(Phase.Resolving) }
@@ -178,7 +190,8 @@ fun LivePlayerScreen(
                 if (recovery.shouldRecover(error.errorCode)) {
                     // A momentary failure: rejoin the live edge without the viewer doing anything.
                     notice = "Recovering…"
-                    scope.launch { delay(PlaybackRecovery.RETRY_DELAY_MILLIS); player.seekToDefaultPosition(); player.prepare() }
+                    recoveryJob[0]?.cancel()
+                    recoveryJob[0] = scope.launch { delay(PlaybackRecovery.RETRY_DELAY_MILLIS); player.seekToDefaultPosition(); player.prepare() }
                     return
                 }
                 val http = (error.cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode
@@ -206,6 +219,7 @@ fun LivePlayerScreen(
 
     // Resolve and start; runs again on every retry.
     LaunchedEffect(channel?.id, attempt) {
+        recoveryJob[0]?.cancel(); recoveryJob[0] = null
         if (channel == null) { phase = Phase.Failed("This channel is not available."); return@LaunchedEffect }
         phase = Phase.Resolving
         recovery.reset()
@@ -308,13 +322,16 @@ fun LivePlayerScreen(
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     useController = false
-                    keepScreenOn = true                       // this window only; no device setting changes
+                    // Whether the screen stays on is set in update below (this window only; no device setting changes).
                     isFocusable = false
                     isFocusableInTouchMode = false
                     layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                     this.player = player
                 }
             },
+            // Keep the screen on only while a stream plays or is starting: when paused or failed, the Fire TV's screensaver may
+            // start as usual, so a forgotten pause cannot keep the TV lit all night.
+            update = { view -> view.keepScreenOn = phase !is Phase.Failed && !paused },
         )
 
         if (overlayVisible && channel != null) {

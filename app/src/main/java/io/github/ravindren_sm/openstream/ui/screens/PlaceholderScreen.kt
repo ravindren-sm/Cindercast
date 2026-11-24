@@ -36,60 +36,16 @@ fun initialFocusId(route: Route): String = when (route) {
 }
 
 /**
- * Stand-in for every screen until it is built (M3 and later). It exists to exercise the shell:
- * focus ring, D-pad movement, "open a detail" and Back restoring the exact card.
- * No provider data is shown.
+ * Shown when a route has nothing to show: a show page whose title is no longer loaded (for example after the portal was
+ * changed in Settings), or a route with no screen. One plain line; Back (handled by the shell) returns to the last screen.
  */
 @Composable
-fun PlaceholderScreen(
-    entry: RouteEntry,
-    memory: FocusMemory,
-    onOpenDetail: (Route, Map<String, String>) -> Unit,
-    modifier: Modifier = Modifier,
-) {
+fun UnavailableScreen(modifier: Modifier = Modifier, message: String = "This title is not available.") {
     Column(
-        modifier
-            .fillMaxSize()
-            .padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.S3),
-        verticalArrangement = Arrangement.spacedBy(Spacing.S3),
+        modifier.fillMaxSize().padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.S3),
+        verticalArrangement = Arrangement.spacedBy(Spacing.S2),
     ) {
-        Text(entry.route.label, style = MaterialTheme.typography.headlineMedium, color = Tokens.TextPrimary)
-        Text(
-            "${entry.route.path} (placeholder: this screen is built in a later milestone)",
-            style = MaterialTheme.typography.bodyLarge,
-            color = Tokens.TextSecondary,
-        )
-        val detail = detailRouteFor(entry.route)
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.S3)) {
-            repeat(5) { i ->
-                OsFocusable(
-                    id = "card-$i",
-                    memory = memory,
-                    variant = FocusVariant.CARD,
-                    onSelect = { detail?.let { onOpenDetail(it, mapOf("item" to "$i")) } },
-                ) { _ ->
-                    Column(Modifier.width(200.dp).height(300.dp).padding(Spacing.S2)) {
-                        Text("Sample ${i + 1}", style = MaterialTheme.typography.bodyLarge, color = Tokens.TextPrimary)
-                        Text(
-                            if (detail != null) "Select to open" else "No detail screen",
-                            style = MaterialTheme.typography.bodyLarge, color = Tokens.TextSecondary,
-                        )
-                    }
-                }
-            }
-        }
-        if (entry.params.isNotEmpty()) {
-            Text("Opened from sample ${(entry.params["item"]?.toIntOrNull() ?: 0) + 1}. Back returns to that card.",
-                style = MaterialTheme.typography.bodyLarge, color = Tokens.StatusSuccess)
-        }
+        Text(message, style = MaterialTheme.typography.headlineMedium, color = Tokens.TextPrimary)
+        Text("Press Back to return.", style = MaterialTheme.typography.bodyLarge, color = Tokens.TextSecondary)
     }
-}
-
-/** Which screen a card opens, for the placeholder demo. */
-private fun detailRouteFor(route: Route): Route? = when (route) {
-    Route.MOVIES -> Route.MOVIE_DETAIL
-    Route.SHOWS -> Route.SHOW_DETAIL
-    Route.HOME, Route.FAVORITES, Route.SEARCH -> Route.MOVIE_DETAIL
-    Route.LIVE_TV -> Route.LIVE_PLAYER
-    else -> null
 }

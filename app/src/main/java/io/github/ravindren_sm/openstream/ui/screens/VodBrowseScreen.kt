@@ -51,6 +51,7 @@ import io.github.ravindren_sm.openstream.data.VodCategory
 import io.github.ravindren_sm.openstream.data.VodKind
 import io.github.ravindren_sm.openstream.provider.PortalText
 import io.github.ravindren_sm.openstream.provider.ShownRating
+import io.github.ravindren_sm.openstream.data.RatingLabels
 import io.github.ravindren_sm.openstream.provider.VodItem
 import io.github.ravindren_sm.openstream.ui.components.FocusVariant
 import io.github.ravindren_sm.openstream.ui.components.HEART
@@ -415,11 +416,11 @@ private fun TitleCard(index: Int, item: VodItem, portalUrl: String, memory: Focu
     }
 }
 
-/** A rating on a card: a star for IMDb, "KP" for Kinopoisk. Shown only when the portal sent a real value. */
+/** A rating on a card: a star for IMDb, "KP" for Kinopoisk, "TMDB" for the online tags' score. Shown only for a real value. */
 @Composable
 fun RatingBadge(rating: ShownRating, modifier: Modifier = Modifier) {
     Text(
-        (if (rating.source == "IMDb") "★ %.1f" else "KP %.1f").format(rating.value), style = Tokens.Body, color = Tokens.StatusWarning, maxLines = 1,
+        RatingLabels.badge(rating), style = Tokens.Body, color = Tokens.StatusWarning, maxLines = 1,
         modifier = modifier
             .background(Tokens.BgCanvas.copy(alpha = 0.8f), RoundedCornerShape(Radii.Sm))
             .padding(horizontal = Spacing.S1, vertical = 2.dp),
