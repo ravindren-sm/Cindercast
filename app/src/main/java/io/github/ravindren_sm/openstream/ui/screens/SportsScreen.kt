@@ -32,7 +32,9 @@ import io.github.ravindren_sm.openstream.data.GuideLoader
 import io.github.ravindren_sm.openstream.data.LiveCatalog
 import io.github.ravindren_sm.openstream.data.LivePlayback
 import io.github.ravindren_sm.openstream.ui.components.ChannelPreview
-import io.github.ravindren_sm.openstream.data.NflSearch
+import io.github.ravindren_sm.openstream.data.GamesSearch
+import io.github.ravindren_sm.openstream.data.League
+import io.github.ravindren_sm.openstream.data.Leagues
 import io.github.ravindren_sm.openstream.data.PagedChannels
 import io.github.ravindren_sm.openstream.data.SportsLogic
 import io.github.ravindren_sm.openstream.data.VodKind
@@ -53,8 +55,8 @@ import kotlinx.coroutines.withContext
 /** One line of the Sports rail. */
 sealed interface SportsEntry {
     val label: String
-    /** The NFL search (games found in the channel guides). */
-    data object Nfl : SportsEntry { override val label = "NFL" }
+    /** A league's games (found in the channel guides by the games search). */
+    data class Games(val league: League) : SportsEntry { override val label get() = league.label }
     /** A live channel group about sport. */
     data class Live(val genre: LiveGenre) : SportsEntry { override val label get() = PortalText.decodeEntities(genre.title) }
     /** An on-demand category about sport; Select opens it in Movies or Shows. */
@@ -62,16 +64,17 @@ sealed interface SportsEntry {
 }
 
 /** What the Sports tab keeps while the viewer is elsewhere (held by the app shell, like the Live TV state). */
-class SportsState(private val catalog: LiveCatalog, loader: GuideLoader, saveNfl: (String) -> Unit = {}) {
+class SportsState(private val catalog: LiveCatalog, loader: GuideLoader, saveGames: (String) -> Unit = {}) {
     var selected: Int by mutableIntStateOf(0)
         private set
     var channels: PagedChannels by mutableStateOf(PagedChannels { CatalogResult.Failed(LiveCatalog.NOT_CONNECTED) })
         private set
-    val nfl = NflSearch(catalog, loader, save = saveNfl)
+    /** One search of the channel guides finds the games of every league. */
+    val games = GamesSearch(catalog, loader, save = saveGames)
     val railState = LazyListState()
     val listState = LazyListState()
 
-    /** Shows rail entry [index]: a live group's channels, or the NFL search. On-demand entries are opened by the shell. */
+    /** Shows rail entry [index]: a live group's channels, or a league's games. On-demand entries are opened by the shell. */
     fun select(index: Int, entry: SportsEntry) {
         selected = index
         if (entry is SportsEntry.Live) channels = PagedChannels { page -> catalog.channels(entry.genre.id, page) }
@@ -79,9 +82,9 @@ class SportsState(private val catalog: LiveCatalog, loader: GuideLoader, saveNfl
     }
 }
 
-/** The rail: the NFL search, then the live sports groups, then the on-demand sports categories (movies, then shows). */
+/** The rail: each league's games, then the live sports groups, then the on-demand sports categories (movies, then shows). */
 fun sportsEntries(genres: List<LiveGenre>, movieCategories: List<VodCategory>, showCategories: List<VodCategory>): List<SportsEntry> =
-    listOf<SportsEntry>(SportsEntry.Nfl) +
+    League.entries.map<League, SportsEntry> { SportsEntry.Games(it) } +
         genres.filter { it.id != LiveCatalog.ALL_ID && SportsLogic.isSports(it.title) }.map { SportsEntry.Live(it) } +
         movieCategories.filter { SportsLogic.isSports(it.title) }.map { SportsEntry.OnDemand(VodKind.MOVIES, it) } +
         showCategories.filter { SportsLogic.isSports(it.title) }.map { SportsEntry.OnDemand(VodKind.SHOWS, it) }
@@ -112,7 +115,7 @@ fun SportsScreen(
 ) {
     var nowSec by remember { mutableLongStateOf(System.currentTimeMillis() / 1000) }
     LaunchedEffect(Unit) { while (true) { delay(30_000); nowSec = System.currentTimeMillis() / 1000 } }
-    val entry = entries.getOrNull(state.selected) ?: SportsEntry.Nfl
+    val entry = entries.getOrNull(state.selected) ?: SportsEntry.Games(League.NFL)
 
     Row(
         modifier.fillMaxSize()
@@ -131,6 +134,7 @@ fun SportsScreen(
                     val prev = entries.getOrNull(i - 1)
                     // Section headings where the kind of entry changes.
                     val heading = when {
+                        e is SportsEntry.Games && prev == null -> "Games in the guide"
                         e is SportsEntry.Live && prev !is SportsEntry.Live -> "Live channels"
                         e is SportsEntry.OnDemand && prev !is SportsEntry.OnDemand -> "On demand"
                         else -> null
@@ -141,8 +145,9 @@ fun SportsScreen(
                             id = sportsRailFocusId(i), memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth(),
                             onSelect = { if (e is SportsEntry.OnDemand) onOpenOnDemand(e) else state.select(i, e) },
                         ) { _ ->
+                            val gameCount = if (e is SportsEntry.Games) remember(state.games.listings, nowSec) { Leagues.forLeague(state.games.current(nowSec), e.league).count { it.game } } else 0
                             Text(
-                                e.label + if (e is SportsEntry.OnDemand) "  ›" else "", style = Tokens.BodyLarge, maxLines = 1,
+                                e.label + if (e is SportsEntry.OnDemand) "  ›" else if (gameCount > 0) "  ·  $gameCount" else "", style = Tokens.BodyLarge, maxLines = 1,
                                 color = if (i == state.selected) Tokens.AccentPrimary else Tokens.TextPrimary,
                                 modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1 + 4.dp),
                             )
@@ -153,7 +158,7 @@ fun SportsScreen(
         }
         Column(Modifier.weight(1f).fillMaxHeight()) {
             when (entry) {
-                is SportsEntry.Nfl -> NflPane(state, allGenres, connected, nowSec, memory, onOpenChannel)
+                is SportsEntry.Games -> GamesPane(entry.league, state, allGenres, connected, nowSec, memory, playback, onOpenChannel)
                 is SportsEntry.Live -> LivePane(state, loader, playback, nowSec, memory, onOpenChannel)
                 is SportsEntry.OnDemand -> Unit
             }
@@ -212,52 +217,57 @@ private fun LivePane(state: SportsState, loader: GuideLoader, playback: LivePlay
 }
 
 @Composable
-private fun NflPane(
-    state: SportsState, allGenres: List<LiveGenre>, connected: Boolean, nowSec: Long, memory: FocusMemory,
-    onOpenChannel: (List<LiveChannel>, Int) -> Unit,
+private fun GamesPane(
+    league: League, state: SportsState, allGenres: List<LiveGenre>, connected: Boolean, nowSec: Long, memory: FocusMemory,
+    playback: LivePlayback, onOpenChannel: (List<LiveChannel>, Int) -> Unit,
 ) {
-    val nfl = state.nfl
+    val search = state.games
     var more by remember { mutableIntStateOf(0) }
     val context = androidx.compose.ui.platform.LocalContext.current
     // The search normally runs in the background (see the shell). If Sports is opened before any pass has finished and none
     // is under way (the first minute after start-up), start one here so the viewer is not left waiting.
     LaunchedEffect(connected, allGenres.size) {
-        if (connected && allGenres.isNotEmpty() && nfl.finishedAt == 0L && !nfl.running) withContext(Dispatchers.IO) { nfl.refresh(allGenres) }
+        if (connected && allGenres.isNotEmpty() && search.finishedAt == 0L && !search.running) withContext(Dispatchers.IO) { search.refresh(allGenres) }
     }
     LaunchedEffect(more) {
-        if (more > 0 && connected && allGenres.isNotEmpty()) withContext(Dispatchers.IO) { nfl.extend(allGenres) }
+        if (more > 0 && connected && allGenres.isNotEmpty()) withContext(Dispatchers.IO) { search.extend(allGenres) }
     }
-    val updated = if (nfl.finishedAt > 0) "Updated ${timeText(context, nfl.finishedAt / 1000)}" else ""
+    val updated = if (search.finishedAt > 0) "Updated ${timeText(context, search.finishedAt / 1000)}" else ""
     val status = when {
-        nfl.finishedAt == 0L && !connected -> "Waiting for the portal connection…"
-        nfl.finishedAt == 0L -> "Looking for NFL games in the guide: ${nfl.current.ifBlank { "…" }} · ${nfl.checked} of ${nfl.queued} channels"
-        nfl.running -> "$updated · checking again in the background (${nfl.checked} of ${nfl.queued} channels)"
-        else -> "$updated · from the guides of ${if (nfl.extended) "the sports and network channels" else "channels named NFL, the US and Canadian networks, ESPN, Paramount+, Peacock and DAZN"}"
+        search.finishedAt == 0L && !connected -> "Waiting for the portal connection…"
+        search.finishedAt == 0L -> "Looking for games in the guides: ${search.current.ifBlank { "…" }} · ${search.checked} of ${search.queued} channels"
+        search.running -> "$updated · checking again in the background (${search.checked} of ${search.queued} channels)"
+        else -> "$updated · from the guides of ${if (search.extended) "the sports and network channels" else "the league groups, the US and Canadian networks, ESPN, Paramount+, Peacock, DAZN and Sky Sports"}"
     }
     Text(status, style = Tokens.Body, color = Tokens.TextSecondary, maxLines = 2, modifier = Modifier.padding(bottom = Spacing.S1))
-    val list = remember(nfl.listings, nowSec) { nfl.current(nowSec) }
+    val list = remember(search.listings, nowSec, league) { Leagues.forLeague(search.current(nowSec), league) }
     val channels = list.map { it.channel }
+    var previewed: LiveChannel? by remember(league) { mutableStateOf(null) }
     // Games are sorted to the top as they are found. A lazy list keeps its first visible row in place when rows are added
     // above it, which would push the new games off the top, so stay at the top until the viewer moves into the results.
-    LaunchedEffect(list.size) {
+    LaunchedEffect(list.size, league) {
         if (memory.focusedId?.startsWith("sports-row-") != true) state.listState.scrollToItem(0)
     }
-    if (list.isEmpty() && nfl.finishedAt > 0L) Text("No NFL games in the guide right now.", style = Tokens.BodyLarge, color = Tokens.TextPrimary, modifier = Modifier.padding(bottom = Spacing.S2))
+    if (list.isEmpty() && search.finishedAt > 0L) Text("No ${league.label} games in the guide right now.", style = Tokens.BodyLarge, color = Tokens.TextPrimary, modifier = Modifier.padding(bottom = Spacing.S2))
+    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(Spacing.S3)) {
     LazyColumn(
         state = state.listState, verticalArrangement = Arrangement.spacedBy(Spacing.S1),
-        modifier = Modifier.fillMaxSize().enterAt(memory) { if (list.isEmpty()) SPORTS_MORE_ID else sportsRowFocusId(state.listState.firstVisibleItemIndex) },
+        modifier = Modifier.weight(1f).fillMaxHeight().enterAt(memory) { if (list.isEmpty()) SPORTS_MORE_ID else sportsRowFocusId(state.listState.firstVisibleItemIndex) },
     ) {
         itemsIndexed(list, key = { _, l -> "${l.channel.id}:${l.programme?.startSec}" }) { i, l ->
             val heading = when {
                 i == 0 && l.game -> "Games"
-                !l.game && (i == 0 || list[i - 1].game) -> if (list.any { it.game }) "NFL shows" else "No games in the guide yet · NFL shows"
+                !l.game && (i == 0 || list[i - 1].game) -> if (list.any { it.game }) "${league.label} shows" else "No games in the guide yet · ${league.label} shows"
                 else -> null
             }
             Column {
             heading?.let { Text(it, style = Tokens.TitleMedium, color = Tokens.TextPrimary, modifier = Modifier.padding(top = if (i == 0) 0.dp else Spacing.S2, bottom = Spacing.S1)) }
-            OsFocusable(id = sportsRowFocusId(i), memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth(), onSelect = { onOpenChannel(channels, i) }) { _ ->
+            OsFocusable(
+                id = sportsRowFocusId(i), memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth(), onSelect = { onOpenChannel(channels, i) },
+                onFocusChange = { f -> if (f) previewed = l.channel else if (previewed?.id == l.channel.id) previewed = null },
+            ) { _ ->
                 Row(Modifier.fillMaxWidth().height(96.dp).padding(horizontal = Spacing.S2), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.width(340.dp)) {
+                    Column(Modifier.width(300.dp)) {
                         Text(l.channel.number, style = Tokens.Mono, color = Tokens.TextSecondary, maxLines = 1)
                         Text(PortalText.decodeEntities(l.channel.name), style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 1)
                     }
@@ -275,7 +285,7 @@ private fun NflPane(
             }
             }
         }
-        if (nfl.finishedAt > 0L && !nfl.running && !nfl.extended) item(key = "more") {
+        if (search.finishedAt > 0L && !search.running && !search.extended) item(key = "more") {
             Box(Modifier.padding(top = Spacing.S2)) {
                 OsFocusable(id = SPORTS_MORE_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = { more++ }) { _ ->
                     Text("Check more channels (the other sports groups, slower)", style = Tokens.Body, color = Tokens.TextPrimary,
@@ -283,6 +293,15 @@ private fun NflPane(
                 }
             }
         }
+    }
+    // The empty space beside the list: a small muted live picture of the channel under focus.
+    Column(Modifier.width(PREVIEW_WIDTH).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(Spacing.S1)) {
+        ChannelPreview(previewed, playback)
+        Text(
+            if (previewed != null) "Live picture, no sound. Select opens the channel full screen." else "Move to a game to see what the channel shows.",
+            style = Tokens.Body, color = Tokens.TextSecondary,
+        )
+    }
     }
 }
 

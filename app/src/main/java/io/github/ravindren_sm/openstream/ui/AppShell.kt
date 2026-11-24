@@ -111,7 +111,7 @@ import io.github.ravindren_sm.openstream.data.ResumeKeys
 import io.github.ravindren_sm.openstream.data.SessionStatus
 import io.github.ravindren_sm.openstream.data.VodCatalog
 import io.github.ravindren_sm.openstream.data.VodKind
-import io.github.ravindren_sm.openstream.data.NflSearch
+import io.github.ravindren_sm.openstream.data.GamesSearch
 import androidx.lifecycle.compose.currentStateAsState
 import io.github.ravindren_sm.openstream.data.VodPlayback
 import io.github.ravindren_sm.openstream.data.SettingsStore
@@ -167,11 +167,11 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     val liveCatalog = remember(portalEpoch) { LiveCatalog(session) }
     val guideLoader = remember(portalEpoch) { GuideLoader(session) }
     val appContextForFiles = LocalContext.current.applicationContext
-    // NFL listings are kept in the app's private storage so Sports shows them at once after a restart.
-    val nflFile = remember { java.io.File(appContextForFiles.filesDir, "nfl-listings.json") }
+    // Game listings are kept in the app's private storage so Sports shows them at once after a restart.
+    val gamesFile = remember { java.io.File(appContextForFiles.filesDir, "sports-listings.json") }
     val sportsState = remember(portalEpoch) {
-        SportsState(liveCatalog, guideLoader, saveNfl = { text -> runCatching { nflFile.writeText(text) } }).also { st ->
-            runCatching { if (nflFile.exists()) NflSearch.decode(nflFile.readText()).let { (list, at) -> st.nfl.restore(list, at) } }
+        SportsState(liveCatalog, guideLoader, saveGames = { text -> runCatching { gamesFile.writeText(text) } }).also { st ->
+            runCatching { if (gamesFile.exists()) GamesSearch.decode(gamesFile.readText()).let { (list, at) -> st.games.restore(list, at) } }
         }
     }
     val guideState = remember(portalEpoch) { GuideState() }
@@ -453,7 +453,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     // The live groups the viewer may see (the set the TV Guide offers): the Sports rail and the NFL search use these.
     val visibleGenres = liveState.allGenres.filter { g -> liveState.genres.any { it.id == g.id } && (defaultScope?.groupAllowed(g) ?: true) }
 
-    // The NFL search runs in the background, at most once an hour, so Sports > NFL has games ready when opened. Never while
+    // The games search runs in the background, at most once an hour, so Sports has games ready when opened. Never while
     // something plays (a stream request must not wait behind guide requests), never on a Kids profile, and only while the app
     // is on screen: in the background (another IPTV app open, the stick asleep) it would be a second session on the account.
     val lifecycleState by androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateAsState()
@@ -468,8 +468,8 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
             // The groups reach this state on the redraw after they load; check again shortly instead of waiting a full minute
             // (a run once lost its pass that way: the viewer started a game inside that minute).
             if (nflGenres.isEmpty()) { delay(2_000); continue }
-            val nfl = sportsState.nfl
-            if ((nfl.running || nfl.due(NFL_REFRESH_MILLIS)) && nflGenres.isNotEmpty()) withContext(Dispatchers.IO) { nfl.refresh(nflGenres) }
+            val games = sportsState.games
+            if ((games.running || games.due(GAMES_REFRESH_MILLIS)) && nflGenres.isNotEmpty()) withContext(Dispatchers.IO) { games.refresh(nflGenres) }
             delay(60_000)
         }
     }
@@ -972,5 +972,5 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     }
 }
 
-/** How often the background NFL search reads the guides again. */
-private const val NFL_REFRESH_MILLIS = 60 * 60_000L
+/** How often the background games search reads the guides again. */
+private const val GAMES_REFRESH_MILLIS = 60 * 60_000L
