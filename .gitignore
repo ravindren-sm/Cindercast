@@ -1,8 +1,34 @@
-node_modules/
+# Secrets and device identifiers: never commit
+.env
+.env.*
+*.secrets
+secrets/
+local.properties
+*.local.*
+docs/env_report.local.txt
+docs/*.local.md
+probe_output/
+captures/
+# Local dev config for the app/probe (portal URL, MAC): never commit.
+dev-config*.json
+# Raw network captures and device logs (may contain stream URLs, tokens, MACs).
+*.har
+*.pcap
+*.pcapng
+logs/
+logcat*.txt
+*.logcat
+*.jks
+*.keystore
+
+# Build output
 build/
-dist/
-coverage/
+.gradle/
+.kotlin/
+.idea/
+*.apk
+*.aab
 .DS_Store
-*.log
-.env*
-!.env.example
+
+# Provider-specific notes (findings, probe plan): kept on this machine, never published.
+docs/private/

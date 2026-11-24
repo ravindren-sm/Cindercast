@@ -1,0 +1,52 @@
+# Online tags (optional): age certification, genres and keywords from themoviedb.org
+
+Added 2026-11-22. The portal gives no age label for 71 percent of its titles, so a Kids profile sees little. An optional crawl asks the free
+themoviedb.org (TMDB) service about each title and keeps what it says on the device.
+
+## What it does
+- **Opt-in, with the viewer's own key.** Settings, "Online tags (optional)": paste a free TMDB key (the v3 key or the long v4 read token). It is stored
+  sealed (AES-GCM, Android Keystore) in `files/tag-key.bin`, never in the clear, never logged. Nothing is sent until a key is saved and Start is pressed.
+- **What is sent:** the title text (tags like [Eng Sub] and quality words removed) and the year, one title at a time, plus the key. No portal address,
+  MAC, profile, viewing history or device identity.
+- **How it matches:** `TmdbMatcher` searches movies or shows by cleaned name, accepts only an exact name (or original name) whose year agrees (one year
+  out is allowed; a different year is rejected); with no year it needs some standing (10 or more votes) or to be the only match. Doubtful titles are
+  recorded as "looked up, no match" and not asked again.
+- **What is kept** (table `title_tags`, database version 6): TMDB id, the certification label and its minimum age (the US label when known, otherwise the
+  strictest of the other countries), genres, original language, rating, up to 30 keywords, and a flag when a genre or keyword is on the Kids word list.
+- **Order and pace:** titles with no portal age label first, newest first; five titles at a time (two requests each), about 8 titles a second on the Fire TV, so the whole catalogue takes roughly 3.5 hours; waits when the service says
+  slow down (HTTP 429); stops at once and says so if the key is refused; pauses while a video plays; resumes where it left off. It runs only while the app is
+  open and idle (it does not keep the screen awake, unlike the title index).
+- **Use for adults (2026-11-22):** wherever a list loads (Movies and Shows from the portal or the on-device copy, and Search), a title the portal gave no score gets the TMDB score (badge "TMDB 7.4", used by the rating floor, the rating filter and the Best rated order), and no genres or age label get the TMDB ones; the portal's own values always win. The rating floor and sort read the score in SQL; the genre filter in a category reads TMDB genres where the portal gave none.
+- **Use:** a Kids profile now takes the TMDB certification when the portal has none, and hides a title whose tag is flagged. Adult profiles are unchanged.
+- **Remove:** Settings, "Remove key and tags" deletes the key and every tag.
+
+## IMDb ratings from IMDb's free file (personal use), and OMDb dropped (2026-11-22)
+Correction: an earlier note here said OMDb was the only practical way to get IMDb scores. That was wrong. IMDb publishes free non-commercial datasets (daily, datasets.imdbws.com), and its help page (help.imdb.com, "Can I use IMDb data in my software?") allows limited non-commercial, personal use with local copies, provided the credit line is shown, the data is not republished or turned into a movie database for others, nothing is scraped, and with permission withdrawable at any time. Credit: "Information courtesy of IMDb (https://www.imdb.com). Used with permission."
+- **Built:** Settings, "IMDb ratings (personal use, optional)": a Download button fetches `title.ratings.tsv.gz` (about 8 MB) straight to the device, keeps the average rating only for titles that have an IMDb id (from TMDB), and shows it as the star badge (portal IMDb, then IMDb file, then Kinopoisk, then TMDB). Credit line shown in that section. Remove deletes the ratings. Nothing about the viewer or titles is sent. The id backfill pass was restored so titles tagged before the id was stored get one (one request each).
+- **First run on the Fire TV (2026-11-22):** the TMDB pass finished (104,571 checked, 80,900 matched, 57,515 with an age certification). The first IMDb download wrote only about 14 scores per second because each update scanned the whole table; database version 8 adds an index on `imdbId` and the second run stored 76,819 scores (of 77,885 titles with an id) in about two minutes.
+- **Public release:** IMDb's licensing FAQ lists apps that show where or what to watch as commercial uses that need a licence, so a public player showing IMDb ratings likely needs one even if free. Treat this as personal use only until IMDb answers the email sent 2026-11-22; consider switching it off in public builds.
+
+## OMDb (dropped)
+OMDb (IMDb score and Rotten Tomatoes through a one-person aggregator) was built and then removed: its data comes from IMDb and Rotten Tomatoes with no public
+licence from those owners. The official routes are commercial: IMDb licenses its data through AWS Data Exchange (pricing by contract), and the Rotten Tomatoes API is
+partner-only through Fandango (reported in the tens of thousands of dollars a year, unconfirmed; no open keys). On 2026-11-22 an email went to imdb-licensing@imdb.com asking
+whether IMDb offers any licence or terms for a free, non-commercial, open-source app, what the commercial price range is, and what its free datasets permit. Until an answer
+arrives, public builds should not show IMDb scores; this install uses IMDb's free file under its personal-use terms. Left over: database version 7 columns `imdbScore`, `rtScore`, `omdbAt` (unused; SQLite here cannot drop columns)
+and the IMDb id that TMDB returns (now used to join IMDb's ratings file). The Search screen has no Rotten Tomatoes filter and there is no Rotten Tomatoes source.
+
+## Data sources and terms (to settle before a public release)
+- **TMDB:** community-contributed, free for non-commercial use, and requires an attribution notice ("This product uses the TMDB API but is not endorsed or
+  certified by TMDB"), now shown in Settings > About; a logo is also expected in the store listing. A commercial release needs TMDB's commercial terms.
+- **IMDb:** personal, non-commercial use of the free datasets only; see the section above. **Rotten Tomatoes:** no source, no licence.
+
+## First real run (2026-11-22)
+Key entered through the Settings box; the crawl started on the real service. (By 13:18 the crawl had checked 72,504 titles: 76 percent matched, 45 percent graded with an age certification.) First 300 titles (newest first, no portal label): 61 percent matched, 33 percent got a
+certification (51 percent of movies, 13 percent of shows); labels were mostly Indian (U/A 16+, 16, U/A 13+) plus some TV-14, PG, R. One worker did 2 titles a second;
+five workers do about 8. The crawl resumes by itself after the app restarts.
+
+## Not done
+- TMDB original language is stored but not used yet (the language filter still works from category names).
+- A second source (OMDb) for titles TMDB cannot grade, and Rotten Tomatoes scores.
+- Checking the crawl against the real service: the key has not been entered yet, so all tests use a fake service (`TitleTaggerTest`, `TmdbTest`). The first
+  real run should be watched for the match rate (how many of the 104,000 titles get a certification), speed and any 429 answers.
+- Non-English and regional titles often have no certification at TMDB; they stay unlabelled.

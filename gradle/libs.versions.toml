@@ -1,0 +1,57 @@
+# Version catalog: every library and plugin version is pinned here.
+# All versions below resolved and built a working APK on 2026-11-20 (Phase 1).
+# They were NOT checked for newer releases; several are likely behind current.
+# Upgrade deliberately, one group at a time, and re-test on the device.
+
+[versions]
+# AGP 8.13 is tested up to compileSdk 36.1 and warns on 37.0. It also breaks on
+# Gradle 9.6+, which is why the wrapper pins Gradle 9.5.0. Long-term fix: move to
+# AGP 9 (built-in Kotlin; then drop the kotlin-android plugin).
+agp = "8.13.0"
+kotlin = "2.1.20"
+composeBom = "2025.05.00"
+tvMaterial = "1.1.0"           # Compose for TV, released May 2026 per release notes
+tvFoundation = "1.0.0"
+activityCompose = "1.10.1"
+coreKtx = "1.16.0"
+# Phase 2 probe (:provider, :probe). JSON parsing only; no HTTP client until the
+# redaction tests pass (docs/private/PHASE2_PROBE_PLAN.md, Step 0).
+kotlinxSerialization = "1.8.1"   # JSON runtime matching Kotlin 2.1.x
+junit = "5.12.2"
+junit4 = "4.13.2"                 # local unit tests in :app (Android Gradle plugin runs JUnit 4)
+okhttp = "4.12.0"                # HTTP client for :provider (JVM and Android); added for Step 2
+media3 = "1.6.1"                 # Media3 ExoPlayer for the debug player (HLS)
+room = "2.7.1"                   # profiles, favorites, history (owner chose Room, 2026-11-21)
+ksp = "2.1.20-2.0.1"             # Room's annotation processor; must match the Kotlin version
+
+[libraries]
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
+media3-exoplayer-hls = { group = "androidx.media3", name = "media3-exoplayer-hls", version.ref = "media3" }
+media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }
+media3-datasource-okhttp = { group = "androidx.media3", name = "media3-datasource-okhttp", version.ref = "media3" }
+okhttp-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "okhttp" }
+junit4 = { group = "junit", name = "junit", version.ref = "junit4" }
+kotlin-test-junit = { group = "org.jetbrains.kotlin", name = "kotlin-test-junit", version.ref = "kotlin" }
+junit-bom = { group = "org.junit", name = "junit-bom", version.ref = "junit" }
+junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter" }
+junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher" }
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+compose-ui = { group = "androidx.compose.ui", name = "ui" }
+compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
+tv-foundation = { group = "androidx.tv", name = "tv-foundation", version.ref = "tvFoundation" }
+tv-material = { group = "androidx.tv", name = "tv-material", version.ref = "tvMaterial" }
+room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
