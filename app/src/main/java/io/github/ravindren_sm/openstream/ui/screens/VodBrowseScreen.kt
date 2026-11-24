@@ -381,6 +381,9 @@ private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMem
             else -> LazyVerticalGrid(
                 columns = GridCells.Fixed(COLUMNS), state = gridState,
                 modifier = Modifier.enterAt(memory) { titleFocusId(gridState.firstVisibleItemIndex) },
+                // Room on every side for a focused card to grow into: the grid clips at its edges, which cut off the top ring of
+                // the first row (and the side ring of the first and last columns), as for card rows (see Spacing.CardRow).
+                contentPadding = Spacing.CardRow,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.S2), verticalArrangement = Arrangement.spacedBy(Spacing.S2),
             ) {
                 itemsIndexed(paged.items, key = { _, t -> t.id }) { index, item ->
