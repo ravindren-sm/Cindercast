@@ -117,6 +117,9 @@ object SportsLogic {
         // A pre-game or post-game show names the broadcast too; those words make it a show, not the game.
         val showWords = listOf("PREGAME", "POSTGAME", "COUNTDOWN", "KICKOFF", "PREVIEW", "RECAP", "HIGHLIGHTS", "REVIEW", "WEEKLY", "LIVE", "TONIGHT")
         if (primeTime(w) && showWords.none { it in w }) return true
+        // ESPN and others list the match itself as plain "NFL Football" when the guide has no team names; "NFL Football Live",
+        // "NFL Football Countdown" and the like stay shows through [showWords].
+        if (" NFL FOOTBALL " in " " + w.joinToString(" ") + " " && showWords.none { it in w }) return true
         val teams = TEAMS.count { it in w }
         return teams >= 2 || (teams >= 1 && (w.contains("AT") || w.contains("VS") || w.contains("V")))
     }

@@ -44,6 +44,9 @@ class SportsLogicTest {
         assertFalse(SportsLogic.isGame(p("Monday Night Countdown", 0, 1)))
         assertTrue(SportsLogic.isGame(p("Manningcast | MNF with Peyton and Eli: Bengals @ Commanders", 0, 1)))
         assertFalse(SportsLogic.isGame(p("Bengals Weekly", 0, 1)))
+        assertTrue(SportsLogic.isGame(p("NFL Football", 0, 1)))   // ESPN's listing of the game with no team names
+        assertFalse(SportsLogic.isGame(p("NFL Football Countdown", 0, 1)))
+        assertFalse(SportsLogic.isGame(p("NFL Live", 0, 1)))
         assertFalse(SportsLogic.isNflText("NHL Hockey: Winnipeg Jets at Florida Panthers"))
         assertFalse(SportsLogic.isNflText("Jets at Panthers"))
         assertFalse(SportsLogic.isNflText("MLB Baseball: Giants at Cardinals"))
