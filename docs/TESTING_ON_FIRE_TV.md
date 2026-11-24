@@ -49,7 +49,7 @@ how scripts and crawls know where they are without reading text.
 | `ftv.py key right right select` | Press keys; prints where focus landed after each. Refuses if `FTV_APP` is not in front. |
 | `ftv.py text "abc"` | Type into the focused field (never presses Enter, see 4.6). |
 | `ftv.py crawl <name> --exclude nav-` | Map a screen's focus graph with arrows only (never Select or Back) and report skipped, unreachable, irreversible moves. |
-| `ftv.py shot <path>` | Screenshot (not redacted: delete after use). |
+| `ftv.py shot <path>` | Screenshot (not redacted: delete after use). OpenStream blocks screen capture; see 4.11. |
 
 Text read from the screen is redacted before it is printed (URLs, hosts, IPs, MACs, long tokens), so portal details never
 reach a log or a report.
@@ -155,6 +155,20 @@ on-screen key and types a stray letter. Close the keyboard with Back, or move to
 `adb shell run-as io.github.ravindren_sm.openstream ls -l files` lists the app's private files, for example
 `nfl-listings.json` (the saved NFL search, with its write time) or `debug-log.txt` (the debug player's log, see
 `scripts/pull_debug_log.sh`). Do not copy these off the device unless needed; some hold channel play commands.
+
+### 4.11 Screenshots of OpenStream are blocked
+The app marks its window secure (`CaptureGuard`, FLAG_SECURE): `screencap` exits with an error and writes an empty file, and
+screen recording and mirroring show black. UI-tree reads (`ftv.py focus`, `dump`, `crawl`) are not affected. When a screenshot is
+really needed, on a debug build only:
+
+```bash
+adb -s "$FTV_SERIAL" shell run-as io.github.ravindren_sm.openstream touch files/allow-screen-capture
+adb -s "$FTV_SERIAL" shell am force-stop io.github.ravindren_sm.openstream   # the switch is read when the app starts
+# ...launch, take the screenshot, delete it...
+adb -s "$FTV_SERIAL" shell run-as io.github.ravindren_sm.openstream rm files/allow-screen-capture
+```
+
+Always remove the file at the end of the run and restart the app, so the TV is left protected. Release builds ignore it.
 
 ## 5. Privacy and hygiene
 - No portal address, MAC, token, device serial or TV address in any file, commit or command line saved to a script;

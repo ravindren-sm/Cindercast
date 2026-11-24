@@ -29,12 +29,14 @@ import java.io.File
 class MainActivity : ComponentActivity() {
     private val session = PortalSession()
 
-    override fun onStart() { super.onStart(); session.onForeground() }
+    // No screenshots or recording of the app (see CaptureGuard); checked on every start so a debug test switch takes effect.
+    override fun onStart() { super.onStart(); io.github.ravindren_sm.openstream.data.CaptureGuard.apply(this); session.onForeground() }
     override fun onStop() { session.onBackground(); super.onStop() }
     override fun onDestroy() { if (isFinishing) session.shutdown(); super.onDestroy() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        io.github.ravindren_sm.openstream.data.CaptureGuard.apply(this)   // before the first frame is drawn
         val store = try {
             SettingsStore(File(filesDir, SETTINGS_FILE), AndroidKeystoreKey.box())
         } catch (_: Exception) {
