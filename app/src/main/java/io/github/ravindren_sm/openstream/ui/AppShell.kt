@@ -458,6 +458,9 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
         delay(20_000)   // let start-up and whatever the viewer opens first go ahead
         if (!liveState.genresLoaded) withContext(Dispatchers.IO) { liveState.loadGenres() }
         while (true) {
+            // The groups reach this state a moment after they load; check again shortly instead of waiting a full minute
+            // (a run once lost its pass that way: the viewer started a game inside that minute).
+            if (nflGenres.isEmpty()) { delay(2_000); continue }
             val nfl = sportsState.nfl
             if ((nfl.running || nfl.due(NFL_REFRESH_MILLIS)) && nflGenres.isNotEmpty()) withContext(Dispatchers.IO) { nfl.refresh(nflGenres) }
             delay(60_000)
