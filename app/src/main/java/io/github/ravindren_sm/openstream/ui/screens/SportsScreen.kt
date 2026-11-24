@@ -167,7 +167,16 @@ private fun LivePane(state: SportsState, loader: GuideLoader, nowSec: Long, memo
             if (loaded > 0 && last >= loaded - 4 && !paged.exhausted && paged.error == null) withContext(Dispatchers.IO) { paged.loadNext() }
         }
     }
+    // Which channels of this group have a guide: when the first several have none, say so once instead of on every row.
+    val hasGuide = remember(paged) { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
+    val noGuideAtAll = hasGuide.size >= 6 && hasGuide.values.none { it }
     Text(paged.total?.let { "%,d channels · what is on now and next".format(it) } ?: " ", style = Tokens.Body, color = Tokens.TextSecondary, modifier = Modifier.padding(bottom = Spacing.S1))
+    if (noGuideAtAll) Text(
+        "The provider gives no programme guide for these channels, so what is showing is not known. Channels named like this are usually " +
+            "numbered slots the provider fills with a match only while one is on, and the name does not say which. Open one to see; " +
+            "Up and Down step to the next.",
+        style = Tokens.Body, color = Tokens.StatusWarning, modifier = Modifier.padding(bottom = Spacing.S1),
+    )
     when {
         paged.items.isEmpty() && paged.error != null -> Text(paged.error!!, style = Tokens.BodyLarge, color = Tokens.StatusError)
         paged.items.isEmpty() && paged.exhausted -> Text("No channels in this group.", style = Tokens.BodyLarge, color = Tokens.TextSecondary)
@@ -177,7 +186,7 @@ private fun LivePane(state: SportsState, loader: GuideLoader, nowSec: Long, memo
             modifier = Modifier.fillMaxSize().enterAt(memory) { sportsRowFocusId(listState.firstVisibleItemIndex) },
         ) {
             itemsIndexed(paged.items, key = { _, c -> c.id }) { i, ch ->
-                ChannelGuideRow(sportsRowFocusId(i), ch, loader, nowSec, memory) { onOpenChannel(paged.items, i) }
+                ChannelGuideRow(sportsRowFocusId(i), ch, loader, nowSec, memory, onGuide = { has -> hasGuide[ch.id] = has }, quietWhenEmpty = noGuideAtAll) { onOpenChannel(paged.items, i) }
             }
         }
     }

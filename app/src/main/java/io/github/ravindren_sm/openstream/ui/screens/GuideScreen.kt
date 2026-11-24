@@ -168,14 +168,24 @@ fun NowNextLine(channel: LiveChannel, loader: GuideLoader, nowSec: Long, modifie
  * row first appears (kept by [loader] for ten minutes). Used by the TV Guide and the Sports tab.
  */
 @Composable
-fun ChannelGuideRow(id: String, channel: LiveChannel, loader: GuideLoader, nowSec: Long, memory: FocusMemory, modifier: Modifier = Modifier, onSelect: () -> Unit) {
+fun ChannelGuideRow(
+    id: String, channel: LiveChannel, loader: GuideLoader, nowSec: Long, memory: FocusMemory, modifier: Modifier = Modifier,
+    /** Told, once the guide is read, whether the channel has anything to show (a group with none can say so once, see the Sports tab). */
+    onGuide: (hasGuide: Boolean) -> Unit = {},
+    /** When true a channel without a guide shows nothing after its name (the screen already says so for the whole group). */
+    quietWhenEmpty: Boolean = false,
+    onSelect: () -> Unit,
+) {
     val context = androidx.compose.ui.platform.LocalContext.current
     // null = still asking; an empty list = the channel has no guide; failed = the portal could not be asked.
     var programmes: List<EpgProgramme>? by remember(channel.id) { mutableStateOf(null) }
     var failed by remember(channel.id) { mutableStateOf(false) }
     LaunchedEffect(channel.id) {
         val r = withContext(Dispatchers.IO) { loader.load(channel) }
-        if (r == null) failed = true else programmes = r
+        if (r == null) failed = true else {
+            programmes = r
+            onGuide(GuideLogic.nowAndNext(r.filterNot { SportsLogic.isPlaceholder(it.name, channel.name) }, nowSec).let { it.now != null || it.next != null })
+        }
     }
     OsFocusable(id = id, memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth().then(modifier), onSelect = onSelect) { _ ->
         Row(Modifier.fillMaxWidth().height(96.dp).padding(horizontal = Spacing.S2), verticalAlignment = Alignment.CenterVertically) {
@@ -189,7 +199,7 @@ fun ChannelGuideRow(id: String, channel: LiveChannel, loader: GuideLoader, nowSe
                 else -> {
                     // Filler entries ("No details available", common on event channels) say nothing: treat them as no guide.
                     val nn = GuideLogic.nowAndNext(list.filterNot { SportsLogic.isPlaceholder(it.name, channel.name) }, nowSec)
-                    if (nn.now == null && nn.next == null) Text("No details in the guide", style = Tokens.Body, color = Tokens.TextSecondary)
+                    if (nn.now == null && nn.next == null) { if (!quietWhenEmpty) Text("No details in the guide", style = Tokens.Body, color = Tokens.TextSecondary) }
                     else {
                         Column(Modifier.weight(1f).padding(end = Spacing.S3), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             nn.now?.let { p ->
