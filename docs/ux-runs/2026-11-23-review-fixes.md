@@ -14,3 +14,18 @@ Two screenshots taken of the poster grid and deleted; the log capture was scanne
 
 Cleanup done on request: the Mickey Mouse Clubhouse test entries (S02 E11 and S02 E12 in Continue watching, S02 E10 in
 Recently watched) were removed with "Remove from Home". Ludwig S01 E04 in Continue watching was left as it is (not from a test).
+
+## Follow-up checks (21:45–22:00)
+
+| Fix | Result |
+|---|---|
+| Screen on, VOD player | **Pass.** Mickey Mouse Clubhouse S02 E09: `KEEP_SCREEN_ON` present while playing, gone 1.5 s after pausing. Played about 1 s, so no history entry was saved. |
+| Shared stream client | **Pass.** After four player opens and closes, the app had 3 OkHttp threads and 43 threads in all, the same after each open. |
+| One IMDb transaction | **Pass.** Settings > IMDb ratings file > Update: download and write finished in 18 s (76,821 titles rated); writing score by score took minutes before. |
+| TMDB score badge | Still not seen on the TV: with the IMDb file loaded, nearly every matched title shows an IMDb score; no TMDB-only badge in KIDS TV SHOW or about 130 KIDS MOVIES titles. Covered by `RatingLabelsTest`. |
+| Recovery cancelled on zap | Not checked: needs a stream error, which cannot be caused safely on the real portal. |
+
+History: Home shows only Ludwig S01 E04 in Continue watching (resume point 15:30, 39 min left), as asked. Settings > "Continue
+watching and watched · Clear" was not used, since it would also remove Ludwig. Still held, with no way to clear them one by one:
+the viewing statistics behind Settings > "Most watched" (lists Mickey Mouse Clubhouse, mostly from these tests), recent
+searches, and five saved resume positions, four of them from before profiles existed (not shown anywhere).
