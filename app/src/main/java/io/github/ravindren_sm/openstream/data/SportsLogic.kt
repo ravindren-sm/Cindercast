@@ -39,9 +39,9 @@ object SportsLogic {
     /** Channel names worth checking inside [NETWORK_GROUP_WORDS] groups. */
     private val NETWORK_WORDS = listOf("FOX", "CBS", "NBC", "ABC", "ESPN", "ESPN2", "NFL", "CTV", "TSN", "SN", "SPORTSNET", "PRIME", "NETFLIX", "PEACOCK", "PARAMOUNT")
 
-    private fun words(text: String): List<String> = text.uppercase().split(Regex("[^A-Z0-9+]+")).filter { it.isNotEmpty() }
+    internal fun words(text: String): List<String> = text.uppercase().split(Regex("[^A-Z0-9+]+")).filter { it.isNotEmpty() }
 
-    private fun hasAny(text: String, list: List<String>): Boolean {
+    internal fun hasAny(text: String, list: List<String>): Boolean {
         val w = words(text)
         val upper = " " + w.joinToString(" ") + " "
         return list.any { k -> if (' ' in k) upper.contains(" $k ") else k in w }
@@ -110,7 +110,7 @@ object SportsLogic {
     }
 
     /** One line of the NFL results: [programme] on [channel], playing now or later; [game] when it is a match, not a show about the league. */
-    class NflListing(val channel: LiveChannel, val programme: EpgProgramme?, val live: Boolean, val game: Boolean = false)
+    class NflListing(val channel: LiveChannel, val programme: EpgProgramme?, val live: Boolean, val game: Boolean = false, val league: League = League.NFL)
 
     /** A game, not a show about the NFL: it names two teams, or one team with "at" or "vs" ("Bills at Chiefs", "Packers vs. Bears"). */
     /** The prime-time game broadcasts, often listed without team names ("Monday Night Football", "TNF"). */

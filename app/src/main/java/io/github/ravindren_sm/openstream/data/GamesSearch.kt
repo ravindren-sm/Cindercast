@@ -24,12 +24,13 @@ import kotlinx.serialization.json.put
 import kotlin.coroutines.coroutineContext
 
 /**
- * Finds NFL games on live channels. The portal has no bulk guide (get_epg_info answers empty), so each channel's short guide
+ * Finds games of the [League]s (NFL, college football, soccer, cricket, Formula 1) on live channels, in one pass. The portal has no bulk guide (get_epg_info answers empty), so each channel's short guide
  * is asked for on its own (about a third of a second, through [GuideLoader]). A full pass over the likely channels takes a few
  * minutes, so the app runs it in the background (see the shell: never while something is playing) and keeps the answer:
  *
  * - A pass ([refresh]) reads, most likely channels first: channels whose name says NFL (the portal's name search) and every
- *   channel in a group named for the NFL; the sports groups named for the US carriers (ESPN+, Paramount+, Peacock, DAZN);
+ *   channel in a group named for the NFL; every channel in the other leagues' own groups (see [Leagues.isLeagueGroup]; a group
+ *   whose first 8 channels have no guide at all is dropped, see [DeadGroupGuard]); the sports groups named for the US carriers (ESPN+, Paramount+, Peacock, DAZN);
  *   the network channels (FOX, CBS, NBC, ABC, ESPN, TSN...) in the US, local and English groups and in the other sports groups.
  * - A pass can be cancelled (playback started) and resumed: channels already read in this pass are not read again.
  * - The listings shown stay those of the last finished pass until the next one finishes, so the list does not empty and refill.
@@ -41,7 +42,7 @@ import kotlin.coroutines.coroutineContext
  * Copies of one channel that differ only by quality ("4K", "HD", "RAW") are read once. Compose state; [refresh] blocks on portal
  * calls, so call it from a background coroutine.
  */
-class NflSearch(
+class GamesSearch(
     private val catalog: LiveCatalog,
     private val loader: GuideLoader,
     private val nowSec: () -> Long = { System.currentTimeMillis() / 1000 },
@@ -83,7 +84,7 @@ class NflSearch(
     /** The listings at [now]: ended programmes dropped, the ones on now marked live. */
     fun current(now: Long = nowSec()): List<SportsLogic.NflListing> = SportsLogic.order(
         listings.filter { (it.programme?.stopSec ?: Long.MAX_VALUE) > now }
-            .map { l -> SportsLogic.NflListing(l.channel, l.programme, live = (l.programme?.startSec ?: 0L) <= now, game = l.game) },
+            .map { l -> SportsLogic.NflListing(l.channel, l.programme, live = (l.programme?.startSec ?: 0L) <= now, game = l.game, league = l.league) },
     )
 
     /** Shows listings saved by an earlier run of the app (see [decode]); ignored once a pass has produced results. */
@@ -101,8 +102,9 @@ class NflSearch(
         current = "channels named NFL"
         checkAll(searchByName("NFL"))
         for (g in genres.filter { SportsLogic.isNflChannel(it.title) }) scanGroup(g, networksOnly = false)
-        for (g in genres.filter { SportsLogic.nflScan(it.title) == SportsLogic.NflScan.ALL_CHANNELS && isCarrierGroup(it.title) }) scanGroup(g, networksOnly = false)
-        for (g in genres.filter { SportsLogic.nflScan(it.title) == SportsLogic.NflScan.NETWORKS_ONLY }) scanGroup(g, networksOnly = true)
+        for (g in genres.filter { Leagues.isLeagueGroup(it.title) && !SportsLogic.isNflChannel(it.title) }) scanGroup(g, networksOnly = false)
+        for (g in genres.filter { Leagues.scan(it.title) == SportsLogic.NflScan.ALL_CHANNELS && isCarrierGroup(it.title) && !Leagues.isLeagueGroup(it.title) }) scanGroup(g, networksOnly = false)
+        for (g in genres.filter { Leagues.scan(it.title) == SportsLogic.NflScan.NETWORKS_ONLY }) scanGroup(g, networksOnly = true)
         // The network channels (ESPN, FOX Sports, CBS Sports, NFL Network...) of the general sports groups, such as one plainly
         // called "SPORTS"; the rest of those groups waits for [extend].
         for (g in otherSportsGroups(genres)) scanGroup(g, networksOnly = true)
@@ -124,7 +126,7 @@ class NflSearch(
     }
 
     private fun otherSportsGroups(genres: List<LiveGenre>) =
-        genres.filter { SportsLogic.nflScan(it.title) == SportsLogic.NflScan.ALL_CHANNELS && !isCarrierGroup(it.title) && !SportsLogic.isNflChannel(it.title) }
+        genres.filter { Leagues.scan(it.title) == SportsLogic.NflScan.ALL_CHANNELS && !isCarrierGroup(it.title) && !Leagues.isLeagueGroup(it.title) && !SportsLogic.isNflChannel(it.title) }
 
     private fun isCarrierGroup(title: String) = SportsLogic.isNetworkChannel(title) || title.uppercase().let { t -> listOf("ESPN", "PARAMOUNT", "PEACOCK", "DAZN", "PRIME", "NETFLIX").any { it in t } }
 
@@ -156,10 +158,10 @@ class NflSearch(
             }
             list.also { groupChannels[g.id] = it }
         }
-        checkAll(if (networksOnly) channels.filter { SportsLogic.isNetworkChannel(it.name) } else channels)
+        checkAll(if (networksOnly) channels.filter { SportsLogic.isNetworkChannel(it.name) } else channels, DeadGroupGuard())
     }
 
-    private suspend fun checkAll(channels: List<LiveChannel>) {
+    private suspend fun checkAll(channels: List<LiveChannel>, guard: DeadGroupGuard? = null) {
         // Keys are claimed only once a channel has been read, so a pass cancelled mid-group reads the rest when it resumes.
         val fresh = channels.filter { SportsLogic.channelKey(it.name) !in seenKeys }.distinctBy { SportsLogic.channelKey(it.name) }
         queued += fresh.size
@@ -169,17 +171,22 @@ class NflSearch(
             seenKeys += SportsLogic.channelKey(ch.name)
             checked++
             if (programmes != null) {
-                val hits = SportsLogic.listings(ch, programmes, nowSec())
+                val hits = Leagues.listings(ch, programmes, nowSec())
                 if (hits.isNotEmpty()) {
                     found = SportsLogic.order(found + hits)
                     if (progressive || extended) listings = found
                 }
             }
+            // A group with no guide at all (numbered event slots) is not worth the rest of its channels.
+            if (guard != null && guard.feed(programmes, ch.name)) break
         }
     }
 
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
+
+        /** The listings of one league. */
+        fun forLeague(list: List<SportsLogic.NflListing>, league: League): List<SportsLogic.NflListing> = Leagues.forLeague(list, league)
 
         /**
          * The listings as JSON for the app's private storage: channel id, number, name and play command (needed to play it; the
@@ -191,7 +198,7 @@ class NflSearch(
                 listings.forEach { l ->
                     add(buildJsonObject {
                         put("id", l.channel.id); put("number", l.channel.number); put("name", l.channel.name); l.channel.cmd?.let { put("cmd", it) }
-                        put("game", l.game)
+                        put("game", l.game); put("league", l.league.name)
                         l.programme?.let { p -> put("title", p.name); put("start", p.startSec); put("stop", p.stopSec) }
                     })
                 }
@@ -210,9 +217,14 @@ class NflSearch(
                 val ch = LiveChannel(id, s("number").orEmpty(), s("name").orEmpty(), s("cmd"))
                 val title = s("title"); val start = n("start"); val stop = n("stop")
                 val p = if (title != null && start != null && stop != null) EpgProgramme(title, null, null, start, stop) else null
-                SportsLogic.NflListing(ch, p, live = false, game = (o["game"] as? JsonPrimitive)?.booleanOrNull == true)
+                // Files from before the leagues have no "league": those are NFL. An unknown name (a newer file) drops the listing.
+                val league = s("league")?.let { n -> League.entries.firstOrNull { it.name == n } ?: return@mapNotNull null } ?: League.NFL
+                SportsLogic.NflListing(ch, p, live = false, game = (o["game"] as? JsonPrimitive)?.booleanOrNull == true, league = league)
             }
             list to savedAt
         } catch (_: Exception) { emptyList<SportsLogic.NflListing>() to 0L }
     }
 }
+
+/** The earlier name, kept so existing callers compile. */
+typealias NflSearch = GamesSearch
