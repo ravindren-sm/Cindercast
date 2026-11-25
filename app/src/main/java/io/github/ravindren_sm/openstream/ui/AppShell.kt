@@ -811,6 +811,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 GuideScreen(
                     state = guideState, favoriteCount = favorites.channels().size, genres = liveState.allGenres.filter { g -> liveState.genres.any { it.id == g.id } && (defaultScope?.groupAllowed(g) ?: true) }, loader = guideLoader,
                     connected = connected, memory = memory,
+                    favoriteChannels = { favorites.channels().map(FavoriteItems::toChannel) },
                     onChooseGroup = { id, title ->
                         guideState.select(id, title,
                             if (id == FAVORITES_GROUP) PagedChannels.fixed(favorites.channels().map(FavoriteItems::toChannel))

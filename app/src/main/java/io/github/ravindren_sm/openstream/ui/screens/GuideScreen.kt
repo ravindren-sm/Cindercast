@@ -18,7 +18,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -50,24 +53,37 @@ import kotlinx.coroutines.withContext
 
 fun guideRowFocusId(i: Int) = "guide-row-$i"
 const val GUIDE_GROUP_ID = "guide-group"
+const val GUIDE_SEARCH_ID = "guide-search"
 const val FAVORITES_GROUP = "fav"
 
-/** Which channels the guide lists: the favorites, or one portal group. Kept by the shell so the choice survives leaving the screen. */
+/**
+ * What the guide keeps while the viewer is elsewhere (held by the shell so the choice survives leaving the screen): which
+ * channels it lists (the favorites, or one portal group), how far the time window has been scrolled, and the programme search.
+ */
 class GuideState {
     var groupId by mutableStateOf<String?>(null)
     var groupTitle by mutableStateOf("")
     var channels: PagedChannels by mutableStateOf(PagedChannels { CatalogResult.Failed(LiveCatalog.NOT_CONNECTED) })
         private set
+    /** The time window starts this many half hours after the current half hour. */
+    var slotOffset by mutableIntStateOf(0)
+    /** The programme search is open (it replaces the grid, so coming back from the player lands in it). */
+    var searchOpen by mutableStateOf(false)
+    var searchQuery by mutableStateOf("")
+    /** Index of the search result last opened, so focus can return to it. */
+    var searchResultIndex by mutableIntStateOf(0)
 
-    fun select(id: String, title: String, newChannels: PagedChannels) { groupId = id; groupTitle = title; channels = newChannels }
+    fun select(id: String, title: String, newChannels: PagedChannels) { groupId = id; groupTitle = title; channels = newChannels; slotOffset = 0 }
 }
 
 internal fun timeText(context: android.content.Context, sec: Long) = android.text.format.DateFormat.getTimeFormat(context).format(java.util.Date(sec * 1000))
 
 /**
- * TV Guide: what is on now and next for each channel of a group (or the favorites). The portal gives a guide one channel
- * at a time, so a row asks for its channel's programmes when it first appears on screen and keeps them for ten minutes.
- * Select plays the channel; the list is what zapping then moves through.
+ * TV Guide: a time grid. Rows are the channels of a group (or the favorites) with their number and name at the left; programme
+ * cells run across a window of about two and a half hours that scrolls through what the loaded guides cover. The portal gives a
+ * guide one channel at a time, so a row asks for its channel's programmes when it first appears on screen (one request at a
+ * time) and the loader keeps them for ten minutes. Select plays the channel; the list is what zapping then moves through.
+ * "Search programmes" looks through the loaded guides and the favorites' channels (see [ProgrammeSearchLayer]).
  */
 @Composable
 fun GuideScreen(
@@ -80,8 +96,9 @@ fun GuideScreen(
     onChooseGroup: (id: String, title: String) -> Unit,
     onOpenChannel: (channels: List<LiveChannel>, index: Int) -> Unit,
     modifier: Modifier = Modifier,
+    /** The favorites' channels, searched by the programme search (asked when the search opens). */
+    favoriteChannels: () -> List<LiveChannel> = { emptyList() },
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
     var picking by remember { mutableStateOf(false) }
     var nowSec by remember { mutableLongStateOf(System.currentTimeMillis() / 1000) }
     LaunchedEffect(Unit) { while (true) { delay(30_000); nowSec = System.currentTimeMillis() / 1000 } }
@@ -94,30 +111,42 @@ fun GuideScreen(
             if (loaded > 0 && last >= loaded - 4 && !paged.exhausted && paged.error == null) withContext(Dispatchers.IO) { paged.loadNext() }
         }
     }
+    // Closing the search puts focus back on its button (the grid is composed again a frame later).
+    var searchWasOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(state.searchOpen) {
+        if (state.searchOpen) searchWasOpen = true
+        else if (searchWasOpen) { searchWasOpen = false; withFrameNanos { }; withFrameNanos { }; memory.tryFocus(GUIDE_SEARCH_ID) }
+    }
 
     Box(modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.S2), verticalArrangement = Arrangement.spacedBy(Spacing.S2)) {
+        if (state.searchOpen) {
+            ProgrammeSearchLayer(
+                state = state, loader = loader, favoriteChannels = favoriteChannels, nowSec = nowSec, memory = memory,
+                onOpenChannel = onOpenChannel, onClose = { state.searchOpen = false },
+            )
+        } else Column(Modifier.fillMaxSize().padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.S2), verticalArrangement = Arrangement.spacedBy(Spacing.S1)) {
+            // Down from either button enters the first row at its channel name (geometry alone would pick a cell, or skip the row).
+            val downToFirstRow = Modifier.focusProperties { down = if (paged.items.isNotEmpty()) memory.requesterFor(guideRowFocusId(0)) else FocusRequester.Default }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.S3)) {
                 Text("TV Guide", style = Tokens.TitleLarge, color = Tokens.TextPrimary)
-                OsFocusable(id = GUIDE_GROUP_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = { picking = true }) { _ ->
+                OsFocusable(id = GUIDE_GROUP_ID, memory = memory, variant = FocusVariant.BUTTON, modifier = downToFirstRow, onSelect = { picking = true }) { _ ->
                     Text("Group: ${state.groupTitle.ifEmpty { "…" }}", style = Tokens.BodyLarge, color = Tokens.AccentPrimary,
                         modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1))
                 }
-                Text("Select a row to watch", style = Tokens.Body, color = Tokens.TextSecondary)
+                OsFocusable(id = GUIDE_SEARCH_ID, memory = memory, variant = FocusVariant.BUTTON, modifier = downToFirstRow, onSelect = { state.searchOpen = true }) { _ ->
+                    Text("Search programmes", style = Tokens.BodyLarge, color = Tokens.AccentPrimary,
+                        modifier = Modifier.padding(horizontal = Spacing.S2, vertical = Spacing.S1))
+                }
             }
             when {
                 paged.items.isEmpty() && paged.error == null && !paged.exhausted ->
                     Text(if (connected) "Loading channels…" else "Waiting for the portal connection…", style = Tokens.BodyLarge, color = Tokens.TextSecondary)
                 paged.items.isEmpty() && paged.error != null -> Text(paged.error!!, style = Tokens.BodyLarge, color = Tokens.StatusError)
                 paged.items.isEmpty() -> Text("No channels in this group.", style = Tokens.BodyLarge, color = Tokens.TextSecondary)
-                else -> LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(Spacing.S1), modifier = Modifier.fillMaxSize()) {
-                    itemsIndexed(paged.items, key = { _, c -> c.id }) { i, channel ->
-                        // Up from the first row goes to the Group button; geometry alone would skip it (it is narrow and off to
-                        // the side of the full-width row) and land on a tab.
-                        val upToGroup = if (i == 0) Modifier.focusProperties { up = memory.requesterFor(GUIDE_GROUP_ID) } else Modifier
-                        ChannelGuideRow(guideRowFocusId(i), channel, loader, nowSec, memory, upToGroup) { onOpenChannel(paged.items, i) }
-                    }
-                }
+                else -> GuideTimeGrid(
+                    state = state, channels = paged.items, listState = listState, loader = loader, nowSec = nowSec, memory = memory,
+                    onOpenChannel = { i -> onOpenChannel(paged.items, i) }, modifier = Modifier.weight(1f),
+                )
             }
         }
         if (picking) {
