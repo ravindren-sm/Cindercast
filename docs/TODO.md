@@ -97,22 +97,29 @@ runs on the family TV still stands (see Environment notes).
 - 30-minute soak on a live channel (the VOD soak passed; live was skipped because content cannot be vetted).
 - Whether the video decoder glitch seen once at about 1 min 50 s recurs, and on which streams.
 - The one `IOException` line seen in the capture of the family-use run and never examined.
-- Behaviour at the end of an episode (no next-episode prompt yet).
 
 ## Features still missing against the AI Studio spec
-See `docs/FEATURE_COVERAGE.md`. Largest first: Home, Search, Favorites and Continue Watching, the next-episode prompt,
-accelerating seek, filters and sort, the live info banner and mini channel list, the EPG (needs a probe), themes,
-transitions, Settings.
+See `docs/FEATURE_COVERAGE.md`. Built since this list was first written: Home, Search, Favorites, Continue Watching,
+next-episode prompt, accelerating seek, filters and sort, Settings, the guide, Sports and Saved searches. Still missing: the live
+info banner and mini channel list, a time-grid guide, themes, transitions, stream readout on screen.
 
 ## Release readiness
-- Decisions and drafts are in docs/RELEASE_PLAN.md (2026-11-22). Done: release signing key and build script, cleartext policy, privacy policy, notices, store text. Left: owner's offline key copy, store artwork, trademark check, hosting the policy.
-- Release builds cannot reach an HTTP-only provider (cleartext is allowed in debug only). Needs a release
-  network-security decision.
-- Public repo: the scrubbed history is on branch `native-app` of the OpenStream repo (pushed 2026-11-21; `main` there is
-  untouched). Decide when to open a PR or make it the default branch; push later commits with `git push`.
+- Decisions and drafts are in docs/RELEASE_PLAN.md. Done: release signing key and build script, cleartext policy (release builds allow
+  plain HTTP, see `app/src/release/res/xml/network_security_config.xml`), privacy policy, notices, store text, version 0.1.1 (code 2).
+  Left: owner's offline key copy, store artwork, trademark check, hosting the policy.
+- Public repo: the app is on `main` of the OpenStream repo since 2026-11-23, with the web prototype under `prototype/`.
+  CI (`.github/workflows/ci.yml`) runs the unit tests and builds the debug APK on every push and pull request.
 - Rotten Tomatoes and real IMDb ratings need an outside service and a user-supplied key; the portal's own rating
   (IMDb when present, otherwise Kinopoisk, labelled) is what is shown today.
-- Docs review before anything is public beyond the scrubbed branch.
+- Docs review before the next public push (provider detail must stay out of the public tree).
+
+## Found 2026-11-24 and 2026-11-25 (open)
+- Launcher tile: Fire OS shows a plain navy tile although the banner in the APK is correct (xhdpi, standard TV size). Cause unknown;
+  the launcher caches the tile and `pm clear` on the launcher is refused (protected package). Retry after a reboot or a version bump.
+- Profiles manager: the new Back button has not been checked on the TV (it needs the household PIN).
+- Live preview inset (Sports lists): not stress-tested (fast zapping, Back during preview, low memory).
+- Soccer titles that carry no team names are listed under Shows instead of games; the title rule needs a look at real examples.
+- Saved searches as a Home row: not built (the Saved tab and its editor are done and checked on the TV).
 
 ## Environment notes
 - The owner's TV is the family TV: real runs use kid-safe titles only (memory file `kids-in-the-house-clean-content`).

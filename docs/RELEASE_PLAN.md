@@ -54,12 +54,13 @@ subscription, no provider is named. A rejection is possible, so the GitHub APK s
   (outside the repo and Google Drive; `release.properties` holds the passwords, chmod 600). **Owner action: make an offline
   copy of that whole folder (for example an encrypted USB stick) now.** Losing it means every install must be removed before an update.
   `scripts/build_release.sh` builds, tests, signs and verifies; a clone without the key builds an unsigned APK.
-- **Release build:** code and resource shrinking on, 32-bit ABI only, versionName 0.1.0 (versionCode rises each release). About 2.5 MB.
+- **Release build:** code and resource shrinking on, 32-bit ABI only, versionName 0.1.1 / versionCode 2 as of 2026-11-25 (versionCode rises each release; 0.1.0 was code 1). About 2.5 MB.
 - **In-app update check: not in 0.1.** It needs the "install unknown apps" permission, which store builds should not carry.
   GitHub Releases plus the Downloader app is the sideload path; stores update themselves. Revisit for a sideload-only flavour.
 - **Order of stores:** Amazon Appstore first (it is the Fire TV store), Google Play later if wanted. Publisher: an individual account.
 - **Plain HTTP and Amazon review:** if the store objects to cleartext, answer that the address is user-supplied; the GitHub APK is the fallback.
 - **Documents:** `docs/PRIVACY.md`, `docs/THIRD_PARTY_NOTICES.md`, `docs/STORE_LISTING.md` drafted (placeholder `<REPO_URL>` to fill).
+- **Status 2026-11-25:** signing key, signed release build, cleartext policy, privacy policy, notices and store text are done; the app is on `main` and CI builds and tests every push.
 - **Still open before submission:** trademark search for "OpenStream", store artwork and screenshots, IMDb's licensing reply
   (IMDb scores should be off in a public build unless licensed), hosting the privacy policy, a fresh scan of docs for provider detail.
 

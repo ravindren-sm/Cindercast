@@ -28,7 +28,7 @@ Milestone column: where the work is planned (M3 live, M4 VOD, M5 everything else
 
 | # | Route | Status | What is built / what is missing | Milestone |
 |---|---|---|---|---|
-| 1 | Home | Partial | Done: Continue watching row (progress, time left, resume from the tile, one tile per show), doors, first-run state. Recently Watched, clock, tile options, Favorite channels, pinned "New in" rows and a pinned Live row done. Missing: Kids variant. | M5 |
+| 1 | Home | Partial | Done: Continue watching row (progress, time left, resume from the tile, one tile per show), doors, first-run state. Recently Watched, clock, tile options, Favorite channels, pinned "New in" rows and a pinned Live row done. Missing: Kids variant, a Saved-search row. | M5 |
 | 2 | Live TV browser | Partial | Done: genre rail, channel list, 14-per-page focus-triggered paging, real data. Missing: 3-column layout with preview and programme panel, sort (number or A-Z), channel logos, HD/4K badges, parental lock badge, programme title, skeleton rows, digit tuning inside the browser. | M3 |
 | 3 | Live player | Partial | Done: full screen, overlay, buffering, errors with retry, channel up/down, digit entry, Back to the watched channel, Language and Subtitles drawer (Menu key). Missing: stream readout on screen (we only log it), info banner with programme and actions, mini channel list (Left). | M3 |
 | 4 | TV Guide (EPG) | Partial | Now and next per channel for a group or the favorites, loaded one channel at a time and cached ten minutes. Missing: a time grid, programme details, programme search. | M5 |
@@ -43,13 +43,19 @@ Milestone column: where the work is planned (M3 live, M4 VOD, M5 everything else
 | 13 | First-run setup wizard | Done | Welcome, URL and MAC entry, live connection test, Save. (The catalog sync progress step is not needed: the catalog is paged.) | M2 |
 | 14 | States and error gallery | Reference only | The states it shows are built into the screens as they land: stream error with retry and portal failure messages exist; skeleton placeholders, empty favorites or search, and an offline banner do not yet. | M5 |
 | 15 | Design notes / handoff | Reference only | Used as the design spec for the port. | - |
+| + | Sports (not in the spec) | Done, checked on the TV | Sports tab: sports groups and on-demand categories, and a games finder for NFL, college football, soccer, cricket and Formula 1 (one guide pass for all five, one search, results saved between launches, counts in the rail), plus a muted live preview inset beside channel lists and game rows. Not stress-tested: the inset under fast zapping. Soccer titles without team names are listed as shows. | - |
+| + | Saved searches (not in the spec) | Done, checked on the TV | Saved tab (adult profiles): named searches over the on-device index (movies, shows or both; genres any-of or all-of; languages; minimum rating; year; order), per profile, editable. Missing: a Home row for a saved search. | - |
+
+Also built, outside the spec's list: the OpenStream logo (top bar, profile chooser, launcher icon and Fire TV banner; the launcher
+tile itself shows plain navy on Fire OS, cause unknown) and capture blocking (`FLAG_SECURE` hides the window from screenshots and
+screen recording, with a debug-only test switch).
 
 ## 3. Shared overlays, modals and services
 
 | Spec item | Status | Notes |
 |---|---|---|
 | Language and Subtitles overlay (audio tracks, subtitle tracks, live caption preview, focus trap) | Partial | Done in both players: right-hand drawer, audio and subtitle columns, check on the active track, format and channel tags (1.0, 2.0, 5.1, AD, SAP, SRT, VTT, CC, DVB), summary line, Done, Back closes it, focus returns to the player; the portal's external subtitle files are side-loaded. Opens with the remote's Menu button (also the Captions key, or L on a keyboard). Missing: the on-canvas caption preview inside the drawer, a button in an info banner (there is no banner yet). Checked on the Fire TV against the fake portal only; the real portal's subtitle format and real live captions (CC, DVB) are unverified. |
-| Parental PIN gate modal (verify, set PIN; unlocks R, TV-MA, U/A 16+ and locked channels) | Partial | The rules and storage are built and tested (age labels to levels, Kids and Adult policy, a hashed household PIN with lockout, profiles in Room); the modal, the profile picker and enforcement in the screens are the next slices (docs/HOME_AND_PROFILES.md). Original row: | The portal sends an age/MPAA field on most titles, so the gate has real input. M5. |
+| Parental PIN gate modal (verify, set PIN; unlocks R, TV-MA, U/A 16+ and locked channels) | Partial | Built: age labels to levels, Kids and Adult policy, a hashed household PIN with lockout, profiles in Room, the profile chooser and manager, Kids rules (docs/HOME_AND_PROFILES.md). The Profiles manager's Back button is not yet checked on the TV (needs the PIN). A PIN prompt for 16+ titles on adult profiles is not built. M5. |
 | Global Remote Menu (15-route directory, simulate session expired) | Reference only | Dev aid. |
 | Ratings service: lazy fetch per visible page, cache with a 7 to 30 day TTL, toggle and cache reset | Partial | Today the portal's own rating fields are used (IMDb, else Kinopoisk). Real IMDb and Rotten Tomatoes need an outside service with a user-supplied key (OMDb or MDBList) and a local cache. Open decision. M5. |
 
