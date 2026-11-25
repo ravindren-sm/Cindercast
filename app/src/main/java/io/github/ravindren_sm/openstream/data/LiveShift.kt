@@ -6,10 +6,11 @@ object LiveShift {
     const val LIVE_THRESHOLD_MS = 4_000L
 
     /** "Live", or "-12:05 behind live". Null offset (not a live stream, or not known) gives "". */
-    fun label(offsetMillis: Long?): String = when {
+    fun label(offsetMillis: Long?, windowMillis: Long? = null): String = when {
         offsetMillis == null || offsetMillis < 0 -> ""
         offsetMillis < LIVE_THRESHOLD_MS -> "Live"
-        else -> "-" + TimeText.format(offsetMillis) + " behind live"
+        // [windowMillis] is how much the stream keeps (the live window): how far back playback can go at most.
+        else -> "-" + TimeText.format(offsetMillis) + " behind live" + (windowMillis?.let { " · can go back " + TimeText.format(it) } ?: "")
     }
 
     /** Whether a forward skip of [deltaMillis] from [offsetMillis] behind live would pass the live edge (so it should rejoin live). */

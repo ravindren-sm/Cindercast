@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -295,7 +297,7 @@ fun VodPlayerScreen(
                     Key.DirectionRight -> { seekBy(SeekRamp.stepMillis(e.nativeKeyEvent.repeatCount)); true }
                     Key.MediaRewind -> { seekBy(-BIG_SEEK_MILLIS); true }
                     Key.MediaFastForward -> { seekBy(BIG_SEEK_MILLIS); true }
-                    Key.MediaPlayPause, Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                    Key.MediaPlayPause, Key.P, Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
                         // With "Up next" showing, Select starts the next episode instead of pausing.
                         val upNext = nextTarget
                         if (upNext != null && (ended || (duration > 0 && duration - position <= UP_NEXT_MILLIS))) onPlayNext(upNext)
@@ -383,14 +385,21 @@ private fun ProgressBar(position: Long, duration: Long, modifier: Modifier = Mod
         modifier.fillMaxWidth().padding(Spacing.SafeHorizontal, Spacing.SafeVertical).background(Tokens.BgCanvas.copy(alpha = 0.7f)).padding(Spacing.S2),
         verticalArrangement = Arrangement.spacedBy(Spacing.S1),
     ) {
-        Box(Modifier.fillMaxWidth().height(8.dp).background(Tokens.Surface3)) {
+        // The position bar with a marker, so it is clear where in the title the viewer is (and where a skip will land).
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().height(20.dp)) {
             val fraction = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
-            Box(Modifier.fillMaxHeight().fillMaxWidth(fraction).background(Tokens.AccentPrimary))
+            Box(Modifier.align(Alignment.CenterStart).fillMaxWidth().height(8.dp).background(Tokens.Surface3)) {
+                Box(Modifier.fillMaxHeight().fillMaxWidth(fraction).background(Tokens.AccentPrimary))
+            }
+            Box(
+                Modifier.align(Alignment.CenterStart).offset(x = (maxWidth * fraction - 10.dp).coerceAtLeast(0.dp)).size(20.dp)
+                    .background(Tokens.TextPrimary, androidx.compose.foundation.shape.CircleShape),
+            )
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(TimeText.format(position), style = Tokens.Mono, color = Tokens.TextPrimary)
-            Text("Menu: audio & subtitles", style = Tokens.Body, color = Tokens.TextSecondary)
-            Text(if (duration > 0) TimeText.format(duration) else "", style = Tokens.Mono, color = Tokens.TextSecondary)
+            Text("Left / Right: skip · Menu: audio & subtitles", style = Tokens.Body, color = Tokens.TextSecondary)
+            Text(if (duration > 0) "-" + TimeText.format((duration - position).coerceAtLeast(0)) + "  of  " + TimeText.format(duration) else "", style = Tokens.Mono, color = Tokens.TextSecondary)
         }
     }
 }

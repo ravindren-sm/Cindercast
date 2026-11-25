@@ -367,8 +367,8 @@ fun LivePlayerScreen(
                 when {
                     e.key == Key.Menu || e.key == Key.Captions || e.key == Key.L -> { tracksOpen = true; true }
                     digit != null -> { if (typed.length < 5) typed += digit; true }
-                    e.key == Key.DirectionUp || e.key == Key.ChannelUp -> { zap(forward = true); true }
-                    e.key == Key.DirectionDown || e.key == Key.ChannelDown -> { zap(forward = false); true }
+                    e.key == Key.DirectionUp || e.key == Key.ChannelUp || e.key == Key.RightBracket -> { zap(forward = true); true }
+                    e.key == Key.DirectionDown || e.key == Key.ChannelDown || e.key == Key.LeftBracket -> { zap(forward = false); true }
                     typed.isNotEmpty() && (e.key == Key.Enter || e.key == Key.NumPadEnter || e.key == Key.DirectionCenter) -> { commitTyped(); true }
                     // Left opens the channel list. (It used to rewind: this portal keeps only about 20 s of live window, too little to
                     // be useful, so rewinding and skipping moved to the media keys.) Right just shows the banner.
@@ -376,7 +376,7 @@ fun LivePlayerScreen(
                     e.key == Key.DirectionRight -> true
                     e.key == Key.MediaRewind -> { shift(-30_000); true }
                     e.key == Key.MediaFastForward -> { shift(30_000); true }
-                    e.key == Key.MediaPlayPause || e.key == Key.Enter || e.key == Key.NumPadEnter || e.key == Key.DirectionCenter -> { player.playWhenReady = !player.playWhenReady; true }
+                    e.key == Key.MediaPlayPause || e.key == Key.P || e.key == Key.Enter || e.key == Key.NumPadEnter || e.key == Key.DirectionCenter -> { player.playWhenReady = !player.playWhenReady; true }
                     e.key == Key.MediaPlay -> { player.playWhenReady = true; true }
                     e.key == Key.MediaPause -> { player.playWhenReady = false; true }
                     else -> false   // Back and everything else still reach the shell
@@ -408,7 +408,7 @@ fun LivePlayerScreen(
                     modifier = Modifier.background(Tokens.BgCanvas.copy(alpha = 0.7f)).padding(Spacing.S1),
                 )
                 if (phase is Phase.Playing) {
-                    val label = LiveShift.label(behindLive)
+                    val label = LiveShift.label(behindLive, windowMillis = player.duration.takeIf { player.isCurrentMediaItemLive && it != androidx.media3.common.C.TIME_UNSET && it > 0 })
                     val text = (if (paused) "Paused" else "") + (if (paused && label.isNotEmpty()) " · " else "") + label
                     if (text.isNotEmpty()) Text(
                         text, style = Tokens.BodyLarge, color = if (paused || label.startsWith("-")) Tokens.StatusWarning else Tokens.StatusSuccess,

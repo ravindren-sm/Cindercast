@@ -97,7 +97,7 @@ fun MiniChannelList(channels: List<LiveChannel>, cursor: Int, playing: Int, wind
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text("Channels", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
-        Text("Up and Down choose · Select watches · Right or Back closes", style = Tokens.Body, color = Tokens.TextSecondary, maxLines = 1)
+        Text("Up/Down choose · Select watches · Back closes", style = Tokens.Body, color = Tokens.TextSecondary, maxLines = 1)
         for (i in window) {
             val c = channels.getOrNull(i) ?: continue
             val parsed = ChannelNames.parse(PortalText.decodeEntities(c.name))
