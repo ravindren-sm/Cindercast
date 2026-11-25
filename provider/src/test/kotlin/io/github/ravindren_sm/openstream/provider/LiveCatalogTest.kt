@@ -54,4 +54,16 @@ class LiveCatalogTest {
         assertNull(LiveCatalogParser.channelPage(null, 1))
         assertNull(LiveCatalogParser.channelPage(js("""[1,2]"""), 1))
     }
+
+    @Test fun `a channel logo is read when present and left null when blank or absent`() {
+        val page = LiveCatalogParser.channelPage(js("""{"total_items":3,"data":[
+            {"id":"1","name":"A","logo":"1.png"},
+            {"id":"2","name":"B","logo":"  "},
+            {"id":"3","name":"C"}]}"""), 1)
+        assertNotNull(page)
+        assertEquals(listOf("1.png", null, null), page.items.map { it.logo })
+        val all = LiveCatalogParser.allChannels(js("""[{"id":"1","name":"A","logo":"http://img.example/a.png"}]"""))
+        assertEquals("http://img.example/a.png", all?.single()?.logo)
+        assertFalse(page.items[0].toString().contains("1.png"))
+    }
 }

@@ -21,6 +21,11 @@ class LiveChannel(
     val number: String,
     val name: String,
     val cmd: String?,
+    /**
+     * The channel's logo as the portal sends it (the itv list's "logo" field): an absolute address, a path on the portal host, or a
+     * bare file name; null when absent. Resolved against the portal address by the app. Never part of toString.
+     */
+    val logo: String? = null,
 ) {
     override fun toString() = "LiveChannel(id=$id, number=$number, name=$name)"
 }
@@ -60,6 +65,7 @@ object LiveCatalogParser {
             number = c.str("number")?.trim().orEmpty(),
             name = c.str("name")?.trim()?.takeIf { it.isNotEmpty() } ?: "?",
             cmd = c.str("cmd")?.takeIf { it.isNotBlank() },
+            logo = c.str("logo")?.trim()?.takeIf { it.isNotEmpty() },
         )
     }
 
@@ -72,16 +78,7 @@ object LiveCatalogParser {
     /** A channel page from the "js" object of itv get_ordered_list; null if the payload is not an object. */
     fun channelPage(js: JsonElement?, page: Int): LiveChannelPage? {
         val o = js as? JsonObject ?: return null
-        val items = (o["data"] as? JsonArray)?.mapNotNull { e ->
-            val c = e as? JsonObject ?: return@mapNotNull null
-            val id = c.str("id")?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            LiveChannel(
-                id = id,
-                number = c.str("number")?.trim().orEmpty(),
-                name = c.str("name")?.trim()?.takeIf { it.isNotEmpty() } ?: "?",
-                cmd = c.str("cmd")?.takeIf { it.isNotBlank() },
-            )
-        }.orEmpty()
+        val items = (o["data"] as? JsonArray)?.mapNotNull(::channel).orEmpty()
         val total = o.int("total_items") ?: items.size
         val size = o.int("max_page_items")?.takeIf { it > 0 } ?: items.size
         return LiveChannelPage(page, items, total, size)
