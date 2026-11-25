@@ -35,8 +35,8 @@ android {
         // minSdk 25 keeps room for older Fire TV models; the test device is API 30.
         minSdk = 25
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
 
         // The device has no 64-bit ABI, so ship the 32-bit ABI only.
         ndk {
