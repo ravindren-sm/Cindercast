@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
 import io.github.ravindren_sm.openstream.data.BrowseSort
@@ -168,7 +169,8 @@ private fun SavedResultsPane(
                 itemsIndexed(results.items, key = { _, t -> t.id }) { index, item ->
                     TitleCard(
                         index, item, portalUrl, memory, { _, it -> onOpen(it) }, isFavorite(item),
-                        onVertical = { from, down -> moveInGrid(from, down, results.items.lastIndex, gridState, memory, scope, pending) },
+                        // Up from the first row goes to the Edit button above the grid (Compose's own search picks the rail on the left).
+                        onVertical = { from, down -> if (!down && from < COLUMNS) { memory.tryFocus(SAVED_EDIT_ID); true } else moveInGrid(from, down, results.items.lastIndex, gridState, memory, scope, pending) },
                     )
                 }
             }
@@ -187,7 +189,8 @@ private enum class Picker { KIND, GENRES, LANGUAGES, RATING, YEAR, SORT }
 /** The form for one saved search: every choice is a row; Select opens its picker. Back cancels. */
 @Composable
 private fun SavedSearchEditor(initial: SavedSearch, isNew: Boolean, memory: FocusMemory, onSave: (SavedSearch) -> Unit, onCancel: () -> Unit, onDelete: () -> Unit) {
-    var s by remember { mutableStateOf(initial) }
+    // A name that is just the automatic one is shown empty, so it keeps following the choices when they change.
+    var s by remember { mutableStateOf(initial.copy(name = if (initial.name == initial.autoName()) "" else initial.name)) }
     var picker: Picker? by remember { mutableStateOf(null) }
     var confirmDelete by remember { mutableStateOf(false) }
     BackHandler(enabled = picker == null && !confirmDelete) { onCancel() }
@@ -200,8 +203,8 @@ private fun SavedSearchEditor(initial: SavedSearch, isNew: Boolean, memory: Focu
                 id = "ss-name", memory = memory, value = s.name, onValueChange = { s = s.copy(name = it) }, label = "Name",
                 hint = "Leave empty for an automatic name from the choices below.", downId = "ss-kind",
             )
-            @Composable fun Row_(id: String, title: String, value: String, p: Picker) {
-                OsFocusable(id = id, memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth(), onSelect = { picker = p }) { _ ->
+            @Composable fun Row_(id: String, title: String, value: String, p: Picker, down: String? = null) {
+                OsFocusable(id = id, memory = memory, variant = FocusVariant.ROW, modifier = Modifier.fillMaxWidth().then(if (down != null) Modifier.focusProperties { this.down = memory.requesterFor(down) } else Modifier), onSelect = { picker = p }) { _ ->
                     Row(Modifier.fillMaxWidth().padding(horizontal = Spacing.S2, vertical = Spacing.S1), verticalAlignment = Alignment.CenterVertically) {
                         Text(title, style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 1, modifier = Modifier.width(420.dp))
                         Text(value, style = Tokens.Body, color = Tokens.TextSecondary, maxLines = 1, modifier = Modifier.weight(1f))
@@ -221,7 +224,7 @@ private fun SavedSearchEditor(initial: SavedSearch, isNew: Boolean, memory: Focu
             Row_("ss-lang", "Languages", if (s.languages.isEmpty()) "Any" else SAVED_LANGUAGES.filter { it.first in s.languages }.joinToString(" / ") { it.second }, Picker.LANGUAGES)
             Row_("ss-rating", "Rating of at least", s.minRating?.let { "%.0f".format(it) } ?: "Any", Picker.RATING)
             Row_("ss-year", "Released since", s.yearFrom?.toString() ?: "Any year", Picker.YEAR)
-            Row_("ss-sort", "Order", s.sort.label, Picker.SORT)
+            Row_("ss-sort", "Order", s.sort.label, Picker.SORT, down = "ss-save")   // Down lands on Save, not on the nearest button (Delete)
             Text("Genre, language and rating come from the online tags and the portal's lists; titles without them cannot match those choices.", style = Tokens.Body, color = Tokens.TextSecondary, modifier = Modifier.padding(vertical = Spacing.S1))
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.S3)) {
                 OsFocusable(id = "ss-save", memory = memory, variant = FocusVariant.BUTTON, onSelect = { onSave(s.copy(name = s.name.trim().ifBlank { s.autoName() })) }) { _ ->
