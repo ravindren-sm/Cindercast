@@ -1,5 +1,7 @@
 # OpenStream
 
+[![CI](https://github.com/ravindren-sm/OpenStream/actions/workflows/ci.yml/badge.svg)](https://github.com/ravindren-sm/OpenStream/actions/workflows/ci.yml)
+
 A free, open-source IPTV player for **Amazon Fire TV** (and other Android TV devices) that connects to your own
 **Stalker / Ministra (MAG) portal** subscription. It covers live TV and on-demand movies and shows, built for the remote:
 D-pad navigation, reliable focus, and fast paging through very large catalogs.
@@ -7,22 +9,26 @@ D-pad navigation, reliable focus, and fast paging through very large catalogs.
 OpenStream bundles **no channels, no content and no provider**. You bring the portal address and the registered MAC
 address from your own subscription. There are no accounts, analytics or ads (see [docs/PRIVACY.md](docs/PRIVACY.md)).
 
-> Status: in active development and tested daily on a Fire TV Stick 4K Plus. There is no signed release yet;
-> build it from source (below). The release plan is in [docs/RELEASE_PLAN.md](docs/RELEASE_PLAN.md).
+> Status: in active development (version 0.1.1) and tested daily on a Fire TV Stick 4K Plus. There is no published
+> release yet; build it from source (below). The release plan is in [docs/RELEASE_PLAN.md](docs/RELEASE_PLAN.md).
 
 ## What it does
 
 - **Live TV**: channel groups, channels with what's on now and next, channel up/down and number entry, audio and subtitle
   choice, Back returns to the channel you were watching.
 - **TV Guide**: now and next for a group or for your favourites.
-- **Sports**: the sports groups and on-demand sports categories in one place, plus an NFL search that finds games in the
-  guide in the background and keeps the results between launches.
+- **Sports**: the sports groups and on-demand sports categories in one place, plus a games finder for NFL, college
+  football, soccer, cricket and Formula 1 that reads the guide in the background and keeps the results between launches,
+  with a muted live preview beside channel lists.
 - **Movies and Shows**: categories, poster grids, detail pages, seasons and episodes, several versions of one episode
   (language, quality), ratings.
 - **Search** across channels, movies and shows, with filters (language, genre, category, rating) and saved defaults.
+- **Saved searches**: name a combination of genres, languages, rating and year once and open it from the Saved tab, with
+  no typing.
 - **Continue watching**, resume where you stopped, the next episode offered at the end.
 - **Favourites** for channels, movies and shows; pinned categories on Home.
 - **Profiles**, including Kids profiles with a PIN for Settings.
+- **Secure window**: the app's screen is hidden from screenshots and screen recording.
 
 What is built and what is still missing, screen by screen: [docs/FEATURE_COVERAGE.md](docs/FEATURE_COVERAGE.md).
 

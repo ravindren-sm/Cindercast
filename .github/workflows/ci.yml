@@ -1,0 +1,42 @@
+# Continuous integration: unit tests and a debug build on every push and pull request to main.
+# No secrets are used: the build needs no signing key (release builds are made locally with scripts/build_release.sh)
+# and the tests run against fakes, never a real portal.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      # The project targets Java 17 (sourceCompatibility and jvmTarget); Gradle 9.5.0 runs on 17.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Installs the SDK and accepts licences; compileSdk is 37 (app/build.gradle.kts).
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-37.0 build-tools;36.0.0'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Test and assemble
+        run: ./gradlew :provider:test :app:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openstream-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

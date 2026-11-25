@@ -435,3 +435,14 @@ Method: the current debug build installed over the real app, the index started f
 - **The index now also keeps each title's genres** (part of schema 5), so genre defaults work on the device copy.
 - Tests: `PersonalizationTest` (tags, scores, version counting, the order of search results with and without stats) and `DefaultScopeTest` (categories, titles, live groups, what the device copy can express).
 
+
+## Summary, 2026-11-22 to 2026-11-25 (checked on the Fire TV unless noted)
+- **Profiles and family safety** (11-22): household PIN, Kids rules, profile chooser; online tags (themoviedb.org) fill age labels, genres and scores; IMDb ratings from IMDb's free personal-use file; Language filter and per-category sort and filter memory.
+- **Release groundwork** (11-22): signed release build (RSA key outside the repository), cleartext allowed in release, privacy policy, notices, store text; app name OpenStream and its logo.
+- **Sports** (11-22 to 11-24): Sports tab with the NFL search (2.7 s after the groups load, down from 42 s), then a games entry per league (NFL, college football, soccer, cricket, Formula 1) from one guide pass, rail counts, and a muted live preview inset beside channel lists. Now and next on Live TV rows.
+- **UX runs** (11-22 to 11-24): journeys and focus crawls, persona runs (impatient, goal-driven, ADHD, browser, settings critic), playback and review-fix runs; fixes for focus, paging bursts and Back behaviour. Logs in `docs/ux-runs/`; method in `docs/TESTING_ON_FIRE_TV.md`.
+- **Hardening** (11-23): screen sleeps when paused, shared HTTP client, one IMDb transaction, focused card on top, and a secure window (`FLAG_SECURE`) that blocks screenshots and recording.
+- **Publishing** (11-23): the app moved to `main` of the public repository, with the web prototype under `prototype/`.
+- **Saved searches** (11-24): Saved tab with a form editor, per-profile storage and a runner over the on-device index; checked on the TV (see `docs/ux-runs/2026-11-24-saved-searches.md`).
+- **Version 0.1.1 (code 2)** (11-25); launcher banner and icon moved to the standard TV size. The launcher tile still shows plain navy on Fire OS (open item in `docs/TODO.md`).
+- **CI** (11-25): a GitHub Actions workflow runs the unit tests and builds the debug APK on every push and pull request.
