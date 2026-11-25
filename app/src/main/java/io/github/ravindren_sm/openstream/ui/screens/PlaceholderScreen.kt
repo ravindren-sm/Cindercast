@@ -24,6 +24,7 @@ import io.github.ravindren_sm.openstream.ui.theme.Tokens
 fun initialFocusId(route: Route): String = when (route) {
     Route.HOME -> continueFocusId(0)
     Route.SEARCH -> SEARCH_INPUT_ID
+    Route.SAVED -> SAVED_NEW_ID
     Route.TV_GUIDE -> guideRowFocusId(0)
     Route.SPORTS -> sportsRailFocusId(0)
     Route.SETTINGS -> settingFocusId(0)

@@ -13,6 +13,7 @@ enum class Route(val path: String, val label: String, val isTab: Boolean = false
     SHOW_DETAIL("/shows/:id", "Show"),
     VOD_PLAYER("/vod/player", "VOD player"),
     SEARCH("/search", "Search", isTab = true),
+    SAVED("/saved", "Saved", isTab = true),
     FAVORITES("/favorites", "Favorites", isTab = true),
     SETTINGS("/settings", "Settings", isTab = true),
     SETUP("/setup", "Setup");

@@ -439,6 +439,24 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     val searchSources = remember(portalEpoch) { SearchSources(repo, favorites, db.catalogIndex()) { searchCatalog.cachedChannelNames() } }
     // The title index: opt-in, gentle, runs only while connected and not playing.
     val indexer = remember(portalEpoch) { TitleIndexer(vodCatalog, db.catalogIndex(), appContext.getSharedPreferences("search", android.content.Context.MODE_PRIVATE)) }
+    // Saved searches: named searches over the on-device title index (per profile; adult profiles only).
+    val savedStore = remember { io.github.ravindren_sm.openstream.data.SavedSearchStore(appContext.getSharedPreferences("saved_searches", android.content.Context.MODE_PRIVATE)) }
+    val savedRunner = remember { io.github.ravindren_sm.openstream.data.SavedSearchRunner(db.catalogIndex()) }
+    var savedList by remember(profileId) { mutableStateOf(savedStore.list(profileId)) }
+    var savedSelectedId: String? by remember(profileId) { mutableStateOf(null) }
+    var savedResults: io.github.ravindren_sm.openstream.ui.screens.SavedResults? by remember { mutableStateOf(null) }
+    var savedLoading by remember { mutableStateOf(false) }
+    LaunchedEffect(savedSelectedId, savedList, effectivePolicy, profile?.showAdultCategories) {
+        val sel = savedList.firstOrNull { it.id == savedSelectedId }
+        if (sel == null) { savedResults = null; return@LaunchedEffect }
+        savedLoading = true
+        val res = withContext(Dispatchers.IO) { savedRunner.run(sel) }
+        // The same rules as the browse screens: adult categories only for a profile that shows them, and the profile's rating policy.
+        val adultIds = (moviesState.categories + showsState.categories).filter { CategoryRules.isAdult(io.github.ravindren_sm.openstream.provider.PortalText.decodeEntities(it.title)) }.mapTo(HashSet()) { it.id }
+        val items = res.items.filter { (profile?.showAdultCategories == true || it.categoryId !in adultIds) && effectivePolicy.passes(it) }
+        savedResults = io.github.ravindren_sm.openstream.ui.screens.SavedResults(items, if (items.size == res.items.size) res.total else items.size)
+        savedLoading = false
+    }
     var indexTick by remember { mutableIntStateOf(0) }
     // The profile's content filter (rating floor), kept per profile on the device, and the on-device copy of the catalog.
     val indexedTitles = remember { IndexedTitles(db.catalogIndex(), enricher = tagEnricher) }
@@ -578,7 +596,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                     if (tab == Route.SETTINGS && isKids) withPin("Enter the PIN to open Settings") { stack = stack.resetToTab(tab) }
                     else stack = stack.resetToTab(tab)
                 },
-                tabs = if (isKids) Route.TABS.filter { it != Route.LIVE_TV && it != Route.TV_GUIDE && it != Route.SPORTS } else Route.TABS,
+                tabs = if (isKids) Route.TABS.filter { it != Route.LIVE_TV && it != Route.TV_GUIDE && it != Route.SPORTS && it != Route.SAVED } else Route.TABS,
             )
             if (stack.current.route == Route.HOME) {
                 HomeScreen(
@@ -828,6 +846,26 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                     },
                     onPauseIndex = { indexer.pause(); tileScopeForSearch.launch(Dispatchers.IO) { delay(300); indexer.refreshStatus() } },
                 )
+            } else if (stack.current.route == Route.SAVED) {
+                io.github.ravindren_sm.openstream.ui.screens.SavedSearchesScreen(
+                    searches = savedList, selectedId = savedSelectedId, results = savedResults, loading = savedLoading,
+                    indexReady = indexer.status.titles > 0, portalUrl = portalUrl, memory = memory, isFavorite = favorites::isVod,
+                    onSelect = { savedSelectedId = it.id },
+                    onOpen = { item ->
+                        // A row from the device copy has no description or cast: fetch the full entry, then open it like the browse screens do.
+                        tileScopeForSearch.launch {
+                            val full = withContext(Dispatchers.IO) { tagEnricher.enrich(listOf(hydrator.hydrate(item, item.categoryId ?: ""))).first() }
+                            favItem = full; detailVersions = emptyList()
+                            if (full.isSeries) {
+                                if (showDetail?.show?.id != full.id) showDetail = ShowDetailState(full, vodCatalog)
+                                stack = stack.navigate(Route.SHOW_DETAIL, emptyMap(), currentFocusId = memory.focusedId)
+                            } else stack = stack.navigate(Route.MOVIE_DETAIL, mapOf("src" to "fav"), currentFocusId = memory.focusedId)
+                        }
+                    },
+                    onSave = { s -> savedList = savedStore.save(profileId, s); savedSelectedId = s.id },
+                    onDelete = { s -> savedList = savedStore.delete(profileId, s.id); if (savedSelectedId == s.id) savedSelectedId = null },
+                    newId = savedStore::newId,
+                )
             } else if (stack.current.route == Route.LIVE_TV) {
                 LiveTvScreen(
                     state = liveState,
@@ -968,7 +1006,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
             }
         }
         memory.tryFocusFirst(stack.restoreFocusId, browseFocus, initialFocusId(stack.current.route), if (onHome) recentFocusId(0) else null, if (onHome) homeFavChannelFocusId(0) else null, if (onHome) doorFocusId(0) else null,
-            *(if (stack.current.route == Route.FAVORITES) FAVORITES_INITIAL_IDS else emptyArray()), if (stack.current.route == Route.TV_GUIDE) GUIDE_GROUP_ID else null, topTab?.let(::tabFocusId))
+            *(if (stack.current.route == Route.FAVORITES) FAVORITES_INITIAL_IDS else emptyArray()), if (stack.current.route == Route.TV_GUIDE) GUIDE_GROUP_ID else null, if (stack.current.route == Route.SAVED) io.github.ravindren_sm.openstream.ui.screens.SAVED_NEW_ID else null, topTab?.let(::tabFocusId))
     }
 }
 

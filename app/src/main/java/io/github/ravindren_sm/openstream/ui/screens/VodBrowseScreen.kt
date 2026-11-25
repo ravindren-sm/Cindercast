@@ -218,7 +218,7 @@ class VodBrowseState(private val catalog: VodCatalog, val kind: VodKind) {
 fun categoryFocusId(index: Int) = "vodcat-$index"
 fun titleFocusId(index: Int) = "title-$index"
 
-private const val COLUMNS = 5
+internal const val COLUMNS = 5
 private const val PREFETCH_TITLES = 10   // two rows ahead
 
 /** A VOD tab: category rail on the left, a paged poster grid on the right, titles loaded as the user nears the end. */
@@ -393,7 +393,7 @@ private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMem
                 horizontalArrangement = Arrangement.spacedBy(Spacing.S2), verticalArrangement = Arrangement.spacedBy(Spacing.S2),
             ) {
                 itemsIndexed(paged.items, key = { _, t -> t.id }) { index, item ->
-                    TitleCard(index, item, portalUrl, memory, onOpen, isFavorite(item), onVertical = { from, down -> moveInGrid(from, down, paged, gridState, memory, scope, pending) })
+                    TitleCard(index, item, portalUrl, memory, onOpen, isFavorite(item), onVertical = { from, down -> moveInGrid(from, down, paged.items.lastIndex, gridState, memory, scope, pending) })
                 }
                 if (paged.error != null) {
                     item(key = "retry", span = { androidx.compose.foundation.lazy.grid.GridItemSpan(COLUMNS) }) {
@@ -406,7 +406,7 @@ private fun TitleGrid(state: VodBrowseState, portalUrl: String, memory: FocusMem
 }
 
 @Composable
-private fun TitleCard(
+internal fun TitleCard(
     index: Int, item: VodItem, portalUrl: String, memory: FocusMemory, onOpen: (Int, VodItem) -> Unit, favorite: Boolean,
     onVertical: (from: Int, down: Boolean) -> Boolean,
 ) {
@@ -463,8 +463,7 @@ private fun Message(text: String) {
  * search, a held key raced the grid's scrolling and the focused card's growing: presses were dropped and focus drifted into
  * another column. Returns true when the key is handled; false from the first row going Up, so focus leaves for the filter buttons.
  */
-private fun moveInGrid(from: Int, down: Boolean, paged: PagedTitles, gridState: LazyGridState, memory: FocusMemory, scope: kotlinx.coroutines.CoroutineScope, pending: GridMove): Boolean {
-    val last = paged.items.lastIndex
+internal fun moveInGrid(from: Int, down: Boolean, last: Int, gridState: LazyGridState, memory: FocusMemory, scope: kotlinx.coroutines.CoroutineScope, pending: GridMove): Boolean {
     // Keys can arrive faster than focus lands on a card that had to be scrolled into view: count from the card the last key
     // aimed at while that is still on its way, not from the card that still has focus, or those presses all aim at one row.
     val now = System.nanoTime()
@@ -484,7 +483,7 @@ private fun moveInGrid(from: Int, down: Boolean, paged: PagedTitles, gridState: 
 }
 
 /** The card the last Up or Down key aimed at, and when, so a burst of keys moves one row each (see [moveInGrid]). */
-private class GridMove {
+internal class GridMove {
     var target = -1
     var at = 0L
     companion object { const val WINDOW_NANOS = 400_000_000L }
