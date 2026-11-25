@@ -125,6 +125,61 @@ interface CatalogIndexDao {
         AND (:lang IS NULL OR t.language = :lang)""")
     suspend fun browseCount(categoryId: String, minRating: Double?, keepUnrated: Int, g1: String?, g2: String?, g3: String?, yearFrom: Int?, lang: String?): Int
 
+    /**
+     * A saved search across ALL categories (see SavedSearch). Same join and rating/order rules as [browse]. Genres: up to four, each with
+     * two spellings (gN, gNb; gNb may be null or equal gN) matched as substrings of the genre text; slots fill from g1 on, so g1 NULL
+     * means no genre filter. [allGenres] 1: every filled genre slot must match; otherwise any. Languages: up to four codes, from l1
+     * on (untagged titles have no language and drop out). A set [minRating] excludes unrated titles. [kind] is MOVIE, SHOW or NULL.
+     * Plain CASE/AND/OR only; NULL parameters inside IN (...) never match, so unused language slots are harmless. Room cannot run in
+     * the unit tests, so this was checked by reading it against [browse].
+     */
+    @Query("""SELECT c.* FROM catalog_titles c LEFT JOIN title_tags t ON t.kind = c.kind AND t.id = c.id
+        WHERE (:kind IS NULL OR c.kind = :kind)
+        AND (:g1 IS NULL OR CASE :allGenres
+              WHEN 1 THEN
+                (COALESCE(c.genres, t.genres) LIKE '%' || :g1 || '%' OR (:g1b IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g1b || '%'))
+                AND (:g2 IS NULL OR COALESCE(c.genres, t.genres) LIKE '%' || :g2 || '%' OR (:g2b IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g2b || '%'))
+                AND (:g3 IS NULL OR COALESCE(c.genres, t.genres) LIKE '%' || :g3 || '%' OR (:g3b IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g3b || '%'))
+                AND (:g4 IS NULL OR COALESCE(c.genres, t.genres) LIKE '%' || :g4 || '%' OR (:g4b IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g4b || '%'))
+              ELSE
+                COALESCE(c.genres, t.genres) LIKE '%' || :g1 || '%' OR (:g1b IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g1b || '%')
+                OR (:g2 IS NOT NULL AND (COALESCE(c.genres, t.genres) LIKE '%' || :g2 || '%' OR (:g2b IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g2b || '%')))
+                OR (:g3 IS NOT NULL AND (COALESCE(c.genres, t.genres) LIKE '%' || :g3 || '%' OR (:g3b IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g3b || '%')))
+                OR (:g4 IS NOT NULL AND (COALESCE(c.genres, t.genres) LIKE '%' || :g4 || '%' OR (:g4b IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g4b || '%')))
+              END)
+        AND (:l1 IS NULL OR t.language IN (:l1, :l2, :l3, :l4))
+        AND (:minRating IS NULL OR COALESCE(c.imdbRating, t.imdbScore, c.kinopoiskRating, t.rating) >= :minRating)
+        AND (:yearFrom IS NULL OR CAST(c.year AS INTEGER) >= :yearFrom)
+        ORDER BY
+          CASE :sort WHEN 1 THEN c.ord END ASC,
+          CASE :sort WHEN 2 THEN CAST(c.year AS INTEGER) END DESC,
+          CASE :sort WHEN 3 THEN COALESCE(c.imdbRating, t.imdbScore, MIN(COALESCE(c.kinopoiskRating, t.rating), 8.0)) END DESC,
+          CASE :sort WHEN 4 THEN c.imdbRating END DESC,
+          CASE :sort WHEN 5 THEN c.kinopoiskRating END DESC,
+          CASE :sort WHEN 6 THEN c.nameKey END ASC,
+          c.ord ASC, c.id ASC
+        LIMIT :limit""")
+    suspend fun savedSearch(kind: String?, g1: String?, g2: String?, g3: String?, g4: String?, g1b: String?, g2b: String?, g3b: String?, g4b: String?, allGenres: Int, l1: String?, l2: String?, l3: String?, l4: String?, minRating: Double?, yearFrom: Int?, sort: Int, limit: Int): List<CatalogTitleEntity>
+
+    @Query("""SELECT COUNT(*) FROM catalog_titles c LEFT JOIN title_tags t ON t.kind = c.kind AND t.id = c.id
+        WHERE (:kind IS NULL OR c.kind = :kind)
+        AND (:g1 IS NULL OR CASE :allGenres
+              WHEN 1 THEN
+                (COALESCE(c.genres, t.genres) LIKE '%' || :g1 || '%' OR (:g1b IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g1b || '%'))
+                AND (:g2 IS NULL OR COALESCE(c.genres, t.genres) LIKE '%' || :g2 || '%' OR (:g2b IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g2b || '%'))
+                AND (:g3 IS NULL OR COALESCE(c.genres, t.genres) LIKE '%' || :g3 || '%' OR (:g3b IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g3b || '%'))
+                AND (:g4 IS NULL OR COALESCE(c.genres, t.genres) LIKE '%' || :g4 || '%' OR (:g4b IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g4b || '%'))
+              ELSE
+                COALESCE(c.genres, t.genres) LIKE '%' || :g1 || '%' OR (:g1b IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g1b || '%')
+                OR (:g2 IS NOT NULL AND (COALESCE(c.genres, t.genres) LIKE '%' || :g2 || '%' OR (:g2b IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g2b || '%')))
+                OR (:g3 IS NOT NULL AND (COALESCE(c.genres, t.genres) LIKE '%' || :g3 || '%' OR (:g3b IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g3b || '%')))
+                OR (:g4 IS NOT NULL AND (COALESCE(c.genres, t.genres) LIKE '%' || :g4 || '%' OR (:g4b IS NOT NULL AND COALESCE(c.genres, t.genres) LIKE '%' || :g4b || '%')))
+              END)
+        AND (:l1 IS NULL OR t.language IN (:l1, :l2, :l3, :l4))
+        AND (:minRating IS NULL OR COALESCE(c.imdbRating, t.imdbScore, c.kinopoiskRating, t.rating) >= :minRating)
+        AND (:yearFrom IS NULL OR CAST(c.year AS INTEGER) >= :yearFrom)""")
+    suspend fun savedSearchCount(kind: String?, g1: String?, g2: String?, g3: String?, g4: String?, g1b: String?, g2b: String?, g3b: String?, g4b: String?, allGenres: Int, l1: String?, l2: String?, l3: String?, l4: String?, minRating: Double?, yearFrom: Int?): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putProgress(p: IndexProgressEntity)
     @Query("SELECT * FROM index_progress") suspend fun progress(): List<IndexProgressEntity>
     @Query("DELETE FROM index_progress") suspend fun clearProgress()
