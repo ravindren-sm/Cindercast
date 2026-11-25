@@ -441,7 +441,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
     val indexer = remember(portalEpoch) { TitleIndexer(vodCatalog, db.catalogIndex(), appContext.getSharedPreferences("search", android.content.Context.MODE_PRIVATE)) }
     // Saved searches: named searches over the on-device title index (per profile; adult profiles only).
     val savedStore = remember { io.github.ravindren_sm.openstream.data.SavedSearchStore(appContext.getSharedPreferences("saved_searches", android.content.Context.MODE_PRIVATE)) }
-    val savedRunner = remember { io.github.ravindren_sm.openstream.data.SavedSearchRunner(db.catalogIndex()) }
+    val savedRunner = remember { io.github.ravindren_sm.openstream.data.SavedSearchRunner(db.catalogIndex(), tagEnricher) }
     var savedList by remember(profileId) { mutableStateOf(savedStore.list(profileId)) }
     var savedSelectedId: String? by remember(profileId) { mutableStateOf(null) }
     var savedResults: io.github.ravindren_sm.openstream.ui.screens.SavedResults? by remember { mutableStateOf(null) }
