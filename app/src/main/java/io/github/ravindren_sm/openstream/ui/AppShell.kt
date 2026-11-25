@@ -550,7 +550,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
             val fromFavorites = stack.current.params["src"] == "fav"
             val from = stack.current.params["from"]
             LivePlayerScreen(
-                channels = (if (fromFavorites) favPlayer else null) ?: liveState.channels, startIndex = index, playback = livePlayback, memory = memory,
+                channels = (if (fromFavorites) favPlayer else null) ?: liveState.channels, startIndex = index, playback = livePlayback, memory = memory, guide = guideLoader,
                 onChannelChanged = { i ->
                     // Back should land on the channel being watched, with its row on screen.
                     if (fromFavorites) {
@@ -880,7 +880,7 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                     isFavorite = favorites::isChannel, onToggleFavorite = favorites::toggleChannel,
                     pinnedGenreId = pins.firstOrNull { it.kind == PinKinds.LIVE }?.categoryId,
                     onTogglePinGenre = { g -> togglePin(PinKinds.LIVE, g.id, g.title) },
-                    guide = guideLoader,
+                    guide = guideLoader, playback = livePlayback, portalUrl = portalUrl,
                     onOpenChannel = { index, _ ->
                         stack = stack.navigate(Route.LIVE_PLAYER, mapOf("item" to "$index"), currentFocusId = memory.focusedId)
                     },
