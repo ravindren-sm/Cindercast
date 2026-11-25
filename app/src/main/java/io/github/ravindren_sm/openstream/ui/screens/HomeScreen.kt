@@ -54,6 +54,7 @@ import io.github.ravindren_sm.openstream.ui.components.onMenuKey
 fun continueFocusId(index: Int) = "home-cw-$index"
 fun recentFocusId(index: Int) = "home-rw-$index"
 fun doorFocusId(index: Int) = "home-door-$index"
+fun homeSavedFocusId(index: Int) = "home-saved-$index"
 fun homePinFocusId(row: Int, index: Int) = "home-pin-$row-$index"
 private fun menuFocusId(index: Int) = "home-menu-$index"
 
@@ -84,6 +85,9 @@ fun HomeScreen(
     memory: FocusMemory,
     onResume: (ContinueTile) -> Unit,
     onDoor: (Route) -> Unit,
+    /** The profile's saved searches (empty when none, or for a Kids profile): a row of tiles that open the Saved tab on that search. */
+    savedSearches: List<io.github.ravindren_sm.openstream.data.SavedSearch> = emptyList(),
+    onOpenSaved: (io.github.ravindren_sm.openstream.data.SavedSearch) -> Unit = {},
     /** False for a Kids profile: no Live TV door. */
     liveAllowed: Boolean = true,
     onTileAction: (ContinueTile, TileAction) -> Unit,
@@ -92,7 +96,7 @@ fun HomeScreen(
     var menuTile: ContinueTile? by remember { mutableStateOf(null) }
     var menuFocusIdBefore by remember { mutableStateOf<String?>(null) }
     var refocus by remember { mutableStateOf<List<String>?>(null) }
-    val empty = continueTiles.isNullOrEmpty() && recentTiles.isEmpty() && favoriteChannels.isEmpty() && pinnedRows.isEmpty()
+    val empty = continueTiles.isNullOrEmpty() && recentTiles.isEmpty() && favoriteChannels.isEmpty() && pinnedRows.isEmpty() && savedSearches.isEmpty()
 
     // After the menu closes, put focus back where the viewer was (the tile may be gone: fall back to a door).
     LaunchedEffect(refocus) {
@@ -166,6 +170,19 @@ fun HomeScreen(
                     }
                     row.failed -> Text("Could not load this row.", style = Tokens.Body, color = Tokens.StatusWarning)
                     else -> Text("Loading…", style = Tokens.Body, color = Tokens.TextSecondary)
+                }
+            }
+            if (savedSearches.isNotEmpty()) {
+                Text("Saved searches", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
+                LazyRow(modifier = Modifier.keepHorizontalFocus(memory, homeSavedFocusId(0)), horizontalArrangement = Arrangement.spacedBy(Spacing.S3), contentPadding = Spacing.CardRow) {
+                    itemsIndexed(savedSearches, key = { _, s -> s.id }) { i, s ->
+                        OsFocusable(id = homeSavedFocusId(i), memory = memory, variant = FocusVariant.CARD, modifier = Modifier.width(300.dp), onSelect = { onOpenSaved(s) }) { _ ->
+                            Column(Modifier.fillMaxWidth().background(Tokens.Surface1).padding(Spacing.S2), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(s.name, style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 2)
+                                Text(s.summary(), style = Tokens.Body, color = Tokens.TextSecondary, maxLines = 2)
+                            }
+                        }
+                    }
                 }
             }
             Text("Browse", style = Tokens.TitleMedium, color = Tokens.TextPrimary)

@@ -643,6 +643,11 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                     },
                     onDoor = { route -> stack = stack.enterTab(route).let { s -> memory.focusedId?.let(s::withPreviousFocus) ?: s } },   // Back returns to the button used, not the tab
                     liveAllowed = !isKids,
+                    savedSearches = if (isKids) emptyList() else savedList,
+                    onOpenSaved = { s ->
+                        savedSelectedId = s.id
+                        stack = stack.enterTab(Route.SAVED).let { st -> memory.focusedId?.let(st::withPreviousFocus) ?: st }   // Back returns to the tile used
+                    },
                 )
             } else if (stack.current.route == Route.MOVIES || stack.current.route == Route.SHOWS) {
                 val browse = if (stack.current.route == Route.SHOWS) showsState else moviesState
