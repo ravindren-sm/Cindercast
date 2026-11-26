@@ -1,6 +1,6 @@
 # Third-party notices (2026-11-22)
 
-OpenStream is MIT licensed (see `LICENSE`). It uses these libraries, under their own licences.
+Cindercast is MIT licensed (see `LICENSE`). It uses these libraries, under their own licences.
 
 | Library | Licence |
 |---|---|

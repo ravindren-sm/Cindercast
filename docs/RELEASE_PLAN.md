@@ -1,6 +1,6 @@
 # Release plan (drafted 2026-11-22; target: a couple of months out)
 
-The aim is to make OpenStream available to everyone: first as signed APKs on GitHub, then in the Amazon Appstore
+The aim is to make Cindercast available to everyone: first as signed APKs on GitHub, then in the Amazon Appstore
 (the store a Fire TV uses) and, optionally, Google Play (Android TV and Google TV devices). Nothing here is urgent;
 it lists what has to be decided or built so the date can be met.
 
@@ -8,7 +8,7 @@ it lists what has to be decided or built so the date can be met.
 - **In-app update check (opt-in, visible in Settings).** Asks the GitHub Releases page for the latest version number,
   compares it with the installed one, downloads the signed APK and hands it to Android's installer. The viewer presses
   Install on the system prompt; there is no silent update without root. Needs the "install unknown apps" permission for
-  OpenStream (Fire OS asks once). The only server contacted is GitHub; nothing about the viewer is sent.
+  Cindercast (Fire OS asks once). The only server contacted is GitHub; nothing about the viewer is sent.
 - **Fallback:** the Downloader app, as most Fire TV sideloaders use, pointed at the same release file.
 - **Signing key.** Android only installs an update signed with the same key as the installed app. Today's APKs are
   debug-signed. Before the first public release: create one release key, store it and a backup outside the repository
@@ -23,7 +23,7 @@ it lists what has to be decided or built so the date can be met.
 | Account | free developer account | one-time fee (about $25); a new personal account must run a closed test with about 12 testers for 14 days first |
 | Updates | store handles them | store handles them |
 | Review | a few days | a few days |
-Both stores have accepted IPTV player apps that bundle no channels; OpenStream bundles none. Wording to keep careful in
+Both stores have accepted IPTV player apps that bundle no channels; Cindercast bundles none. Wording to keep careful in
 the listing: the portal address and the registered MAC address are the viewer's own, the content is the viewer's own
 subscription, no provider is named. A rejection is possible, so the GitHub APK stays as the fallback channel.
 
@@ -44,7 +44,11 @@ subscription, no provider is named. A rejection is possible, so the GitHub APK s
    memory work verified over long real sessions, the decoder-failure investigation, crash capture in Settings.
 7. Licence and credits review (MIT, decided 2026-11-21), a third-party notices screen for libraries, and the provider-specific
    documents kept out of the public repository (already scrubbed once; recheck at release).
-8. Name: OpenStream was decided; trademark databases were not checked. Do that before store submission.
+8. Name: Cindercast (decided 2026-11-25). The first name, OpenStream, was dropped because an unrelated music-streaming project on
+   GitHub (openstreamorg) already uses it; Fireside was dropped because a streaming app of that name (Fireside Chat Inc., with a
+   USPTO filing for app software, reported to be coming to Fire TV) is in the same field. For Cindercast only web searches were
+   done (nothing found under the exact name; a registered CINECAST mark for streaming services sounds similar). The USPTO and EUIPO
+   registers still have to be searched before store submission.
 
 ## Decisions made (2026-11-22, by the assistant on the owner's instruction)
 - **Cleartext:** allowed in release builds through a base network security config (`app/src/release`), TLS validation untouched
@@ -61,7 +65,7 @@ subscription, no provider is named. A rejection is possible, so the GitHub APK s
 - **Plain HTTP and Amazon review:** if the store objects to cleartext, answer that the address is user-supplied; the GitHub APK is the fallback.
 - **Documents:** `docs/PRIVACY.md`, `docs/THIRD_PARTY_NOTICES.md`, `docs/STORE_LISTING.md` drafted (placeholder `<REPO_URL>` to fill).
 - **Status 2026-11-25:** signing key, signed release build, cleartext policy, privacy policy, notices and store text are done; the app is on `main` and CI builds and tests every push.
-- **Still open before submission:** trademark search for "OpenStream", store artwork and screenshots, IMDb's licensing reply
+- **Still open before submission:** trademark search for "Cindercast", store artwork and screenshots, IMDb's licensing reply
   (IMDb scores should be off in a public build unless licensed), hosting the privacy policy, a fresh scan of docs for provider detail.
 
 ## Rough timeline

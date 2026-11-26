@@ -107,7 +107,7 @@ info banner and mini channel list, a time-grid guide, themes, transitions, strea
 - Decisions and drafts are in docs/RELEASE_PLAN.md. Done: release signing key and build script, cleartext policy (release builds allow
   plain HTTP, see `app/src/release/res/xml/network_security_config.xml`), privacy policy, notices, store text, version 0.1.1 (code 2).
   Left: owner's offline key copy, store artwork, trademark check, hosting the policy.
-- Public repo: the app is on `main` of the OpenStream repo since 2026-11-23, with the web prototype under `prototype/`.
+- Public repo: the app is on `main` of the Cindercast repo since 2026-11-23, with the web prototype under `prototype/`.
   CI (`.github/workflows/ci.yml`) runs the unit tests and builds the debug APK on every push and pull request.
 - Rotten Tomatoes and real IMDb ratings need an outside service and a user-supplied key; the portal's own rating
   (IMDb when present, otherwise Kinopoisk, labelled) is what is shown today.

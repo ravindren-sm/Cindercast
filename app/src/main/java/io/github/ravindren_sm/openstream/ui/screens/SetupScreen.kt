@@ -80,13 +80,13 @@ fun SetupScreen(
         modifier.fillMaxSize().padding(horizontal = Spacing.SafeHorizontal, vertical = Spacing.S4),
         verticalArrangement = Arrangement.spacedBy(Spacing.S3),
     ) {
-        Text("OpenStream · First-run setup", style = MaterialTheme.typography.headlineMedium, color = Tokens.TextPrimary)
+        Text("Cindercast · First-run setup", style = MaterialTheme.typography.headlineMedium, color = Tokens.TextPrimary)
 
         if (step == SetupStep.WELCOME) {
             Column(Modifier.widthIn(max = 1100.dp), verticalArrangement = Arrangement.spacedBy(Spacing.S2)) {
                 Text("Connect your Stalker or Ministra portal using your device's registered MAC address.",
                     style = MaterialTheme.typography.bodyLarge, color = Tokens.TextPrimary)
-                Text("OpenStream does not bundle channels, track what you watch, or need an account. " +
+                Text("Cindercast does not bundle channels, track what you watch, or need an account. " +
                     "Your portal address and MAC stay on this device, sealed with a key held by Android.",
                     style = MaterialTheme.typography.bodyLarge, color = Tokens.TextSecondary)
                 Text("You will need: the portal address from your provider (often ending in /c/ or /stalker_portal/c/) " +

@@ -446,3 +446,10 @@ Method: the current debug build installed over the real app, the index started f
 - **Saved searches** (11-24): Saved tab with a form editor, per-profile storage and a runner over the on-device index; checked on the TV (see `docs/ux-runs/2026-11-24-saved-searches.md`).
 - **Version 0.1.1 (code 2)** (11-25); launcher banner and icon moved to the standard TV size. The launcher tile still shows plain navy on Fire OS (open item in `docs/TODO.md`).
 - **CI** (11-25): a GitHub Actions workflow runs the unit tests and builds the debug APK on every push and pull request.
+
+## Renamed to Cindercast (2026-11-25)
+The app is now called **Cindercast** (flame-and-play logo supplied by the owner; `scripts/make_brand_assets.swift` builds the
+launcher icon and Fire TV banner from `branding/cindercast-logo-source.jpg`). The user-visible name, the logo, the documents and the
+GitHub repository changed; the internal application id (`io.github.ravindren_sm.openstream`), package names, class names and
+the `OpenStream.*` log tags were kept, so installed copies update in place and keep their data. Version 0.1.2 (build 3).
+Earlier dated entries keep the name used at the time.

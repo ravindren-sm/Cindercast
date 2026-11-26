@@ -43,7 +43,7 @@ package to avoid repeating `--expect`).
 | `key down*3 select --expect <pkg>` | Press keys; prints where focus landed after each. Names: up down left right select back home menu playpause play pause ff rew del enter. |
 | `text "abc" --expect <pkg>` | Type into the focused field (no Enter). |
 | `launch <pkg>` | Start the app from its TV launcher entry. |
-| `shot <path>` | Screenshot (unredacted; delete after). OpenStream blocks capture: see docs/TESTING_ON_FIRE_TV.md 4.11 for the debug-only switch. |
+| `shot <path>` | Screenshot (unredacted; delete after). Cindercast blocks capture: see docs/TESTING_ON_FIRE_TV.md 4.11 for the debug-only switch. |
 | `crawl <name> --expect <pkg> [--exclude nav-]` | Map the current screen's focus graph with D-pad keys only, then report findings. |
 
 ### The crawler

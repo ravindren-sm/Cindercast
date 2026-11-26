@@ -1,4 +1,4 @@
-# OpenStream
+# Cindercast
 
 [![CI](https://github.com/ravindren-sm/OpenStream/actions/workflows/ci.yml/badge.svg)](https://github.com/ravindren-sm/OpenStream/actions/workflows/ci.yml)
 
@@ -6,7 +6,7 @@ A free, open-source IPTV player for **Amazon Fire TV** (and other Android TV dev
 **Stalker / Ministra (MAG) portal** subscription. It covers live TV and on-demand movies and shows, built for the remote:
 D-pad navigation, reliable focus, and fast paging through very large catalogs.
 
-OpenStream bundles **no channels, no content and no provider**. You bring the portal address and the registered MAC
+Cindercast bundles **no channels, no content and no provider**. You bring the portal address and the registered MAC
 address from your own subscription. There are no accounts, analytics or ads (see [docs/PRIVACY.md](docs/PRIVACY.md)).
 
 > Status: in active development (version 0.1.1) and tested daily on a Fire TV Stick 4K Plus. There is no published
@@ -56,7 +56,7 @@ The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
    adb install -r app/build/outputs/apk/debug/app-debug.apk
    ```
 
-3. Open **OpenStream** from Your Apps & Channels. On first launch, enter your portal address and the MAC address
+3. Open **Cindercast** from Your Apps & Channels. On first launch, enter your portal address and the MAC address
    registered with your provider. They are stored on the device only, encrypted with a key from the Android Keystore.
 
 Most providers allow **one connection per MAC address**: close any other app using the same subscription first.

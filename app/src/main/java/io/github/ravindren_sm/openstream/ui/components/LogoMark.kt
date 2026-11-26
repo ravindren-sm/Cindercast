@@ -15,11 +15,11 @@ import io.github.ravindren_sm.openstream.R
 import io.github.ravindren_sm.openstream.ui.theme.Spacing
 import io.github.ravindren_sm.openstream.ui.theme.Tokens
 
-/** The OpenStream icon, with the name beside it when [withName] is set. Not focusable. */
+/** The Cindercast icon, with the name beside it when [withName] is set. Not focusable. */
 @Composable
 fun LogoMark(modifier: Modifier = Modifier, size: Dp = 36.dp, withName: Boolean = true) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(Spacing.S1), verticalAlignment = Alignment.CenterVertically) {
-        Image(painterResource(R.drawable.ic_launcher), contentDescription = "OpenStream", modifier = Modifier.size(size))
-        if (withName) Text("OpenStream", style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 1)
+        Image(painterResource(R.drawable.ic_launcher), contentDescription = "Cindercast", modifier = Modifier.size(size))
+        if (withName) Text("Cindercast", style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 1)
     }
 }

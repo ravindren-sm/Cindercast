@@ -1,18 +1,18 @@
-# Installing OpenStream on a Fire TV (from an APK)
+# Installing Cindercast on a Fire TV (from an APK)
 
-OpenStream is a Stalker / Ministra (MAG) client for the Fire TV. It does **not** include any channels, movies or shows. To use it
+Cindercast is a Stalker / Ministra (MAG) client for the Fire TV. It does **not** include any channels, movies or shows. To use it
 you need your own subscription and the two things your provider gives you: a **portal address** and the **MAC address**
 registered for your device. Use it only with a service you are entitled to.
 
-**What the file is:** `OpenStream-0.1.1.apk`, version 0.1.1 (build 2), about 2.7 MB, signed with the project's release key.
+**What the file is:** `Cindercast-0.1.2.apk`, version 0.1.2 (build 3), about 2.8 MB, signed with the project's release key.
 
 SHA-256 (check that your copy is the same file):
 
 ```text
-26acb01cf3182accd5b61ee2b0dff7025cdf5d57048c74cd3078fa03c2cc3212
+8b6c302af31624b53a3674a5867387b47d5492c2dd8c623e1db821e6d0bbce7e
 ```
 
-On a Mac or Linux: `shasum -a 256 OpenStream-0.1.1.apk`. On Windows (PowerShell): `Get-FileHash OpenStream-0.1.1.apk`.
+On a Mac or Linux: `shasum -a 256 Cindercast-0.1.2.apk`. On Windows (PowerShell): `Get-FileHash Cindercast-0.1.2.apk`.
 
 ## What you need
 
@@ -25,7 +25,7 @@ On a Mac or Linux: `shasum -a 256 OpenStream-0.1.1.apk`. On Windows (PowerShell)
 ## Option A: with the Downloader app (no computer needed)
 
 1. Install **Downloader** (orange icon) from the Amazon Appstore on the Fire TV, open it, and allow it to access files if asked.
-2. In Downloader's address box, type the link you were sent for `OpenStream-0.1.1.apk` and choose Go. (A link from Dropbox
+2. In Downloader's address box, type the link you were sent for `Cindercast-0.1.2.apk` and choose Go. (A link from Dropbox
    must end in `?dl=1`; a Google Drive link must be a direct-download link. If the link does not download, ask whoever sent
    it for another.)
 3. When the download finishes, choose **Install**, then **Done** (not Open yet), then **Delete** to remove the file.
@@ -39,7 +39,7 @@ On a Mac or Linux: `shasum -a 256 OpenStream-0.1.1.apk`. On Windows (PowerShell)
 
    ```bash
    adb connect <FIRETV_IP>:5555
-   adb install OpenStream-0.1.1.apk
+   adb install Cindercast-0.1.2.apk
    ```
 
 3. Accept the **Allow USB debugging?** prompt on the TV (tick "Always allow"). Run the install again if it asked first.
@@ -47,7 +47,7 @@ On a Mac or Linux: `shasum -a 256 OpenStream-0.1.1.apk`. On Windows (PowerShell)
 
 ## First run
 
-1. Open **OpenStream**. It is not on the main Home row: press the Home button, scroll to **Your Apps & Channels**, and
+1. Open **Cindercast**. It is not on the main Home row: press the Home button, scroll to **Your Apps & Channels**, and
    choose **See all** (or hold the Home button and pick Apps). Its tile may show a plain navy block on some Fire OS versions;
    that is cosmetic.
 2. The setup screen asks for the **portal address** and the **MAC address**. Both are stored on the device only, encrypted
@@ -59,12 +59,12 @@ On a Mac or Linux: `shasum -a 256 OpenStream-0.1.1.apk`. On Windows (PowerShell)
 
 ## Coming from StbEmu, TiviMate or another IPTV app
 
-OpenStream cannot read another app's settings, and it never stops, changes or removes another app. You move the two values over
+Cindercast cannot read another app's settings, and it never stops, changes or removes another app. You move the two values over
 by hand, once:
 
 1. In the old app (StbEmu, TiviMate or similar), open its profile or portal settings and write down the **portal address**
    (also called server or portal URL) and the **MAC address** it uses (in StbEmu it is the STB MAC). Labels differ by version.
-2. In OpenStream's setup screen (or Settings > Portal > Change portal) type the same two values. Your provider recognises the
+2. In Cindercast's setup screen (or Settings > Portal > Change portal) type the same two values. Your provider recognises the
    MAC, so reusing it is what makes the subscription work.
 3. **Stop the old app yourself before you connect.** Most providers allow one connection per MAC, and an app that is closed
    with Back often keeps running in the background. On the Fire TV: Settings > Applications > Manage installed applications >
@@ -84,10 +84,10 @@ by hand, once:
 
 ## Updating and removing
 
-- **Update:** install a newer `OpenStream-x.y.z.apk` the same way; it installs over the old one and keeps your settings,
+- **Update:** install a newer `Cindercast-x.y.z.apk` the same way; it installs over the old one and keeps your settings,
   profiles and favourites, as long as it comes from the same signer.
 - **If you built the app yourself** it is signed with your own debug key, so it cannot be installed over this release (or the
-  other way round). Remove one first (**Settings > Applications > Manage installed applications > OpenStream > Uninstall**);
+  other way round). Remove one first (**Settings > Applications > Manage installed applications > Cindercast > Uninstall**);
   that deletes its data.
 - **Remove:** the same menu, Uninstall.
 

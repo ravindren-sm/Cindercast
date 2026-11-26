@@ -1,6 +1,6 @@
-# Contributing to OpenStream
+# Contributing to Cindercast
 
-Thank you for helping. OpenStream is a free, open-source Stalker / Ministra client for the Fire TV, MIT licensed. Fork it, change
+Thank you for helping. Cindercast is a free, open-source Stalker / Ministra client for the Fire TV, MIT licensed. Fork it, change
 it, send it back or keep your own copy.
 
 ## Get it building

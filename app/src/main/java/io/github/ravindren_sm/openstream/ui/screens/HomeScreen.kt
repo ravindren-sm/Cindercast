@@ -131,7 +131,7 @@ fun HomeScreen(
                 Text("Continue watching", style = Tokens.TitleMedium, color = Tokens.TextPrimary)
                 TileRow(continueTiles, ::continueFocusId, 220.dp, portalUrl, memory, onResume, ::open)
             } else if (empty && continueTiles != null) {
-                Text("Welcome to OpenStream", style = Tokens.TitleLarge, color = Tokens.TextPrimary)
+                Text("Welcome to Cindercast", style = Tokens.TitleLarge, color = Tokens.TextPrimary)
                 Text("Pick something to watch. Titles you start will appear here so you can carry on later.", style = Tokens.Body, color = Tokens.TextSecondary)
             }
             if (recentTiles.isNotEmpty()) {

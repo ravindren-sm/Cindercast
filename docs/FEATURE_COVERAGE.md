@@ -1,6 +1,6 @@
 # Feature coverage against the AI Studio spec
 
-Source: "OpenStream TV, Complete Feature Specification" (prototype v1.4.0), supplied by the owner on 2026-11-21.
+Source: "Cindercast TV, Complete Feature Specification" (prototype v1.4.0), supplied by the owner on 2026-11-21.
 This file compares every item in that spec with what the native app does today, so nothing from the original is
 dropped by accident. Update it whenever a slice lands.
 
@@ -46,7 +46,7 @@ Milestone column: where the work is planned (M3 live, M4 VOD, M5 everything else
 | + | Sports (not in the spec) | Done, checked on the TV | Sports tab: sports groups and on-demand categories, and a games finder for NFL, college football, soccer, cricket and Formula 1 (one guide pass for all five, one search, results saved between launches, counts in the rail), plus a muted live preview inset beside channel lists and game rows. Not stress-tested: the inset under fast zapping. Soccer titles without team names are listed as shows. | - |
 | + | Saved searches (not in the spec) | Done, checked on the TV | Saved tab (adult profiles): named searches over the on-device index (movies, shows or both; genres any-of or all-of; languages; minimum rating; year; order), per profile, editable. Missing: a Home row for a saved search. | - |
 
-Also built, outside the spec's list: the OpenStream logo (top bar, profile chooser, launcher icon and Fire TV banner; the launcher
+Also built, outside the spec's list: the Cindercast logo (top bar, profile chooser, launcher icon and Fire TV banner; the launcher
 tile itself shows plain navy on Fire OS, cause unknown) and capture blocking (`FLAG_SECURE` hides the window from screenshots and
 screen recording, with a debug-only test switch).
 

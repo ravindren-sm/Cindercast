@@ -17,7 +17,7 @@ Step 4g: KEEPALIVE_VERIFIED (watchdog every 120 s; token valid with and without 
 (for example stay-awake), even temporarily. Playback unverified. Milestones: docs/MILESTONES.md. Findings: docs/private/PROVIDER_FINDINGS.md. Plan: docs/private/PHASE2_PROBE_PLAN.md
 Repo: ~/Developer/firetv-iptv (outside Google Drive). Build with ./gradlew using
 Android Studio's JBR as JAVA_HOME; wrapper pins Gradle 9.5.0 (AGP 8.x breaks on 9.6+).
-UI source: the OpenStream prototype (docs/OPENSTREAM_INTAKE.md), ported to Compose for TV.
+UI source: the OpenStream design prototype (docs/OPENSTREAM_INTAKE.md; the app was called OpenStream until 2026-11-25), ported to Compose for TV.
 Full plan: docs/PROJECT_PLAN.md
 
 ## Hard rules
@@ -64,9 +64,9 @@ Full plan: docs/PROJECT_PLAN.md
 
 ## Before publishing on GitHub (open decisions)
 - License: MIT, decided by the user 2026-11-21 (LICENSE added; the copyright line uses the git
-  author name and can be changed). App name: OpenStream (decided 2026-11-21). A web search found no
-  IPTV project with that name; one small unrelated Google Play podcast/radio app is called
-  OpenStream; trademark databases were not checked. Package id: io.github.ravindren_sm.openstream
+  author name and can be changed). App name: Cindercast (decided 2026-11-25; the earlier name OpenStream collided with an
+  unrelated GitHub music-streaming project, and Fireside with a streaming app and a USPTO filing). Only web searches were
+  done for Cindercast; the USPTO and EUIPO registers were not searched (see docs/RELEASE_PLAN.md). Package id: io.github.ravindren_sm.openstream
   (chosen 2026-11-21; was com.example.firetvhello for the debug app, so an older debug install on
   the Fire TV is a separate app that can be removed). Library and probe packages are
   io.github.ravindren_sm.openstream.provider and .probe.

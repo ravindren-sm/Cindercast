@@ -1,6 +1,6 @@
 # Testing on a Fire TV: driving the stick from a computer
 
-How OpenStream is installed, driven and measured on a real Fire TV over ADB, and the gotchas learned doing it (2026-11-20
+How Cindercast is installed, driven and measured on a real Fire TV over ADB, and the gotchas learned doing it (2026-11-20
 to 2026-11-23, Fire TV Stick 4K Plus, Fire OS 8 on Android 11). It is written for people working on the app and for coding
 agents that test it. The tool is `.claude/skills/firetv-drive/scripts/ftv.py`; its short guide is the skill's
 [SKILL.md](../.claude/skills/firetv-drive/SKILL.md). The journeys and crawl plan are in [UX_TEST_PLAN.md](UX_TEST_PLAN.md);
@@ -49,7 +49,7 @@ how scripts and crawls know where they are without reading text.
 | `ftv.py key right right select` | Press keys; prints where focus landed after each. Refuses if `FTV_APP` is not in front. |
 | `ftv.py text "abc"` | Type into the focused field (never presses Enter, see 4.6). |
 | `ftv.py crawl <name> --exclude nav-` | Map a screen's focus graph with arrows only (never Select or Back) and report skipped, unreachable, irreversible moves. |
-| `ftv.py shot <path>` | Screenshot (not redacted: delete after use). OpenStream blocks screen capture; see 4.11. |
+| `ftv.py shot <path>` | Screenshot (not redacted: delete after use). Cindercast blocks screen capture; see 4.11. |
 
 Text read from the screen is redacted before it is printed (URLs, hosts, IPs, MACs, long tokens), so portal details never
 reach a log or a report.
@@ -156,7 +156,7 @@ on-screen key and types a stray letter. Close the keyboard with Back, or move to
 `nfl-listings.json` (the saved NFL search, with its write time) or `debug-log.txt` (the debug player's log, see
 `scripts/pull_debug_log.sh`). Do not copy these off the device unless needed; some hold channel play commands.
 
-### 4.11 Screenshots of OpenStream are blocked
+### 4.11 Screenshots of Cindercast are blocked
 The app marks its window secure (`CaptureGuard`, FLAG_SECURE): `screencap` exits with an error and writes an empty file, and
 screen recording and mirroring show black. UI-tree reads (`ftv.py focus`, `dump`, `crawl`) are not affected. When a screenshot is
 really needed, on a debug build only:

@@ -1,6 +1,6 @@
-# OpenStream privacy policy (draft, 2026-11-22)
+# Cindercast privacy policy (draft, 2026-11-22)
 
-OpenStream is a player for the viewer's own Stalker/Ministra IPTV subscription. It has no account, no analytics, no advertising
+Cindercast is a player for the viewer's own Stalker/Ministra IPTV subscription. It has no account, no analytics, no advertising
 and no server of its own.
 
 ## What stays on the device
@@ -23,7 +23,7 @@ Nothing else is sent. There is no crash reporting and no remote logging. Debug b
 with portal addresses, MAC addresses and tokens redacted; release builds do not.
 
 ## Plain-HTTP portals
-Most IPTV portals use plain HTTP, so traffic to them is not encrypted. OpenStream allows that because the address is yours to
+Most IPTV portals use plain HTTP, so traffic to them is not encrypted. Cindercast allows that because the address is yours to
 choose, and warns on the setup screen. HTTPS connections are validated normally against Android's system certificates.
 
 ## Children
@@ -31,7 +31,7 @@ Profiles can be restricted by age label, word filters, allowed categories and a 
 viewing, not a guarantee; unlabelled titles are blocked for Kids profiles by default.
 
 ## Content
-OpenStream bundles no channels, films or shows and does not provide any. Content comes from your own provider.
+Cindercast bundles no channels, films or shows and does not provide any. Content comes from your own provider.
 
 ## Contact
 Open an issue on the project's GitHub page: <REPO_URL>.

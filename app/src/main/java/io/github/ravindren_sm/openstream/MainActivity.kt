@@ -54,7 +54,7 @@ class MainActivity : ComponentActivity() {
                 } else {
                     Box(Modifier.fillMaxSize().background(Tokens.BgCanvas).padding(Spacing.SafeHorizontal)) {
                         Text(
-                            "This device could not provide secure storage for your portal settings, so OpenStream cannot run here.",
+                            "This device could not provide secure storage for your portal settings, so Cindercast cannot run here.",
                             style = MaterialTheme.typography.headlineSmall, color = Tokens.StatusError,
                         )
                     }
