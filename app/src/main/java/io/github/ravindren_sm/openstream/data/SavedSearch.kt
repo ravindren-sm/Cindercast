@@ -83,7 +83,25 @@ object SavedLanguages {
         "de" to "German", "it" to "Italian", "pt" to "Portuguese", "ru" to "Russian", "tr" to "Turkish", "ar" to "Arabic", "sv" to "Swedish",
     )
     fun nameOf(code: String): String = names[code.lowercase()] ?: code
+    /** The tag service's code for a language name ("English" gives "en"), or null when the name is not known. */
+    fun codeOf(name: String): String? = names.entries.firstOrNull { it.value.equals(name.trim(), ignoreCase = true) }?.key
 }
+
+/**
+ * A saved search made from the Search tab's filters, so the viewer can list titles with those filters without typing.
+ * Languages and genres carry over; the minimum rating carries over; category choices and the English-subtitles choice have no
+ * meaning for the title index and are dropped ([dropsCategoriesOrSubtitles] says when). Genres are capped at four, languages at four.
+ */
+fun SavedSearch.Companion.fromFilters(id: String, f: SearchFilters): SavedSearch =
+    SavedSearch(
+        id = id, name = "",
+        genres = f.genres.sorted().take(SavedSearch.MAX_GENRES).toSet(),
+        languages = f.languages.mapNotNull { SavedLanguages.codeOf(it) }.sorted().take(SavedSearch.MAX_LANGUAGES).toSet(),
+        minRating = f.minRating,
+    ).let { it.copy(name = it.autoName()) }
+
+/** True when [f] has choices that [SavedSearch.Companion.fromFilters] cannot carry over. */
+fun dropsCategoriesOrSubtitles(f: SearchFilters): Boolean = f.categoryIds.isNotEmpty() || f.englishSubtitles
 
 /**
  * The two spellings the index may hold for one genre. Portal lists say "Sci-Fi", the tag service (TMDB) says "Science Fiction".

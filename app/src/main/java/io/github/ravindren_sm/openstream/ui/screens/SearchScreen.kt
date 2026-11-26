@@ -31,6 +31,8 @@ import io.github.ravindren_sm.openstream.data.PosterUrl
 import io.github.ravindren_sm.openstream.data.IndexStatus
 import io.github.ravindren_sm.openstream.data.FilterRules
 import io.github.ravindren_sm.openstream.data.SearchFilters
+import io.github.ravindren_sm.openstream.data.SearchRanking
+import io.github.ravindren_sm.openstream.data.dropsCategoriesOrSubtitles
 import io.github.ravindren_sm.openstream.data.SearchResults
 import io.github.ravindren_sm.openstream.data.VodCategory
 import io.github.ravindren_sm.openstream.data.Suggestion
@@ -52,6 +54,8 @@ import androidx.compose.ui.Alignment
 import io.github.ravindren_sm.openstream.ui.components.HEART
 
 const val SEARCH_INPUT_ID = "search-input"
+const val SEARCH_GO_ID = "search-go"
+const val SEARCH_BROWSE_ID = "search-browse"
 fun searchChannelFocusId(i: Int) = "search-ch-$i"
 fun searchMovieFocusId(i: Int) = "search-mv-$i"
 fun searchShowFocusId(i: Int) = "search-sh-$i"
@@ -113,6 +117,8 @@ fun SearchScreen(
     onPauseIndex: () -> Unit,
     onFiltersChange: (SearchFilters) -> Unit,
     onSaveDefaultFilters: () -> Unit,
+    /** Lists titles with the current filters without any typed text (opens a saved search made from them). */
+    onBrowseFilters: (SearchFilters) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var picker: FilterPicker? by remember { mutableStateOf(null) }
@@ -166,6 +172,21 @@ fun SearchScreen(
             id = SEARCH_INPUT_ID, memory = memory, value = state.query, onValueChange = { state.query = it }, upId = upTarget,
             label = "Search", hint = "Movies, shows and channels. Back closes the keyboard; then Down reaches the results.", imeAction = ImeAction.Done,
             onDone = { state.submitTick++ },
+        )
+        // A visible way to run the search (the keyboard's Done key and typing also run it), and a way to use the filters on their
+        // own: a search needs at least two typed letters, so filters alone list nothing.
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.S2)) {
+            OsFocusable(id = SEARCH_GO_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = { state.submitTick++ }) { _ ->
+                Text("Search", style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 1, modifier = Modifier.padding(horizontal = Spacing.S3, vertical = Spacing.S1))
+            }
+            if (state.filters.isActive) OsFocusable(id = SEARCH_BROWSE_ID, memory = memory, variant = FocusVariant.BUTTON, onSelect = { onBrowseFilters(state.filters) }) { _ ->
+                Text("Browse titles with these filters", style = Tokens.BodyLarge, color = Tokens.TextPrimary, maxLines = 1, modifier = Modifier.padding(horizontal = Spacing.S3, vertical = Spacing.S1))
+            }
+        }
+        if (state.filters.isActive && state.query.trim().length < SearchRanking.MIN_QUERY) Text(
+            "Filters narrow a search: type at least two letters, or choose \"Browse titles with these filters\" to list matching titles without typing" +
+                if (dropsCategoriesOrSubtitles(state.filters)) " (category and subtitle choices are not used there)." else ".",
+            style = Tokens.Body, color = Tokens.TextSecondary,
         )
         if (state.suggestions.isNotEmpty()) {
             Text(if (state.query.isBlank()) "Recent searches" else "Suggestions", style = Tokens.TitleMedium, color = Tokens.TextPrimary)

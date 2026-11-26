@@ -112,6 +112,7 @@ import io.github.ravindren_sm.openstream.data.SessionStatus
 import io.github.ravindren_sm.openstream.data.VodCatalog
 import io.github.ravindren_sm.openstream.data.VodKind
 import io.github.ravindren_sm.openstream.data.GamesSearch
+import io.github.ravindren_sm.openstream.data.fromFilters
 import androidx.lifecycle.compose.currentStateAsState
 import io.github.ravindren_sm.openstream.data.VodPlayback
 import io.github.ravindren_sm.openstream.data.SettingsStore
@@ -846,6 +847,12 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                     onPickSuggestion = { sug -> searchState.query = sug.text; searchState.submitTick++ },
                     onEnableIndex = { indexer.enable(); indexTick++ },
                     onFiltersChange = { searchState.filters = it },
+                    onBrowseFilters = { f ->
+                        // The filters become a saved search (named from them), which opens in the Saved tab; edit or delete it there.
+                        val made = io.github.ravindren_sm.openstream.data.SavedSearch.fromFilters(savedStore.newId(), f)
+                        savedList = savedStore.save(profileId, made); savedSelectedId = made.id
+                        stack = stack.enterTab(Route.SAVED).let { st -> memory.focusedId?.let(st::withPreviousFocus) ?: st }
+                    },
                     onSaveDefaultFilters = {
                         searchPrefs.edit().putString("default_filters", searchState.filters.encode()).apply()
                         searchState.defaultFilters = searchState.filters

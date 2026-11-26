@@ -84,3 +84,18 @@ private class FakePrefs : SharedPreferences {
     override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {}
     override fun unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {}
 }
+
+class SavedSearchFromFiltersTest {
+    @Test fun theSearchTabsFiltersBecomeASavedSearch() {
+        val f = SearchFilters(languages = setOf("English", "Swedish"), genres = setOf("Comedy", "Sci-Fi"), categoryIds = setOf("12"), minRating = 6.0, englishSubtitles = true)
+        val s = SavedSearch.fromFilters("id1", f)
+        assertEquals(setOf("Comedy", "Sci-Fi"), s.genres)
+        assertEquals(setOf("en", "sv"), s.languages)
+        assertEquals(6.0, s.minRating)
+        assertEquals(false, s.allGenres)
+        assertTrue(s.name.isNotBlank())
+        assertTrue(dropsCategoriesOrSubtitles(f))
+        assertEquals(false, dropsCategoriesOrSubtitles(SearchFilters(genres = setOf("Comedy"))))
+        assertEquals(null, SavedLanguages.codeOf("Klingon"))
+    }
+}
