@@ -1,6 +1,6 @@
 # OpenStream prototype: intake review (2026-11-21)
 
-Source: https://github.com/ravindren-sm/OpenStream (public since 2026-11-21), commit `01bcc7990f67`
+Source: https://github.com/ravindren-sm/Cindercast (public since 2026-11-21), commit `01bcc7990f67`
 (2026-11-21). Read-only review of a tarball unpacked in an isolated scratch folder; nothing from
 the repo was installed, built or run. The scratch copy was deleted afterwards.
 

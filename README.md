@@ -1,6 +1,6 @@
 # Cindercast
 
-[![CI](https://github.com/ravindren-sm/OpenStream/actions/workflows/ci.yml/badge.svg)](https://github.com/ravindren-sm/OpenStream/actions/workflows/ci.yml)
+[![CI](https://github.com/ravindren-sm/Cindercast/actions/workflows/ci.yml/badge.svg)](https://github.com/ravindren-sm/Cindercast/actions/workflows/ci.yml)
 
 A free, open-source IPTV player for **Amazon Fire TV** (and other Android TV devices) that connects to your own
 **Stalker / Ministra (MAG) portal** subscription. It covers live TV and on-demand movies and shows, built for the remote:

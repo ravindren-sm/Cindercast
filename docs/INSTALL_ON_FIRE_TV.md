@@ -97,5 +97,5 @@ by hand, once:
 - Plain-HTTP portals are common. The app allows them and warns on the setup screen; HTTPS certificates are always checked.
 - Nothing is sent anywhere except to your portal and, only if you add a key in Settings, title names to themoviedb.org.
   See [PRIVACY.md](PRIVACY.md).
-- Found a bug? Open an issue at <https://github.com/ravindren-sm/OpenStream/issues> and say what you pressed. Never include
+- Found a bug? Open an issue at <https://github.com/ravindren-sm/Cindercast/issues> and say what you pressed. Never include
   your portal address, MAC address or any logs that show them.
