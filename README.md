@@ -61,6 +61,9 @@ The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
 Most providers allow **one connection per MAC address**: close any other app using the same subscription first.
 
+**Just want to install the app?** Use the ready-made APK and the step-by-step guide in
+[docs/INSTALL_ON_FIRE_TV.md](docs/INSTALL_ON_FIRE_TV.md) (Downloader or ADB). **Want to help?** See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Testing on the device
 
 The app is tested on a real Fire TV by driving the remote over ADB and reading where focus lands after every key
