@@ -1018,7 +1018,9 @@ fun AppShell(store: SettingsStore, session: PortalSession, onExit: () -> Unit) {
                 delay(200)
             }
         }
-        memory.tryFocusFirst(stack.restoreFocusId, browseFocus, initialFocusId(stack.current.route), if (onHome) recentFocusId(0) else null, if (onHome) homeFavChannelFocusId(0) else null, if (onHome) doorFocusId(0) else null,
+        memory.tryFocusFirst(stack.restoreFocusId, browseFocus,
+            if (stack.current.route == Route.SAVED && savedList.isNotEmpty()) io.github.ravindren_sm.openstream.ui.screens.savedRailFocusId(savedList.indexOfFirst { it.id == savedSelectedId }.coerceAtLeast(0)) else null,
+            initialFocusId(stack.current.route), if (onHome) recentFocusId(0) else null, if (onHome) homeFavChannelFocusId(0) else null, if (onHome) doorFocusId(0) else null,
             *(if (stack.current.route == Route.FAVORITES) FAVORITES_INITIAL_IDS else emptyArray()), if (stack.current.route == Route.TV_GUIDE) GUIDE_GROUP_ID else null, if (stack.current.route == Route.SAVED) io.github.ravindren_sm.openstream.ui.screens.SAVED_NEW_ID else null, topTab?.let(::tabFocusId))
     }
 }

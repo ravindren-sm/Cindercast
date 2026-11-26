@@ -170,7 +170,8 @@ fun SearchScreen(
         }
         OsTextField(
             id = SEARCH_INPUT_ID, memory = memory, value = state.query, onValueChange = { state.query = it }, upId = upTarget,
-            label = "Search", hint = "Movies, shows and channels. Back closes the keyboard; then Down reaches the results.", imeAction = ImeAction.Done,
+            label = "Search", hint = "Movies, shows and channels. Back closes the keyboard; then Down reaches the Search button and the results.", imeAction = ImeAction.Done,
+            downId = SEARCH_GO_ID,
             onDone = { state.submitTick++ },
         )
         // A visible way to run the search (the keyboard's Done key and typing also run it), and a way to use the filters on their
