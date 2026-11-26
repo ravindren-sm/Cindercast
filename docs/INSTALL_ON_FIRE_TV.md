@@ -57,6 +57,20 @@ On a Mac or Linux: `shasum -a 256 OpenStream-0.1.1.apk`. On Windows (PowerShell)
 4. Optional, Settings: build the **title index** (a few minutes to an hour, only while the app is open) for instant search,
    sorting and saved searches; add profiles and a household PIN.
 
+## Coming from StbEmu, TiviMate or another IPTV app
+
+OpenStream cannot read another app's settings, and it never stops, changes or removes another app. You move the two values over
+by hand, once:
+
+1. In the old app (StbEmu, TiviMate or similar), open its profile or portal settings and write down the **portal address**
+   (also called server or portal URL) and the **MAC address** it uses (in StbEmu it is the STB MAC). Labels differ by version.
+2. In OpenStream's setup screen (or Settings > Portal > Change portal) type the same two values. Your provider recognises the
+   MAC, so reusing it is what makes the subscription work.
+3. **Stop the old app yourself before you connect.** Most providers allow one connection per MAC, and an app that is closed
+   with Back often keeps running in the background. On the Fire TV: Settings > Applications > Manage installed applications >
+   (the old app) > **Force stop**. Do this each time you switch between the two, or the provider may refuse one of them.
+4. You can keep the old app installed as a fallback, but only run one of them at a time.
+
 ## The remote
 
 | Key | Does |
